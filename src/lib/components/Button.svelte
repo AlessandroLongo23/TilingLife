@@ -1,9 +1,9 @@
 <script>
-    let {content} = $props();
+    let {content, func} = $props();
 </script>
 
 <div>
-    <button class="bg-red-500 p-4 rounded-lg hover:bg-green-500 transition-color duration-200 text-xl">
+    <button onclick={func} class="bg-blue-500 hover:bg-blue-700 text-white py-1 px-4 rounded mt-4">
         {content}
     </button>
 </div>
