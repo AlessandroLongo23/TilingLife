@@ -1,7 +1,8 @@
 <script>
-    import Button from "../lib/components/Button.svelte";
-    import { Grid } from "../lib/utils.svelte.js";
-    import { birth, survive } from "../lib/stores.svelte.js";
+    import { birth, survive } from "$lib/stores.svelte.js";
+    import { Grid } from "$lib/utils.svelte.js";
+    
+    import Button from "$lib/components/Button.svelte";
 
     let isPlaying = $state(true);
     let shape = $state('square');
@@ -40,4 +41,6 @@
         <Button content="Next" func={() => grid.update($birth, $survive)}/>
         <Button content={shape} func={() => shape = shape === 'square' ? 'circle' : 'square'}/>
     </div>
+
+    <a href="/tilings">Tilings</a>
 </div>
