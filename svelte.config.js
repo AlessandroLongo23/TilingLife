@@ -1,13 +1,9 @@
 import adapter from '@sveltejs/adapter-vercel';
 
-export default {
-  kit: {
-    adapter: adapter({
-      runtime: 'nodejs20.x'
-    }),
-    trailingSlash: 'never',
-    paths: {
-      base: ''
-    }
-  }
+const config = {
+	kit: {
+		adapter: adapter()
+	}
 };
+
+export default config;
