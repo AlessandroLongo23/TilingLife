@@ -29,14 +29,12 @@
     let tolerance = $state(0.01);
     let frameMod = $derived(Math.max(1, Math.floor(60 / speed)));
 
-    let oldWidth = $state(width);   
-    let oldHeight = $state(height);
-    let oldRule = $state(rule);
-    let oldTiling = $state(tiling);
-    let oldTransformSteps = $state(transformSteps);
-    let oldSide = $state(side);
-
-    // Update frameMod when speed changes
+    let prevWidth = $state(width);   
+    let prevHeight = $state(height);
+    let prevTiling = $state(tiling);
+    let prevTransformSteps = $state(transformSteps);
+    let prevSide = $state(side);
+    let prevRule = $state(rule);
 
     let graph = $state({
         nodes: [],
@@ -51,6 +49,9 @@
                 this.n = n;
                 this.angle = angle;
                 this.neighbors = [];
+                this.state = false;
+                this.nextState = false;
+
                 this.calculateCentroid();
                 this.calculateVertices();
                 this.calculateHalfways();
@@ -86,7 +87,7 @@
             showGameOfLife = () => {
                 p5.push();
                 p5.stroke(0, 0, 0);
-                if (this.alive) {
+                if (this.state) {
                     p5.fill(0, 0, 0);
                 } else {
                     p5.fill(0, 0, 100);
@@ -106,10 +107,10 @@
                     y: this.pos.y
                 };
 
-                if (Math.abs(this.centroid.x) < 0.001) {
+                if (Math.abs(this.centroid.x) < tolerance) {
                     this.centroid.x = 0;
                 }
-                if (Math.abs(this.centroid.y) < 0.001) {
+                if (Math.abs(this.centroid.y) < tolerance) {
                     this.centroid.y = 0;
                 }
             }
@@ -123,10 +124,10 @@
                         y: this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle)
                     });
 
-                    if (Math.abs(this.vertices[i].x) < 0.001) {
+                    if (Math.abs(this.vertices[i].x) < tolerance) {
                         this.vertices[i].x = 0;
                     }
-                    if (Math.abs(this.vertices[i].y) < 0.001) {
+                    if (Math.abs(this.vertices[i].y) < tolerance) {
                         this.vertices[i].y = 0;
                     }
                 }
@@ -140,10 +141,10 @@
                         y: (this.vertices[i].y + this.vertices[(i + 1) % this.n].y) / 2
                     });
 
-                    if (Math.abs(this.halfways[i].x) < 0.001) {
+                    if (Math.abs(this.halfways[i].x) < tolerance) {
                         this.halfways[i].x = 0;
                     }
-                    if (Math.abs(this.halfways[i].y) < 0.001) {
+                    if (Math.abs(this.halfways[i].y) < tolerance) {
                         this.halfways[i].y = 0;
                     }
                 }
@@ -155,10 +156,6 @@
             p5.colorMode(p5.HSB, 360, 100, 100);
 
             try {
-                [birth, survival] = rule.split('/');
-                birth = birth.slice(1).split('').map(Number);
-                survival = survival.slice(1).split('').map(Number);
-
                 let [shapeSeed, groups, transforms] = p5.parseTiling(tiling);
                 p5.createGraphTiling(shapeSeed, groups, transforms);
                 p5.setupGameOfLife();
@@ -166,10 +163,9 @@
                 console.log(e);
             }
 
-            oldRule = rule;
-            oldTiling = tiling;
-            oldTransformSteps = transformSteps;
-            oldSide = side;
+            prevTiling = tiling;
+            prevTransformSteps = transformSteps;
+            prevSide = side;
         }
 
         p5.draw = () => {
@@ -179,9 +175,14 @@
             p5.background(255);
             try {
                 if (showGameOfLife) {
+                    if (prevRule != rule) {
+                        p5.setupGameOfLife();
+                    }
+
                     if (p5.frameCount % frameMod == 0) {
                         p5.updateGameOfLife();
                     }
+                    
                     p5.drawGameOfLife();
                 } else {
                     if (showInfo) {
@@ -196,11 +197,7 @@
             p5.noStroke();
  
             try {
-                if (oldRule != rule || oldTiling != tiling || oldTransformSteps != transformSteps || oldSide != side) {
-                    [birth, survival] = rule.split('/');
-                    birth = birth.slice(1).split('').map(Number);
-                    survival = survival.slice(1).split('').map(Number);
-                    
+                if (prevTiling != tiling || prevTransformSteps != transformSteps || prevSide != side) {
                     let [shapeSeed, groups, transforms] = p5.parseTiling(tiling);
                     p5.createGraphTiling(shapeSeed, groups, transforms);
                     p5.setupGameOfLife();
@@ -209,12 +206,12 @@
                 console.log(e);
             }
 
-            oldWidth = width;
-            oldHeight = height;
-            oldRule = rule;
-            oldTiling = tiling;
-            oldTransformSteps = transformSteps;
-            oldSide = side;
+            prevWidth = width;
+            prevHeight = height;
+            prevTiling = tiling;
+            prevTransformSteps = transformSteps;
+            prevSide = side;
+            prevRule = rule;
         }
 
         p5.sortPointsByAngleAndDistance = (points) => {
@@ -896,24 +893,32 @@
         }
 
         p5.setupGameOfLife = () => {
+            [birth, survival] = rule.split('/');
+            birth = birth.slice(1).split('').map(Number);
+            survival = survival.slice(1).split('').map(Number);
+
             for (let i = 0; i < graph.nodes.length; i++) {
-                graph.nodes[i].alive = Math.random() < 0.5;
+                graph.nodes[i].state = Math.random() < 0.5;
             }
         }
 
         p5.updateGameOfLife = () => {
             for (let i = 0; i < graph.nodes.length; i++) {
-                let aliveNeighbors = graph.nodes[i].neighbors.filter(neighbor => neighbor.alive).length;
+                let aliveNeighbors = graph.nodes[i].neighbors.filter(neighbor => neighbor.state).length;
                 
-                if (graph.nodes[i].alive) {
+                if (graph.nodes[i].state) {
                     if (!survival.includes(aliveNeighbors)) {
-                        graph.nodes[i].alive = false;
+                        graph.nodes[i].nextState = false;
                     }
                 } else {
                     if (birth.includes(aliveNeighbors)) {
-                        graph.nodes[i].alive = true;
+                        graph.nodes[i].nextState = true;
                     }
                 }
+            }
+
+            for (let i = 0; i < graph.nodes.length; i++) {
+                graph.nodes[i].state = graph.nodes[i].nextState;
             }
         }
 
@@ -972,10 +977,10 @@
         }
 
         p5.windowResized = () => {
-            if (oldWidth !== width || oldHeight !== height) {
+            if (prevWidth !== width || prevHeight !== height) {
                 p5.resizeCanvas(width, height);
-                oldWidth = width;
-                oldHeight = height;
+                prevWidth = width;
+                prevHeight = height;
             }
         }
 	};
