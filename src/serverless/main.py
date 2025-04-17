@@ -42,11 +42,13 @@ current_survive_rule = ti.field(dtype=ti.i8, shape=(9))
 class StartMetrics:
     average_population: float
     acivity: float
+    final_alive: float
 
 @dataclass
 class RuleMetrics:
     average_population: float
     activity: float
+    final_alive: float
 
     @staticmethod
     def from_starts(starts: List[StartMetrics]):
@@ -63,10 +65,17 @@ class RuleMetrics:
             activity += start.acivity
         activity /= len(starts)
 
+        # Calculate the final alive count across all starts
+        final_alive = 0.0
+        for start in starts:
+            final_alive += start.final_alive
+        final_alive /= len(starts)
+
 
         return RuleMetrics(
             average_population=average_population,
-            activity=activity
+            activity=activity,
+            final_alive=final_alive
         )
 
 @dataclass
@@ -116,9 +125,14 @@ def summarize_metrics() -> StartMetrics:
     activity /= iterations
     activity /= (n * n)
 
+    # Final alive count
+    final_alive = alive_count[None]
+    final_alive /= (n * n)
+
     return StartMetrics(
         average_population=average_population,
-        acivity=activity
+        acivity=activity,
+        final_alive=final_alive
     )
 
 @ti.func
