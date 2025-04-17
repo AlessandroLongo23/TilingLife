@@ -1,11 +1,13 @@
 import taichi as ti
 import numpy as np
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 from dataclasses import dataclass
 from typing import List
 import time
 import argparse
 import logging
+from itertools import combinations
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,7 @@ ti.init(arch=ti.gpu, default_fp=ti.f32, default_ip=ti.i32, kernel_profiler=True,
 n = 256
 alive_p = 0.15
 iterations = 1000
-random_starts = 100
+random_starts = 5
 
 current = ti.field(dtype=ti.i32, shape=(n, n))
 next = ti.field(dtype=ti.i32, shape=(n, n))
@@ -202,27 +204,58 @@ def set_rule_from_i(i):
             current_survive_rule[j] = 1
         else:
             current_survive_rule[j] = 0
+
+def compute_rule_indices(birth_str: str, survive_str: str) -> List[int]:
+    # 1) Parse into integer neighbor‐counts
+    birth_vals   = [int(ch) for ch in birth_str]
+    survive_vals = [int(ch) for ch in survive_str]
+
+    # 2) Generate all subsets of a list
+    def all_subsets(vals):
+        for r in range(len(vals) + 1):
+            for combo in combinations(vals, r):
+                yield combo
+
+    # 3) Build the 18-bit indices
+    indices = []
+    for b_subset in all_subsets(birth_vals):
+        for s_subset in all_subsets(survive_vals):
+            # bits 0–8 for birth, bits 9–17 for survive
+            birth_mask   = sum(1 << b       for b in b_subset)
+            survive_mask = sum(1 << (s + 9) for s in s_subset)
+            indices.append(birth_mask | survive_mask)
+
+    return indices
     
 
-def main():
+def main(args):
+    birth = args.birth
+    survive = args.survive
 
-    for i in tqdm(range(2**18)):
-        set_rule_from_i(i)
-        rule_metrics = test_rule()
+    rules = compute_rule_indices(birth, survive)
+    logger.debug(f"Found {len(rules)} rules")
 
-    logger.info("Final Rule Metrics:")
-    logger.info(f"Average population: {rule_metrics.average_population:.4f}")
-    logger.info(f"Activity: {rule_metrics.activity:.4f}")
+    with logging_redirect_tqdm():
+        for i in tqdm(rules):
+            set_rule_from_i(i)
+            rule_metrics = test_rule()
+
+            logger.info("Final Rule Metrics:")
+            logger.info(f"Average population: {rule_metrics.average_population:.4f}")
+            logger.info(f"Activity: {rule_metrics.activity:.4f}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Game of Life Simulation")
     parser.add_argument('--gui', action='store_true', help="Show GUI")
-    parser.add_argument('--iterations', type=int, default=1000, help="Number of iterations")
-    parser.add_argument('--random_starts', type=int, default=100, help="Number of random starts")
-    parser.add_argument('--alive_p', type=float, default=0.15, help="Probability of a cell being alive")
+    parser.add_argument('--iterations', type=int, default=iterations, help="Number of iterations")
+    parser.add_argument('--random_starts', type=int, default=random_starts, help="Number of random starts")
+    parser.add_argument('--alive_p', type=float, default=alive_p, help="Probability of a cell being alive")
     # Get logging level
     parser.add_argument('--log_level', type=str, default='INFO', help="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
+
+    parser.add_argument('--birth', type=str, default="012345678", help="Birth values")
+    parser.add_argument('--survive', type=str, default="012345678", help="Survive values")
 
     args = parser.parse_args()
     logger.info(f"Arguments: {args}")
@@ -234,4 +267,4 @@ if __name__ == "__main__":
     level = getattr(logging, args.log_level.upper(), None)
     logging.basicConfig(level=level, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    main()
+    main(args)
