@@ -4,6 +4,10 @@ from tqdm import tqdm
 from dataclasses import dataclass
 from typing import List
 import time
+import argparse
+import logging
+
+logger = logging.getLogger(__name__)
 
 show_gui = False
 
@@ -12,7 +16,7 @@ ti.init(arch=ti.gpu, default_fp=ti.f32, default_ip=ti.i32, kernel_profiler=True,
 n = 256
 alive_p = 0.15
 iterations = 1000
-random_starts = 5
+random_starts = 100
 
 current = ti.field(dtype=ti.i32, shape=(n, n))
 next = ti.field(dtype=ti.i32, shape=(n, n))
@@ -175,7 +179,6 @@ def test_rule() -> RuleMetrics:
     for i in range(random_starts):
         metrics = test_start()
         metrics_list.append(metrics)
-        print(metrics)
     
     return RuleMetrics.from_starts(metrics_list)
 
@@ -202,15 +205,33 @@ def set_rule_from_i(i):
     
 
 def main():
-    set_rule_from_i(6152)
 
-    rule_metrics = test_rule()
+    for i in tqdm(range(2**18)):
+        set_rule_from_i(i)
+        rule_metrics = test_rule()
 
-    print("Final Rule Metrics:")
-    print(f"Average population: {rule_metrics.average_population:.4f}")
-    print(f"Activity: {rule_metrics.activity:.4f}")
-
+    logger.info("Final Rule Metrics:")
+    logger.info(f"Average population: {rule_metrics.average_population:.4f}")
+    logger.info(f"Activity: {rule_metrics.activity:.4f}")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Game of Life Simulation")
+    parser.add_argument('--gui', action='store_true', help="Show GUI")
+    parser.add_argument('--iterations', type=int, default=1000, help="Number of iterations")
+    parser.add_argument('--random_starts', type=int, default=100, help="Number of random starts")
+    parser.add_argument('--alive_p', type=float, default=0.15, help="Probability of a cell being alive")
+    # Get logging level
+    parser.add_argument('--log_level', type=str, default='INFO', help="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
+
+    args = parser.parse_args()
+    logger.info(f"Arguments: {args}")
+    show_gui = args.gui
+    iterations = args.iterations
+    random_starts = args.random_starts
+    alive_p = args.alive_p
+
+    level = getattr(logging, args.log_level.upper(), None)
+    logging.basicConfig(level=level, format='%(asctime)s - %(levelname)s - %(message)s')
+
     main()
