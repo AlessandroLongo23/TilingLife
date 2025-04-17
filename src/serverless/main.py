@@ -2,12 +2,13 @@ import taichi as ti
 import numpy as np
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import List
 import time
 import argparse
 import logging
 from itertools import combinations
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,12 @@ class RuleMetrics:
             average_population=average_population,
             activity=activity
         )
+
+@dataclass
+class ResultRow:
+    rule_index: int
+    rule_format: str
+    rule_metrics: RuleMetrics
 
 
 @ti.kernel
@@ -205,6 +212,11 @@ def set_rule_from_i(i):
         else:
             current_survive_rule[j] = 0
 
+def rule_index_to_string(i: int) -> str:
+    birth = ''.join(str(n) for n in range(9) if (i >> n) & 1)
+    survive = ''.join(str(n) for n in range(9) if (i >> (n + 9)) & 1)
+    return f"B{birth}/S{survive}"
+
 def compute_rule_indices(birth_str: str, survive_str: str) -> List[int]:
     # 1) Parse into integer neighbor‐counts
     birth_vals   = [int(ch) for ch in birth_str]
@@ -235,14 +247,23 @@ def main(args):
     rules = compute_rule_indices(birth, survive)
     logger.debug(f"Found {len(rules)} rules")
 
+    results = []
+
     with logging_redirect_tqdm():
         for i in tqdm(rules):
             set_rule_from_i(i)
             rule_metrics = test_rule()
 
-            logger.info("Final Rule Metrics:")
-            logger.info(f"Average population: {rule_metrics.average_population:.4f}")
-            logger.info(f"Activity: {rule_metrics.activity:.4f}")
+            result = ResultRow(
+                rule_index=i,
+                rule_format=rule_index_to_string(i),
+                rule_metrics=rule_metrics
+            )
+            results.append(result)
+    
+    with open(args.output, 'w') as f:
+        json.dump([asdict(r) for r in results], f, indent=2)
+
 
 
 if __name__ == "__main__":
@@ -256,6 +277,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--birth', type=str, default="012345678", help="Birth values")
     parser.add_argument('--survive', type=str, default="012345678", help="Survive values")
+
+    parser.add_argument('--output', type=str, help="Output file", required=True)
 
     args = parser.parse_args()
     logger.info(f"Arguments: {args}")
