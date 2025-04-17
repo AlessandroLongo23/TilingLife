@@ -178,14 +178,31 @@ def test_rule() -> RuleMetrics:
         print(metrics)
     
     return RuleMetrics.from_starts(metrics_list)
+
+def set_rule_from_i(i):
+    """
+    Set the birth and survival rules based on the index i
+
+    i: index from 0 to 2^18 - 1 (= 262143)
+
+    for Conway's Game of Life, the rule is 6152
+    
+    """
+    for j in range(9):
+        if (i >> j) & 1:
+            current_birth_rule[j] = 1
+        else:
+            current_birth_rule[j] = 0
+
+    for j in range(9):
+        if (i >> (j + 9)) & 1:
+            current_survive_rule[j] = 1
+        else:
+            current_survive_rule[j] = 0
     
 
 def main():
-    current_birth_rule.fill(0)
-    current_birth_rule[3] = 1
-    current_survive_rule.fill(0)
-    current_survive_rule[2] = 1
-    current_survive_rule[3] = 1
+    set_rule_from_i(6152)
 
     rule_metrics = test_rule()
 
