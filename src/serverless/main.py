@@ -12,9 +12,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-show_gui = False
-
-ti.init(arch=ti.gpu, default_fp=ti.f32, default_ip=ti.i32, kernel_profiler=True, random_seed=int(time.time()))
+ti.init(arch=ti.gpu, default_fp=ti.f32, default_ip=ti.i32, random_seed=int(time.time()))
 
 n = 256
 alive_p = 0.15
@@ -177,8 +175,6 @@ def compute_pixels():
             pixels[i, j] = 0.0
 
 
-gui = ti.GUI("Game of Life", (n, n))
-
 def test_start() -> StartMetrics:
     alive_count[None] = 0
     population_sum[None] = 0
@@ -187,11 +183,6 @@ def test_start() -> StartMetrics:
 
     init()
     for step in range(iterations):
-        if show_gui:
-            compute_pixels()
-            gui.set_image(pixels)
-            gui.show()
-
         update_swap()
     
     return summarize_metrics()
@@ -282,7 +273,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Game of Life Simulation")
-    parser.add_argument('--gui', action='store_true', help="Show GUI")
     parser.add_argument('--iterations', type=int, default=iterations, help="Number of iterations")
     parser.add_argument('--random_starts', type=int, default=random_starts, help="Number of random starts")
     parser.add_argument('--alive_p', type=float, default=alive_p, help="Probability of a cell being alive")
@@ -296,7 +286,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     logger.info(f"Arguments: {args}")
-    show_gui = args.gui
     iterations = args.iterations
     random_starts = args.random_starts
     alive_p = args.alive_p
