@@ -21,7 +21,6 @@ random_starts = 5
 
 current = ti.field(dtype=ti.i32, shape=(n, n))
 next = ti.field(dtype=ti.i32, shape=(n, n))
-pixels = ti.field(dtype=ti.f32, shape=(n, n))
 
 # Used for computing statistics
 alive_count = ti.field(dtype=ti.i32, shape=()) # Total number of alive cells in the current frame
@@ -165,14 +164,6 @@ def update_swap():
     # Swap buffers
     for i, j in current:
         current[i, j] = next[i, j]
-
-@ti.kernel
-def compute_pixels():
-    for i, j in pixels:
-        if current[i, j] == 1:
-            pixels[i, j] = 1.0
-        else:
-            pixels[i, j] = 0.0
 
 
 def test_start() -> StartMetrics:
