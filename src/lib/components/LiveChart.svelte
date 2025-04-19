@@ -19,6 +19,8 @@
         if (chart) {
             chart.data.datasets[0].data = [...chartData];
             chart.update('none');
+
+            chart.options.scales.y.max = Math.max(...chartData) * 2;
         }
     }
     
@@ -90,7 +92,7 @@
                                 padding: 8,
                                 maxTicksLimit: 5,
                                 callback: function(value) {
-                                    return value + '%';
+                                    return Math.round(value) + '%';
                                 }
                             },
                             grid: {
@@ -118,7 +120,7 @@
 <div class="chart-container w-full h-36 bg-zinc-800/60 backdrop-blur-sm rounded-lg overflow-hidden border border-zinc-700/50">
     <div class="px-4 py-2 text-xs font-medium text-white/80 flex justify-between items-center border-b border-zinc-700/50">
         <span>Live Population</span>
-        <span class="text-green-400 font-bold">{Math.round(alivePercentage)}%</span>
+        <span class="text-green-400 font-bold">{alivePercentage.toFixed(1)}%</span>
     </div>
     <div class="p-2 h-[calc(100%-32px)]">
         <canvas bind:this={chartElement}></canvas>

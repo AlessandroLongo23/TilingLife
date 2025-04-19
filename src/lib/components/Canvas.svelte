@@ -71,12 +71,19 @@
             constructor() {
                 this.nodes = [];
                 this.anchorNodes = [];
+                this.dual = false;
 
                 this.shapeSeed = [];
                 this.transforms = [];
             }
 
             parseRule = (tilingRule) => {
+                this.dual = false;
+                if (tilingRule[tilingRule.length - 1] === '*') {
+                    this.dual = true;
+                    tilingRule = tilingRule.slice(0, -1);
+                }
+
                 let phases = tilingRule.split('/');
                 this.shapeSeed = phases[0].split('-');
                 for (let i = 0; i < this.shapeSeed.length; i++) {
@@ -213,6 +220,10 @@
                 const transformEnd = performance.now();
                 if (debug) console.timeEnd("Applying transformations");
                 if (debug) console.log(`All transformations applied in ${transformEnd - transformStart}ms`);
+
+                if (this.dual) {
+                    this.computeDual();
+                }
 
                 this.calculateNeighbors();
 
@@ -475,6 +486,70 @@
                     
                     angle += alfa * Math.PI / 180;
                 }
+            }
+
+            computeDual = () => {
+                let vertices = this.nodes.map(node => node.vertices).flat();
+
+                let uniqueVertices = [];
+                for (let i = 0; i < vertices.length; i++) {
+                    let vertex = vertices[i];
+
+                    if (!uniqueVertices.some(v => p5.isWithinTolerance(v, vertex))) {
+                        uniqueVertices.push(vertex);
+                    }
+                }
+
+                let dualNodes = [];
+                for (let i = 0; i < uniqueVertices.length; i++) {
+                    let centroid = uniqueVertices[i];
+
+                    let vertices = [];
+                    for (let j = 0; j < this.nodes.length; j++) {
+                        let belongsToCentroid = false;
+                        for (let k = 0; k < this.nodes[j].vertices.length; k++) {
+                            if (p5.isWithinTolerance(this.nodes[j].vertices[k], centroid)) {
+                                belongsToCentroid = true;
+                                break;
+                            }
+                        }
+
+                        if (belongsToCentroid) {
+                            vertices.push(this.nodes[j].centroid);
+                        }
+                    }
+
+                    vertices.sort((a, b) => {
+                        let angleToCentroidA = Math.atan2(a.y - centroid.y, a.x - centroid.x);
+                        let angleToCentroidB = Math.atan2(b.y - centroid.y, b.x - centroid.x);
+
+                        if (angleToCentroidA < 0) angleToCentroidA += 2 * Math.PI;
+                        if (angleToCentroidB < 0) angleToCentroidB += 2 * Math.PI;
+
+                        return angleToCentroidA - angleToCentroidB;
+                    });
+
+                    let halfways = [];
+                    for (let j = 0; j < vertices.length; j++) {
+                        halfways.push({
+                            x: (vertices[j].x + vertices[(j + 1) % vertices.length].x) / 2,
+                            y: (vertices[j].y + vertices[(j + 1) % vertices.length].y) / 2
+                        });
+                    }
+
+                    let dualNode = new DualNode(
+                        {
+                            x: centroid.x,
+                            y: centroid.y
+                        },
+                        vertices,
+                        halfways
+                    );
+
+                    dualNodes.push(dualNode);
+                }
+
+                this.nodes = [...dualNodes];
             }
 
             calculateNeighbors = () => {
@@ -751,6 +826,7 @@
 
             showGameOfLife = () => {
                 p5.push();
+                p5.strokeWeight(1 / side);
                 p5.stroke(0, 0, 0);
                 if (this.state) {
                     p5.fill(0, 0, 0);
@@ -815,6 +891,43 @@
                         this.halfways[i].y = 0;
                     }
                 }
+            }
+        }
+
+        // svelte-ignore perf_avoid_nested_class
+        class DualNode extends Node {
+            constructor(centroid, vertices, halfways) {
+                super(centroid, 3, 0);
+                this.centroid = centroid;
+                this.vertices = vertices;
+                this.halfways = halfways;
+            }
+
+            show = (color = null) => {
+                p5.push();
+                p5.stroke(0, 0, 0);
+                p5.fill(color || p5.map(this.vertices.length, 3, 12, 0, 300), 40, 100, 0.80);
+                p5.beginShape();
+                for (let i = 0; i < this.vertices.length; i++) {
+                    p5.vertex(this.vertices[i].x, this.vertices[i].y);
+                }
+                p5.endShape(p5.CLOSE);
+                
+                if (showConstructionPoints) {
+                    p5.fill(0, 100, 100);
+                    p5.ellipse(this.centroid.x, this.centroid.y, 5 / side);
+                    
+                    p5.fill(120, 100, 100);
+                    for (let i = 0; i < this.halfways.length; i++) {
+                        p5.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / side);
+                    }
+                    
+                    p5.fill(240, 100, 100);
+                    for (let i = 0; i < this.vertices.length; i++) {
+                        p5.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / side);
+                    }
+                }
+                p5.pop();
             }
         }
 
@@ -1462,7 +1575,6 @@
     });
 </script>
 
-<!-- Pass in specific dimensions using inline style to ensure immediate update -->
 <div class="relative h-full w-full">
     <div bind:this={canvasContainer}></div>
     
