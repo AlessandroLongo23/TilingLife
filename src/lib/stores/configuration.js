@@ -9,6 +9,7 @@ export let golRules = writable({
   12: 'B3/S23'
 });
 export let tilingRule = writable('3/m30/r(h1)');
+export let isDual = writable(false);
 export let transformSteps = writable(0);
 export let side = writable(50);
 export let showConstructionPoints = writable(false);

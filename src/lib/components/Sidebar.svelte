@@ -1,5 +1,5 @@
 <script>
-	import { golRule, golRules, tilingRule, transformSteps, side, showConstructionPoints, showInfo, speed, ruleType } from '$lib/stores/configuration';
+	import { golRule, golRules, tilingRule, transformSteps, side, showConstructionPoints, showInfo, speed, ruleType, isDual } from '$lib/stores/configuration';
 	import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-svelte';
 	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
 	import { tilingRules } from '$lib/stores/tilingRules.js';
@@ -79,7 +79,7 @@
 	}
 </script>
 
-<div id="sidebar" class="h-full fixed left-0 top-0 transition-all duration-300 flex flex-col shadow-2xl" class:w-80={isSidebarOpen} class:w-12={!isSidebarOpen} bind:this={sidebarElement}>
+<div id="sidebar" class="h-full fixed left-0 top-0 transition-all duration-300 flex flex-col shadow-2xl {isSidebarOpen ? 'w-96' : 'w-12'}" bind:this={sidebarElement}>
 	<div class="bg-zinc-800/90 backdrop-blur-sm text-white h-full overflow-hidden flex flex-col border-r border-zinc-700/50">
 		<div class="p-3 flex items-center justify-between border-b border-zinc-700/50 flex-shrink-0 bg-zinc-900/30">
 			{#if isSidebarOpen}
@@ -106,12 +106,21 @@
 						<!-- Fixed options section -->
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
 							<div class="flex flex-col gap-3">
-								<Input 
-									id="tilingRule"
-									label="Tiling Rule"
-									bind:value={$tilingRule}
-									placeholder="4/m90/r(h1)"
-								/>
+								<div class="flex flex-row gap-3">
+									<Input 
+										id="tilingRule"
+										label="Tiling Rule"
+										bind:value={$tilingRule}
+										placeholder="4/m90/r(h1)"
+									/>
+
+									<!-- <Checkbox 
+										id="isDual"
+										label="Dual"
+										position="top"
+										bind:checked={$isDual}
+									/> -->
+								</div>	
 
 								<div class="flex flex-row gap-3">
 									<Input
@@ -135,12 +144,14 @@
 									<Checkbox 
 										id="showConstructionPoints"
 										label="Show Construction Points"
+										position="right"
 										bind:checked={$showConstructionPoints}
 									/>
 									
 									<Checkbox 
 										id="showInfo"
 										label="Show Info"
+										position="right"
 										bind:checked={$showInfo}
 									/>
 								</div>
@@ -169,11 +180,19 @@
 											{#if expandedGroups[tilingPatternGroup.title]}
 												<div class="pl-1 space-y-1" transition:slide={{ duration: 200 }}>
 													{#each tilingPatternGroup.rules as tilingPattern}
-														<RuleCard 
-															title={tilingPattern}
-															value={tilingPattern}
-															onClick={loadTiling}
-														/>
+														<div class="flex flex-row gap-2">
+															<RuleCard 
+																title={tilingPattern}
+																value={tilingPattern}
+																onClick={loadTiling}
+															/>
+
+															<RuleCard 
+																title={tilingPattern.concat('*')}
+																value={tilingPattern.concat('*')}
+																onClick={loadTiling}
+															/>
+														</div>
 													{/each}
 												</div>
 											{/if}

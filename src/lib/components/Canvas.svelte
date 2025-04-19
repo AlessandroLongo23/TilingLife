@@ -18,12 +18,13 @@
         width = 600,
         height = 600,
         tilingRule,
+        isDual,
         transformSteps,
         side,
         showConstructionPoints,
         showGameOfLife,
         showInfo,
-        speed
+        speed,
     } = $props();
 
 
@@ -42,6 +43,7 @@
     let prevHeight = $state(height);
     let prevTilingRule = $state(tilingRule);
     let prevTransformSteps = $state(transformSteps);
+    // let prevIsDual = $state(isDual);
 
     let prevRuleType = $state($ruleType);
     let prevGolRule = $state($golRule);
@@ -797,10 +799,10 @@
                 this.calculateHalfways();
             }
 
-            show = (color = null) => {
+            show = (customColor = null) => {
                 p5.push();
                 p5.stroke(0, 0, 0);
-                p5.fill(color || p5.map(this.n, 3, 12, 0, 300), 40, 100, 0.80);
+                p5.fill(customColor || p5.map(this.vertices.length, 3, 12, 0, 300), 40, 100, 0.80);
                 p5.beginShape();
                 for (let i = 0; i < this.vertices.length; i++) {
                     p5.vertex(this.vertices[i].x, this.vertices[i].y);
@@ -892,6 +894,46 @@
                     }
                 }
             }
+
+            calculateAnglesHash() {
+                // Calculate internal angles
+                let angles = [];
+                for (let i = 0; i < this.vertices.length; i++) {
+                    const prev = (i === 0) ? this.vertices.length - 1 : i - 1;
+                    const curr = i;
+                    const next = (i === this.vertices.length - 1) ? 0 : i + 1;
+                    
+                    // Get vectors for the two sides
+                    const v1 = {
+                        x: this.vertices[prev].x - this.vertices[curr].x,
+                        y: this.vertices[prev].y - this.vertices[curr].y
+                    };
+                    const v2 = {
+                        x: this.vertices[next].x - this.vertices[curr].x,
+                        y: this.vertices[next].y - this.vertices[curr].y
+                    };
+                    
+                    // Calculate magnitudes
+                    const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+                    const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+                    
+                    // Calculate dot product
+                    const dot = v1.x * v2.x + v1.y * v2.y;
+                    
+                    // Calculate angle in radians and convert to degrees
+                    const angle = Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2)))) * 180 / Math.PI;
+                    angles.push(angle);
+                }
+
+                // Create hash from angles - simple sum then modulo
+                let hash = 0;
+                for (let i = 0; i < angles.length; i++) {
+                    hash += angles[i] * (i + 1); // Weight by position to differentiate shapes
+                }
+                
+                // Return a value between 0 and 300 for hue
+                return hash % 300;
+            }
         }
 
         // svelte-ignore perf_avoid_nested_class
@@ -903,10 +945,11 @@
                 this.halfways = halfways;
             }
 
-            show = (color = null) => {
+            show = (customColor = null) => {
                 p5.push();
                 p5.stroke(0, 0, 0);
-                p5.fill(color || p5.map(this.vertices.length, 3, 12, 0, 300), 40, 100, 0.80);
+                const hue = customColor !== null ? customColor : this.calculateAnglesHash();
+                p5.fill(hue, 40, 100, 0.80);
                 p5.beginShape();
                 for (let i = 0; i < this.vertices.length; i++) {
                     p5.vertex(this.vertices[i].x, this.vertices[i].y);
@@ -929,6 +972,72 @@
                 }
                 p5.pop();
             }
+
+            // Override the calculateAnglesHash method with rotation-invariant version
+            calculateAnglesHash() {
+                // Calculate internal angles
+                let angles = [];
+                for (let i = 0; i < this.vertices.length; i++) {
+                    const prev = (i === 0) ? this.vertices.length - 1 : i - 1;
+                    const curr = i;
+                    const next = (i === this.vertices.length - 1) ? 0 : i + 1;
+                    
+                    // Get vectors for the two sides
+                    const v1 = {
+                        x: this.vertices[prev].x - this.vertices[curr].x,
+                        y: this.vertices[prev].y - this.vertices[curr].y
+                    };
+                    const v2 = {
+                        x: this.vertices[next].x - this.vertices[curr].x,
+                        y: this.vertices[next].y - this.vertices[curr].y
+                    };
+                    
+                    // Calculate magnitudes
+                    const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+                    const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+                    
+                    // Calculate dot product
+                    const dot = v1.x * v2.x + v1.y * v2.y;
+                    
+                    // Calculate angle in radians and convert to degrees
+                    const angle = Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2)))) * 180 / Math.PI;
+                    angles.push(Math.round(angle)); // Round to reduce floating point errors
+                }
+
+                // Find the canonical representation (lexicographically minimal rotation)
+                let minRotation = [...angles]; 
+                let canonicalAngles = [...angles];
+                
+                // Try all rotations and find the lexicographically smallest
+                for (let i = 1; i < angles.length; i++) {
+                    const rotation = [...angles.slice(i), ...angles.slice(0, i)];
+                    
+                    // Compare this rotation with our current minimum
+                    let isSmaller = false;
+                    for (let j = 0; j < angles.length; j++) {
+                        if (rotation[j] < minRotation[j]) {
+                            isSmaller = true;
+                            break;
+                        } else if (rotation[j] > minRotation[j]) {
+                            break;
+                        }
+                    }
+                    
+                    if (isSmaller) {
+                        minRotation = rotation;
+                        canonicalAngles = rotation;
+                    }
+                }
+                
+                // Create hash from canonical angle sequence
+                let hash = 0;
+                for (let i = 0; i < canonicalAngles.length; i++) {
+                    hash = (hash * 31 + canonicalAngles[i]) % (300 * Math.sqrt(2));
+                }
+                
+                // Scale to 0-300 for hue
+                return hash % 300;
+            }
         }
 
         p5.setup = () => {
@@ -947,6 +1056,7 @@
             }
 
             prevTilingRule = tilingRule;
+            // prevIsDual = isDual;
             prevTransformSteps = transformSteps;
         }
 
@@ -1010,12 +1120,17 @@
             p5.noStroke();
  
             try {
-                if (prevTilingRule != tilingRule || prevTransformSteps != transformSteps) {
+                if (
+                    prevTilingRule != tilingRule || 
+                    // prevIsDual != isDual || 
+                    prevTransformSteps != transformSteps
+                ) {
                     tiling.parseRule(tilingRule);
                     tiling.createGraph();
                     tiling.setupGameOfLife();
                     
                     prevTilingRule = tilingRule;
+                    // prevIsDual = isDual;
                     prevTransformSteps = transformSteps;
                 }
             } catch (e) {
@@ -1431,24 +1546,27 @@
         p5.takeScreenshot = () => {
             const filename = `${tilingRule}.png`;
             
+            const screenshotCanvas = p5.createGraphics(600, 600);
+            
             screenshotCanvas.colorMode(p5.HSB, 360, 100, 100);
             
             screenshotCanvas.push();
             screenshotCanvas.translate(0, 600);
             screenshotCanvas.scale(1, -1);
             
-            screenshotCanvas.background(255);
+            screenshotCanvas.background(240, 7, 16);
             
             screenshotCanvas.translate(300, 300);
             
             screenshotCanvas.stroke(0);
-            screenshotCanvas.strokeWeight(2);
+            screenshotCanvas.strokeWeight(2 / side);
             
             screenshotCanvas.scale(side);
             
             for (let i = 0; i < tiling.nodes.length; i++) {
                 screenshotCanvas.push();
-                screenshotCanvas.fill(p5.map(tiling.nodes[i].n, 3, 12, 0, 300), 100, 100, 0.2);
+                const hue = tiling.nodes[i].calculateAnglesHash();
+                screenshotCanvas.fill(hue, 40, 100, 0.80);
                 screenshotCanvas.beginShape();
                 for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
                     screenshotCanvas.vertex(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y);
@@ -1513,15 +1631,15 @@
             
             if (showConstructionPoints) {
                 for (let i = 0; i < tiling.nodes.length; i++) {
-                    screenshotCanvas.fill(0, 100, 100);
+                    screenshotCanvas.fill(0, 40, 100);
                     screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5 / side);
                     
-                    screenshotCanvas.fill(120, 100, 100);
+                    screenshotCanvas.fill(120, 40, 100);
                     for (let j = 0; j < tiling.nodes[i].halfways.length; j++) {
                         screenshotCanvas.ellipse(tiling.nodes[i].halfways[j].x, tiling.nodes[i].halfways[j].y, 5 / side);
                     }
                     
-                    screenshotCanvas.fill(240, 100, 100);
+                    screenshotCanvas.fill(240, 40, 100);
                     for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
                         screenshotCanvas.ellipse(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y, 5 / side);
                     }

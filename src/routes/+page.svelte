@@ -1,5 +1,5 @@
 <script>
-    import { golRule, tilingRule, transformSteps, side, showConstructionPoints, showInfo, speed, activeTab } from '$lib/stores/configuration';
+    import { golRule, tilingRule, isDual, transformSteps, side, showConstructionPoints, showInfo, speed, activeTab } from '$lib/stores/configuration';
     import { onMount } from 'svelte';
 
     import Sidebar from '$lib/components/Sidebar.svelte';
@@ -73,6 +73,7 @@
             height={height} 
             golRule={$golRule} 
             tilingRule={$tilingRule} 
+            isDual={$isDual}
             transformSteps={$transformSteps} 
             side={$side} 
             showConstructionPoints={$showConstructionPoints} 
