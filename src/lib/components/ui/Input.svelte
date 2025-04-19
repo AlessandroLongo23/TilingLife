@@ -8,7 +8,8 @@
 		min, 
 		max, 
 		step, 
-		disabled = false 
+		disabled = false,
+		onChangeFunction = () => {}
 	} = $props();
 </script>
 
@@ -22,7 +23,10 @@
 		id={id}
 		type={type}
 		bind:value={value}
-		oninput={(e) => (value = type === "number" ? Number(e.target.value) : e.target.value)}
+		oninput={(e) => {
+			value = type === "number" ? Number(e.target.value) : e.target.value;
+			onChangeFunction(e);
+		}}
 		placeholder={placeholder}
 		min={min}
 		max={max}

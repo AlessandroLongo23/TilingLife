@@ -10,15 +10,16 @@
 	} = $props();
 </script>
 
-<div class="grid w-full gap-1.5">
+<div class="grid w-full gap-4">
 	{#if label}
-		<div class="flex justify-between items-center">
+		<div class="flex flex-row justify-between items-center">
 			<label for={id} class="text-sm font-medium leading-none text-zinc-900 dark:text-zinc-50">
 				{label}
 			</label>
-			<span class="text-xs text-zinc-500 dark:text-zinc-400">{value}</span>
+			<span class="text-xs text-zinc-500 dark:text-zinc-400">{value} iterations/s</span>
 		</div>
 	{/if}
+
 	<input 
 		id={id}
 		type="range"
