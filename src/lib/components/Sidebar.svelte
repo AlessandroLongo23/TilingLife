@@ -10,7 +10,6 @@
 	import ShapeIcon from '$lib/components/ShapeIcon.svelte';
 	import RuleCard from '$lib/components/RuleCard.svelte';
 	import Slider from '$lib/components/ui/Slider.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
@@ -73,10 +72,6 @@
     const loadTiling = (selectedTiling) => {
         $tilingRule = selectedTiling;
     }
-
-	const randomize = () => {
-		console.log('randomize');
-	}
 </script>
 
 <div id="sidebar" class="h-full fixed left-0 top-0 transition-all duration-300 flex flex-col shadow-2xl {isSidebarOpen ? 'w-96' : 'w-12'}" bind:this={sidebarElement}>
@@ -188,7 +183,7 @@
 															/>
 
 															<RuleCard 
-																title={tilingPattern.concat('*')}
+																title={'Dual of: ' + tilingPattern}
 																value={tilingPattern.concat('*')}
 																onClick={loadTiling}
 															/>

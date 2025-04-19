@@ -491,22 +491,22 @@
             }
 
             computeDual = () => {
-                let vertices = this.nodes.map(node => node.vertices).flat();
+                let originalVertices = this.nodes.map(node => node.vertices).flat();
 
-                let uniqueVertices = [];
-                for (let i = 0; i < vertices.length; i++) {
-                    let vertex = vertices[i];
+                let uniqueOriginalVertices = [];
+                for (let i = 0; i < originalVertices.length; i++) {
+                    let vertex = originalVertices[i];
 
-                    if (!uniqueVertices.some(v => p5.isWithinTolerance(v, vertex))) {
-                        uniqueVertices.push(vertex);
+                    if (!uniqueOriginalVertices.some(v => p5.isWithinTolerance(v, vertex))) {
+                        uniqueOriginalVertices.push(vertex);
                     }
                 }
 
                 let dualNodes = [];
-                for (let i = 0; i < uniqueVertices.length; i++) {
-                    let centroid = uniqueVertices[i];
+                for (let i = 0; i < uniqueOriginalVertices.length; i++) {
+                    let centroid = uniqueOriginalVertices[i];
 
-                    let vertices = [];
+                    let neighboringPolygons = [];
                     for (let j = 0; j < this.nodes.length; j++) {
                         let belongsToCentroid = false;
                         for (let k = 0; k < this.nodes[j].vertices.length; k++) {
@@ -517,9 +517,51 @@
                         }
 
                         if (belongsToCentroid) {
-                            vertices.push(this.nodes[j].centroid);
+                            neighboringPolygons.push(this.nodes[j]);
                         }
                     }
+
+                    if (neighboringPolygons.length < 3) {
+                        continue;
+                    }
+
+                    const angleBetween = (a, b, c) => {
+                        let v1 = {
+                            x: a.x - b.x,
+                            y: a.y - b.y
+                        };
+
+                        let v2 = {
+                            x: c.x - b.x,
+                            y: c.y - b.y
+                        };
+
+                        return (Math.atan2(v1.y, v1.x) - Math.atan2(v2.y, v2.x) + Math.PI) % Math.PI;
+                    }
+
+                    let neighboringHalfwayPoints = [];
+                    for (let i = 0; i < neighboringPolygons.length; i++) {
+                        for (let k = 0; k < neighboringPolygons[i].halfways.length; k++) {
+                            let angle = angleBetween(neighboringPolygons[i].centroid, neighboringPolygons[i].halfways[k], centroid);
+
+                            if (Math.abs(angle - Math.PI / 2) < tolerance || Math.abs(angle + Math.PI / 2) < tolerance) {
+                                neighboringHalfwayPoints.push(neighboringPolygons[i].halfways[k]);
+                            }
+                        }
+                    }
+
+                    let uniqueNeighboringHalfwayPoints = [];
+                    for (let i = 0; i < neighboringHalfwayPoints.length; i++) {
+                        if (!uniqueNeighboringHalfwayPoints.some(point => p5.isWithinTolerance(point, neighboringHalfwayPoints[i]))) {
+                            uniqueNeighboringHalfwayPoints.push(neighboringHalfwayPoints[i]);
+                        }
+                    }
+
+                    if (neighboringPolygons.length < uniqueNeighboringHalfwayPoints.length) {
+                        continue;
+                    }
+
+                    let vertices = neighboringPolygons.map(polygon => polygon.centroid);
 
                     vertices.sort((a, b) => {
                         let angleToCentroidA = Math.atan2(a.y - centroid.y, a.x - centroid.x);
@@ -797,12 +839,17 @@
                 this.calculateCentroid();
                 this.calculateVertices();
                 this.calculateHalfways();
+                this.calculateHue();
+            }
+
+            calculateHue = () => {
+                this.hue = p5.map(this.vertices.length, 3, 12, 0, 300);
             }
 
             show = (customColor = null) => {
                 p5.push();
                 p5.stroke(0, 0, 0);
-                p5.fill(customColor || p5.map(this.vertices.length, 3, 12, 0, 300), 40, 100, 0.80);
+                p5.fill(customColor || this.hue, 40, 100, 0.80);
                 p5.beginShape();
                 for (let i = 0; i < this.vertices.length; i++) {
                     p5.vertex(this.vertices[i].x, this.vertices[i].y);
@@ -894,46 +941,6 @@
                     }
                 }
             }
-
-            calculateAnglesHash() {
-                // Calculate internal angles
-                let angles = [];
-                for (let i = 0; i < this.vertices.length; i++) {
-                    const prev = (i === 0) ? this.vertices.length - 1 : i - 1;
-                    const curr = i;
-                    const next = (i === this.vertices.length - 1) ? 0 : i + 1;
-                    
-                    // Get vectors for the two sides
-                    const v1 = {
-                        x: this.vertices[prev].x - this.vertices[curr].x,
-                        y: this.vertices[prev].y - this.vertices[curr].y
-                    };
-                    const v2 = {
-                        x: this.vertices[next].x - this.vertices[curr].x,
-                        y: this.vertices[next].y - this.vertices[curr].y
-                    };
-                    
-                    // Calculate magnitudes
-                    const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
-                    const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
-                    
-                    // Calculate dot product
-                    const dot = v1.x * v2.x + v1.y * v2.y;
-                    
-                    // Calculate angle in radians and convert to degrees
-                    const angle = Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2)))) * 180 / Math.PI;
-                    angles.push(angle);
-                }
-
-                // Create hash from angles - simple sum then modulo
-                let hash = 0;
-                for (let i = 0; i < angles.length; i++) {
-                    hash += angles[i] * (i + 1); // Weight by position to differentiate shapes
-                }
-                
-                // Return a value between 0 and 300 for hue
-                return hash % 300;
-            }
         }
 
         // svelte-ignore perf_avoid_nested_class
@@ -943,13 +950,18 @@
                 this.centroid = centroid;
                 this.vertices = vertices;
                 this.halfways = halfways;
+
+                this.calculateHue();
+            }
+
+            calculateHue = () => {
+                this.hue = this.calculateAnglesHash();
             }
 
             show = (customColor = null) => {
                 p5.push();
                 p5.stroke(0, 0, 0);
-                const hue = customColor !== null ? customColor : this.calculateAnglesHash();
-                p5.fill(hue, 40, 100, 0.80);
+                p5.fill(customColor || this.hue, 40, 100, 0.80);
                 p5.beginShape();
                 for (let i = 0; i < this.vertices.length; i++) {
                     p5.vertex(this.vertices[i].x, this.vertices[i].y);
@@ -973,16 +985,13 @@
                 p5.pop();
             }
 
-            // Override the calculateAnglesHash method with rotation-invariant version
             calculateAnglesHash() {
-                // Calculate internal angles
                 let angles = [];
                 for (let i = 0; i < this.vertices.length; i++) {
                     const prev = (i === 0) ? this.vertices.length - 1 : i - 1;
                     const curr = i;
                     const next = (i === this.vertices.length - 1) ? 0 : i + 1;
                     
-                    // Get vectors for the two sides
                     const v1 = {
                         x: this.vertices[prev].x - this.vertices[curr].x,
                         y: this.vertices[prev].y - this.vertices[curr].y
@@ -992,27 +1001,21 @@
                         y: this.vertices[next].y - this.vertices[curr].y
                     };
                     
-                    // Calculate magnitudes
                     const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
                     const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
                     
-                    // Calculate dot product
                     const dot = v1.x * v2.x + v1.y * v2.y;
                     
-                    // Calculate angle in radians and convert to degrees
                     const angle = Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2)))) * 180 / Math.PI;
                     angles.push(Math.round(angle)); // Round to reduce floating point errors
                 }
 
-                // Find the canonical representation (lexicographically minimal rotation)
                 let minRotation = [...angles]; 
                 let canonicalAngles = [...angles];
                 
-                // Try all rotations and find the lexicographically smallest
                 for (let i = 1; i < angles.length; i++) {
                     const rotation = [...angles.slice(i), ...angles.slice(0, i)];
                     
-                    // Compare this rotation with our current minimum
                     let isSmaller = false;
                     for (let j = 0; j < angles.length; j++) {
                         if (rotation[j] < minRotation[j]) {
@@ -1029,13 +1032,11 @@
                     }
                 }
                 
-                // Create hash from canonical angle sequence
                 let hash = 0;
                 for (let i = 0; i < canonicalAngles.length; i++) {
                     hash = (hash * 31 + canonicalAngles[i]) % (300 * Math.sqrt(2));
                 }
                 
-                // Scale to 0-300 for hue
                 return hash % 300;
             }
         }
@@ -1565,7 +1566,7 @@
             
             for (let i = 0; i < tiling.nodes.length; i++) {
                 screenshotCanvas.push();
-                const hue = tiling.nodes[i].calculateAnglesHash();
+                const hue = tiling.nodes[i].hue;
                 screenshotCanvas.fill(hue, 40, 100, 0.80);
                 screenshotCanvas.beginShape();
                 for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
