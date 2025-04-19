@@ -2,6 +2,7 @@
     import { ruleType, golRule, golRules } from '$lib/stores/configuration';
     import { Check, Camera, RefreshCw } from 'lucide-svelte';
     import { onMount } from 'svelte';
+    import LiveChart from '$lib/components/LiveChart.svelte';
     
     let possibleAngles = [30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
     let possibleSides = [0, 3, 4, 6, 8, 10, 12];
@@ -31,12 +32,16 @@
     let takeScreenshot = $state(false);
     let showNotification = $state(false);
     let notificationMessage = $state('');
+    let alivePercentage = $state(0);
+    let iterationCount = $state(0);
+    
+    // Track canvas element to update dimensions
+    let canvasElement = $state(null);
 
     let prevWidth = $state(width);   
     let prevHeight = $state(height);
     let prevTilingRule = $state(tilingRule);
     let prevTransformSteps = $state(transformSteps);
-    let prevSide = $state(side);
 
     let prevRuleType = $state($ruleType);
     let prevGolRule = $state($golRule);
@@ -46,6 +51,19 @@
     let tiling = $state();
 
     let resetGameOfLife = $state(false);
+    
+    // Handle dimension changes
+    $effect(() => {
+        if (width !== prevWidth || height !== prevHeight) {
+            prevWidth = width;
+            prevHeight = height;
+            
+            if (canvasElement && canvasElement.resizeCanvas) {
+                // Force canvas resize
+                canvasElement.resizeCanvas(width, height);
+            }
+        }
+    });
 
 	let sketch = function(p5) {
         // svelte-ignore perf_avoid_nested_class
@@ -106,8 +124,8 @@
                 // first group
                 this.nodes.push(new Node(
                     {
-                        x: this.shapeSeed[0][0] == 3 ? side * Math.sqrt(3) / 6 : 0,
-                        y: this.shapeSeed[0][0] == 3 ? side / 2 : 0,
+                        x: this.shapeSeed[0][0] == 3 ? Math.sqrt(3) / 6 : 0,
+                        y: this.shapeSeed[0][0] == 3 ? 0.5 : 0,
                     },
                     this.shapeSeed[0][0],
                     this.shapeSeed[0][0] == 3 ? 0 : Math.PI / this.shapeSeed[0][0]
@@ -130,7 +148,7 @@
                         );
                         v.normalize();
 
-                        let apothem = side / 2 / Math.tan(Math.PI / this.shapeSeed[i][j]);
+                        let apothem = 0.5 / Math.tan(Math.PI / this.shapeSeed[i][j]);
                         let newCentroid = {
                             x: anchor.halfwayPoint.x + v.x * apothem,
                             y: anchor.halfwayPoint.y + v.y * apothem
@@ -201,8 +219,6 @@
                 const perfEnd = performance.now();
                 if (debug) console.timeEnd("Total tiling generation");
                 if (debug) console.log(`Total tiling generation completed in ${perfEnd - perfStart}ms, Total nodes: ${this.nodes.length}`);
-
-                console.log(this.nodes);
             }
 
             mirrorRelativeTo = (transformationIndex) => {
@@ -615,12 +631,16 @@
                             this.nodes[i].nextState = false;
                         } else if (!this.nodes[i].state && rule.birth.includes(aliveNeighbors)) {
                             this.nodes[i].nextState = true;
+                        } else {
+                            this.nodes[i].nextState = this.nodes[i].state;
                         }
                     } else {
                         if (this.nodes[i].state && !rules[this.nodes[i].n].survival.includes(aliveNeighbors)) {
                             this.nodes[i].nextState = false;
                         } else if (!this.nodes[i].state && rules[this.nodes[i].n].birth.includes(aliveNeighbors)) {
                             this.nodes[i].nextState = true;
+                        } else {
+                            this.nodes[i].nextState = this.nodes[i].state;
                         }
                     }
                 }
@@ -633,6 +653,7 @@
             drawGameOfLife = () => {
                 p5.push();
                 p5.translate(p5.width / 2, p5.height / 2);
+                p5.scale(side);
                 for (let i = 0; i < this.nodes.length; i++) {
                     this.nodes[i].showGameOfLife();
                 }
@@ -642,17 +663,18 @@
             drawGraphTiling = () => {
                 p5.push();
                 p5.translate(p5.width / 2, p5.height / 2);
+                p5.scale(side);
                 p5.stroke(0);
-                p5.strokeWeight(2);
+                p5.strokeWeight(2 / side);
                 for (let i = 0; i < this.nodes.length; i++) {
                     this.nodes[i].show();
                 }
 
                 p5.stroke(0);
-                p5.strokeWeight(1);
+                p5.strokeWeight(1 / side);
                 for (let i = 0; i < this.nodes.length; i++) {
                     if (
-                        p5.dist(p5.mouseX - p5.width / 2, -p5.mouseY + p5.height / 2, this.nodes[i].pos.x, this.nodes[i].pos.y) < p5.apothem(this.nodes[i].n)
+                        p5.dist((p5.mouseX - p5.width / 2) / side, (-p5.mouseY + p5.height / 2) / side, this.nodes[i].pos.x, this.nodes[i].pos.y) < p5.apothem(this.nodes[i].n)
                     ) {
                         this.nodes[i].show(p5.color(0, 0, 100));
 
@@ -667,8 +689,8 @@
                             p5.ellipse(
                                 this.nodes[i].neighbors[j].pos.x,
                                 this.nodes[i].neighbors[j].pos.y,
-                                side / 5,
-                                side / 5
+                                1/5,
+                                1/5
                             );
                         }
 
@@ -676,8 +698,8 @@
                         p5.ellipse(
                             this.nodes[i].pos.x,
                             this.nodes[i].pos.y,
-                            side / 5,
-                            side / 5
+                            1/5,
+                            1/5
                         );
                     }
                 }
@@ -703,7 +725,7 @@
             show = (color = null) => {
                 p5.push();
                 p5.stroke(0, 0, 0);
-                p5.fill(color || p5.map(this.n, 3, 12, 0, 300), 100, 100, 0.2);
+                p5.fill(color || p5.map(this.n, 3, 12, 0, 300), 40, 100, 0.80);
                 p5.beginShape();
                 for (let i = 0; i < this.vertices.length; i++) {
                     p5.vertex(this.vertices[i].x, this.vertices[i].y);
@@ -712,16 +734,16 @@
                 
                 if (showConstructionPoints) {
                     p5.fill(0, 100, 100);
-                    p5.ellipse(this.centroid.x, this.centroid.y, 5);
+                    p5.ellipse(this.centroid.x, this.centroid.y, 5 / side);
                     
                     p5.fill(120, 100, 100);
                     for (let i = 0; i < this.halfways.length; i++) {
-                        p5.ellipse(this.halfways[i].x, this.halfways[i].y, 5);
+                        p5.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / side);
                     }
                     
                     p5.fill(240, 100, 100);
                     for (let i = 0; i < this.vertices.length; i++) {
-                        p5.ellipse(this.vertices[i].x, this.vertices[i].y, 5);
+                        p5.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / side);
                     }
                 }
                 p5.pop();
@@ -760,7 +782,7 @@
 
             calculateVertices = () => {
                 this.vertices = [];
-                let radius = side / 2 / Math.sin(Math.PI / this.n);
+                let radius = 0.5 / Math.sin(Math.PI / this.n);
                 for (let i = 0; i < this.n; i++) {
                     this.vertices.push({
                         x: this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle),
@@ -798,6 +820,7 @@
 
         p5.setup = () => {
             p5.createCanvas(width, height);
+            canvasElement = p5;
             p5.colorMode(p5.HSB, 360, 100, 100);
 
             tiling = new Tiling();
@@ -812,7 +835,6 @@
 
             prevTilingRule = tilingRule;
             prevTransformSteps = transformSteps;
-            prevSide = side;
         }
 
         p5.isSameRule = (prev, current) => {
@@ -837,7 +859,7 @@
             p5.push();
             p5.translate(0, p5.height);
             p5.scale(1, -1);
-            p5.background(255);
+            p5.background(240, 7, 16);
             try {
                 if (showGameOfLife) {
                     if (
@@ -852,6 +874,8 @@
 
                     if (p5.frameCount % frameMod == 0) {
                         tiling.updateGameOfLife();
+                        alivePercentage = tiling.nodes.filter(node => node.state).length / tiling.nodes.length * 100;
+                        iterationCount++;
                     }
                     
                     tiling.drawGameOfLife();
@@ -873,10 +897,13 @@
             p5.noStroke();
  
             try {
-                if (prevTilingRule != tilingRule || prevTransformSteps != transformSteps || prevSide != side) {
+                if (prevTilingRule != tilingRule || prevTransformSteps != transformSteps) {
                     tiling.parseRule(tilingRule);
                     tiling.createGraph();
                     tiling.setupGameOfLife();
+                    
+                    prevTilingRule = tilingRule;
+                    prevTransformSteps = transformSteps;
                 }
             } catch (e) {
                 console.log(e);
@@ -884,10 +911,6 @@
 
             prevWidth = width;
             prevHeight = height;
-            prevTilingRule = tilingRule;
-            prevTransformSteps = transformSteps;
-            prevSide = side;
-
             prevRuleType = $ruleType;
             prevGolRule = $golRule;
             prevGolRules = $golRules;
@@ -916,6 +939,9 @@
             p5.push();
             p5.translate(0, p5.height);
             p5.scale(1, -1);
+            p5.translate(p5.width / 2, p5.height / 2);
+            p5.scale(side);
+            
             let uniqueCentroids = [];
 
             for (let i = 0; i < tiling.anchorNodes.length; i++) {
@@ -928,9 +954,11 @@
             let uniqueCentroidsSorted = p5.sortPointsByAngleAndDistance(uniqueCentroids);
             uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !p5.isWithinTolerance(centroid, {x: 0, y: 0}));
             
+            p5.textSize(12 / side);
+            
             for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
                 let centroid = uniqueCentroidsSorted[i];
-                p5.text('c' + (i + 1), centroid.x + p5.width / 2, -centroid.y + p5.height / 2);
+                p5.text('c' + (i + 1), centroid.x, centroid.y);
             }
 
             let uniqueHalfways = [];
@@ -947,7 +975,7 @@
 
             for (let i = 0; i < uniqueHalfwaysSorted.length; i++) {
                 let halfway = uniqueHalfwaysSorted[i];
-                p5.text('h' + (i + 1), halfway.x + p5.width / 2, -halfway.y + p5.height / 2);
+                p5.text('h' + (i + 1), halfway.x, halfway.y);
             }
 
             let uniqueVertices = [];
@@ -964,7 +992,7 @@
 
             for (let i = 0; i < uniqueVerticesSorted.length; i++) {
                 let vertex = uniqueVerticesSorted[i];
-                p5.text('v' + (i + 1), vertex.x + p5.width / 2, -vertex.y + p5.height / 2);
+                p5.text('v' + (i + 1), vertex.x, vertex.y);
             }
 
             p5.pop();
@@ -1089,7 +1117,7 @@
                 const hexagon = hexagons[i];
                 
                 // Only consider hexagons close to the triangle
-                if (p5.dist(triangle.pos.x, triangle.pos.y, hexagon.pos.x, hexagon.pos.y) > side * 2) {
+                if (p5.dist(triangle.pos.x, triangle.pos.y, hexagon.pos.x, hexagon.pos.y) > 2) {
                     continue;
                 }
                 
@@ -1143,7 +1171,7 @@
                 for (let j = 0; j < triangles.length; j++) {
                     const triangle = triangles[j];
                     
-                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > side * 2) {
+                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > 2) {
                         continue;
                     }
                     
@@ -1158,7 +1186,7 @@
             
             if (coveredVertices.size >= 2) {
                 const trianglesPointingInward = triangles.filter(triangle => {
-                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > side * 2) {
+                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > 2) {
                         return false;
                     }
                     
@@ -1263,7 +1291,7 @@
         }
 
         p5.apothem = (n) => {
-            return side / 2 / Math.tan(Math.PI / n);
+            return 0.5 / Math.tan(Math.PI / n);
         }
 
         p5.getClockwiseAngle = (point) => {
@@ -1288,31 +1316,23 @@
         }
         
         p5.takeScreenshot = () => {
-            // Create a screenshot from the current canvas
             const filename = `${tilingRule}.png`;
             
-            // Create a temporary canvas for the screenshot
-            let screenshotCanvas = p5.createGraphics(600, 600);
-            
-            // Set color mode to match the main canvas
             screenshotCanvas.colorMode(p5.HSB, 360, 100, 100);
             
-            // Flip the y-axis like in the main canvas
             screenshotCanvas.push();
             screenshotCanvas.translate(0, 600);
             screenshotCanvas.scale(1, -1);
             
-            // Set white background
             screenshotCanvas.background(255);
             
-            // Translate to center the tiling in the screenshot
             screenshotCanvas.translate(300, 300);
             
-            // Draw the tiling on the screenshot canvas
             screenshotCanvas.stroke(0);
             screenshotCanvas.strokeWeight(2);
             
-            // Draw each node
+            screenshotCanvas.scale(side);
+            
             for (let i = 0; i < tiling.nodes.length; i++) {
                 screenshotCanvas.push();
                 screenshotCanvas.fill(p5.map(tiling.nodes[i].n, 3, 12, 0, 300), 100, 100, 0.2);
@@ -1324,10 +1344,8 @@
                 screenshotCanvas.pop();
             }
             
-            // If showing info points, draw them too
             if (showInfo) {
                 const drawInfoOnScreenshot = () => {
-                    // Similar implementation to p5.drawInfo but for the screenshot canvas
                     let uniqueCentroids = [];
                     for (let i = 0; i < tiling.anchorNodes.length; i++) {
                         let centroid = tiling.anchorNodes[i].centroid;
@@ -1380,36 +1398,29 @@
                 drawInfoOnScreenshot();
             }
             
-            // If showing construction points, draw them too
             if (showConstructionPoints) {
                 for (let i = 0; i < tiling.nodes.length; i++) {
-                    // Draw centroid
                     screenshotCanvas.fill(0, 100, 100);
-                    screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5);
+                    screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5 / side);
                     
-                    // Draw halfways
                     screenshotCanvas.fill(120, 100, 100);
                     for (let j = 0; j < tiling.nodes[i].halfways.length; j++) {
-                        screenshotCanvas.ellipse(tiling.nodes[i].halfways[j].x, tiling.nodes[i].halfways[j].y, 5);
+                        screenshotCanvas.ellipse(tiling.nodes[i].halfways[j].x, tiling.nodes[i].halfways[j].y, 5 / side);
                     }
                     
-                    // Draw vertices
                     screenshotCanvas.fill(240, 100, 100);
                     for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
-                        screenshotCanvas.ellipse(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y, 5);
+                        screenshotCanvas.ellipse(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y, 5 / side);
                     }
                 }
             }
             
             screenshotCanvas.pop();
             
-            // Save the screenshot
             p5.saveCanvas(screenshotCanvas, filename, 'png');
             
-            // Clean up
             screenshotCanvas.remove();
             
-            // Show success notification
             notificationMessage = `Screenshot saved as ${filename}`;
             showNotification = true;
             setTimeout(() => {
@@ -1431,6 +1442,8 @@
             p5 = (await import('p5')).default;
             myp5 = new p5(sketch, canvasContainer);
             
+            canvasElement = myp5;
+            
             if (width && height && myp5) {
                 myp5.resizeCanvas(width, height);
                 prevWidth = width;
@@ -1440,8 +1453,8 @@
     });
 
     $effect(() => {
-        if (myp5 && width && height && (prevWidth !== width || prevHeight !== height)) {
-            
+        if (myp5 && (width !== prevWidth || height !== prevHeight)) {
+            // Force immediate canvas resize when width or height changes
             myp5.resizeCanvas(width, height);
             prevWidth = width;
             prevHeight = height;
@@ -1449,25 +1462,34 @@
     });
 </script>
 
-<div bind:this={canvasContainer}></div>
-
-{#if !showGameOfLife}
-    <button 
-        class="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2 z-10"
-        onclick={captureScreenshot}
-    >
-        <Camera />
-        Screenshot
-    </button>
-{:else}
-    <button 
-        class="absolute top-4 right-4 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2 z-10"
-        onclick={() => resetGameOfLife = true}
-    >
-        <RefreshCw />
-        Randomize
-    </button>
-{/if}
+<!-- Pass in specific dimensions using inline style to ensure immediate update -->
+<div class="relative h-full w-full">
+    <div bind:this={canvasContainer}></div>
+    
+    {#if !showGameOfLife}
+        <button 
+            class="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2 z-10"
+            onclick={captureScreenshot}
+        >
+            <Camera />
+            Screenshot
+        </button>
+    {:else}
+        <div class="absolute top-4 right-4 flex flex-col gap-4 z-10">
+            <button 
+                class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                onclick={() => resetGameOfLife = true}
+            >
+                <RefreshCw size={18} />
+                Randomize
+            </button>
+            
+            <div class="w-72">
+                <LiveChart bind:alivePercentage={alivePercentage} bind:iterationCount={iterationCount}/>
+            </div>
+        </div>
+    {/if}
+</div>
 
 {#if showNotification}
     <div class="fixed bottom-4 right-4 bg-green-500 text-white py-2 px-4 rounded-md shadow-md animate-fade-in-out flex items-center gap-2 z-20">

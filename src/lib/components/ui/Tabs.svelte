@@ -7,11 +7,11 @@
 </script>
 
 <div class="w-full h-full flex flex-col">
-	<div class="flex border-b border-zinc-600 flex-shrink-0">
+	<div class="flex border-b border-zinc-700/50 flex-shrink-0 bg-zinc-800/60">
 		{#each tabs as tab}
 			<button
 				onclick={() => { $activeTab = tab }}
-				class="px-4 py-2 text-sm font-medium {$activeTab === tab ? 'text-white border-b-2 border-blue-500' : 'text-zinc-300 hover:text-white'}"
+				class="px-4 py-3 text-sm font-medium transition-all {$activeTab === tab ? 'text-white border-b-2 border-green-500 bg-zinc-800/40' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/20'}"
 				aria-selected={$activeTab === tab}
 				role="tab"
 			>

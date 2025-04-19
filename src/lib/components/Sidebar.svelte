@@ -53,7 +53,17 @@
 	
 	const toggleSidebar = () => {
 		isSidebarOpen = !isSidebarOpen;
+		
+		// Notify parent of toggling
 		dispatch('toggle', { isSidebarOpen });
+		
+		// Force a repaint after the transition
+		if (isSidebarOpen) {
+			// For opening, emit resize event after transition
+			setTimeout(() => {
+				window.dispatchEvent(new Event('resize'));
+			}, 300);
+		}
 	}
 
 	const loadGameRule = (selectedRule) => {
@@ -69,22 +79,22 @@
 	}
 </script>
 
-<div id="sidebar" class="h-full fixed left-0 top-0 transition-all duration-300 flex flex-col" class:w-80={isSidebarOpen} class:w-12={!isSidebarOpen} bind:this={sidebarElement}>
-	<div class="bg-zinc-800 text-white h-full overflow-hidden flex flex-col">
-		<div class="p-4 flex items-center justify-between border-b border-zinc-700 flex-shrink-0">
+<div id="sidebar" class="h-full fixed left-0 top-0 transition-all duration-300 flex flex-col shadow-2xl" class:w-80={isSidebarOpen} class:w-12={!isSidebarOpen} bind:this={sidebarElement}>
+	<div class="bg-zinc-800/90 backdrop-blur-sm text-white h-full overflow-hidden flex flex-col border-r border-zinc-700/50">
+		<div class="p-3 flex items-center justify-between border-b border-zinc-700/50 flex-shrink-0 bg-zinc-900/30">
 			{#if isSidebarOpen}
-				<h2 class="text-lg font-semibold text-white">Controls</h2>
+				<h2 class="text-sm font-medium text-white/90 uppercase tracking-wider">Controls</h2>
 			{/if}
 
 			<button
 				onclick={toggleSidebar}
-				class="p-1 rounded-md hover:bg-zinc-700 transition-colors text-white"
+				class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100"
 				aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
 			>
 				{#if isSidebarOpen}
-					<ChevronLeft size={24} />
+					<ChevronLeft size={18} />
 				{:else}
-					<ChevronRight size={24} />
+					<ChevronRight size={18} />
 				{/if}
 			</button>
 		</div>
@@ -94,8 +104,8 @@
 				<Tabs tabs={["Tilings", "Game of Life"]}>
 					<div slot="tab-0" class="h-full flex flex-col">
 						<!-- Fixed options section -->
-						<div class="p-4 flex-shrink-0 border-b border-zinc-700">
-							<div class="flex flex-col gap-4">
+						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
+							<div class="flex flex-col gap-3">
 								<Input 
 									id="tilingRule"
 									label="Tiling Rule"
@@ -103,7 +113,7 @@
 									placeholder="4/m90/r(h1)"
 								/>
 
-								<div class="flex flex-row gap-4">
+								<div class="flex flex-row gap-3">
 									<Input
 										id="transformSteps"
 										type="number"
@@ -121,7 +131,7 @@
 									/>
 								</div>
 
-								<div class="space-y-2 pt-2">
+								<div class="space-y-2 pt-1">
 									<Checkbox 
 										id="showConstructionPoints"
 										label="Show Construction Points"
@@ -138,20 +148,20 @@
 						</div>
 						
 						<!-- Scrollable rules section -->
-						<div class="flex-1 overflow-y-auto p-4">
-							<div class="flex flex-col gap-4">
-								<h3 class="font-medium text-base mb-4 text-white">Tiling Patterns</h3>
+						<div class="flex-1 overflow-y-auto p-3">
+							<div class="flex flex-col gap-3">
+								<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Tiling Patterns</h3>
 								<div>
 									{#each tilingRules as tilingPatternGroup}
-										<div class="mb-4">
+										<div class="mb-3">
 											<button 
-												class="w-full flex items-center justify-between font-medium text-zinc-200 mb-2 hover:text-white focus:outline-none"
+												class="w-full flex items-center justify-between font-medium text-sm text-zinc-300 mb-2 hover:text-white focus:outline-none transition-colors"
 												onclick={() => toggleGroup(tilingPatternGroup.title)}
 												aria-expanded={expandedGroups[tilingPatternGroup.title]}
 											>
-												<span>{tilingPatternGroup.title} ({tilingPatternGroup.rules.length})</span>
+												<span>{tilingPatternGroup.title} <span class="text-green-400/80 font-normal">({tilingPatternGroup.rules.length})</span></span>
 												<ChevronDown 
-                                                    size={16} 
+                                                    size={14} 
                                                     class="transition-transform duration-200 {expandedGroups[tilingPatternGroup.title] ? 'rotate-180' : ''}"
                                                 />
 											</button>
@@ -176,9 +186,9 @@
 
 					<div slot="tab-1" class="h-full flex flex-col">
 						<!-- Fixed options section -->
-						<div class="p-4 flex-shrink-0 border-b border-zinc-700">
-							<div class="flex flex-col gap-4">
-								<h3 class="font-medium text-base text-white">Game of Life Simulation</h3>
+						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
+							<div class="flex flex-col gap-3">
+								<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Game of Life Simulation</h3>
 								<Toggle
 									id="debug"
 									leftValue="Single"
@@ -194,12 +204,12 @@
 										placeholder="B3/S23"
 									/>
 								{:else}
-									<div class="mb-2 font-medium">Rules by Shape</div>
-									<div class="max-h-48 overflow-y-auto pr-2 mb-2">
+									<div class="font-medium text-xs text-white/80 uppercase tracking-wider mb-2">Rules by Shape</div>
+									<div class="max-h-48 overflow-y-auto pr-2 mb-2 rounded-lg border border-zinc-700/50 bg-zinc-800/20 p-3">
 										{#each shapes as shape}
-											<div class="flex flex-row gap-4 items-center mb-2">
-												<div class="w-8 flex justify-center">
-													<ShapeIcon sides={shape} size={32} />
+											<div class="flex flex-row gap-3 items-center mb-2 last:mb-0">
+												<div class="w-7 flex justify-center">
+													<ShapeIcon sides={shape} size={24} />
 												</div>
 
 												<Input 
@@ -224,21 +234,15 @@
 									max={60}
 									step={1}
 								/>
-
-								<!-- <Button
-									id="randomize"
-									label="Randomize"
-									onclick={randomize}
-								/> -->
 							</div>
 						</div>
 						
 						<!-- Scrollable rules section -->
 						{#if $ruleType === 'Single'}
-							<div class="flex-1 overflow-y-auto p-4">
-								<div class="flex flex-col gap-4">
-									<h3 class="font-medium text-base text-white">Game of Life Rules</h3>
-									<div class="flex flex-col gap-2">
+							<div class="flex-1 overflow-y-auto p-3">
+								<div class="flex flex-col gap-3">
+									<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Game of Life Rules</h3>
+									<div class="grid grid-cols-2 gap-2">
 										{#each gameOfLifeRules as gameRule}
 										<RuleCard 
 											title={gameRule}

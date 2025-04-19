@@ -1,46 +1,84 @@
 <script>
-    import { birth, survive } from "$lib/stores.svelte.js";
-    import { Grid } from "$lib/utils.svelte.js";
+    import { golRule, tilingRule, transformSteps, side, showConstructionPoints, showInfo, speed, activeTab } from '$lib/stores/configuration';
+    import { onMount } from 'svelte';
+
+    import Sidebar from '$lib/components/Sidebar.svelte';
+    import Canvas from '$lib/components/Canvas.svelte';
+
+    let sidebarElement = $state('');
+    let sidebarWidth = $state(320);
+    let isSidebarOpen = $state(true);
+    let prevSidebarState = $state(true);
     
-    import Button from "$lib/components/Button.svelte";
+    let width = $state(600);
+    let height = $state(600);
+    let isResizing = $state(false);
 
-    let isPlaying = $state(true);
-    let shape = $state('square');
+    onMount(() => {
+        updateDimensions();
+        window.addEventListener('resize', handleResize);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    });
 
-    let grid = $state(new Grid(50));
+    let showGameOfLife = $derived($activeTab == "Game of Life");
 
-    setInterval(() => {
-        if (grid && isPlaying)
-            grid.update();
-    }, 100);
+    // Track sidebar state changes
+    $effect(() => {
+        if (prevSidebarState !== isSidebarOpen) {
+            prevSidebarState = isSidebarOpen;
+            
+            // Use appropriate delay based on whether sidebar is opening or closing
+            const delay = isSidebarOpen ? 300 : 10; // Longer delay for opening
+            
+            setTimeout(() => {
+                updateDimensions();
+            }, delay);
+        }
+    });
+    
+    const handleResize = () => {
+        if (!isResizing) {
+            isResizing = true;
+            setTimeout(() => {
+                updateDimensions();
+                isResizing = false;
+            }, 100);
+        }
+    }
+    
+    const updateDimensions = () => {
+        if (!sidebarElement) return;
+        
+        // Calculate correct sidebar width based on open/closed state
+        sidebarWidth = isSidebarOpen ? sidebarElement.clientWidth : 48; // Width when closed is 48px (w-12)
+        
+        // Immediately update canvas dimensions
+        width = window.innerWidth - sidebarWidth;
+        height = window.innerHeight;
+    }
 </script>
 
-<div class="flex flex-col items-center justify-center m-auto h-screen">
-    <h1 class="text-4xl font-bold mb-4">Game of Life</h1>
-    <h3 class="text-xl font-bold mb-4">Rulestring:
-        B<input bind:value={$birth} class="w-16 border border-black mx-2 rounded px-2" type="text">/
-        S<input bind:value={$survive} class="w-16 border border-black ms-2 rounded px-2" type="text">
-    </h3>
-
-    <div class="border-4 border-black">
-        {#each grid.cells as row}
-            <div class="flex flex-rpw">
-                {#each row as cell}
-                    <button onclick={() => {cell.state = 1 - cell.state}} class="flex flex-col text-xl bg-black" aria-label="cell">
-                        <div class="{cell.state === 1 ? 'bg-orange-600' : 'bg-white'} {shape === "square" ? 'rounded-sm' : 'rounded-full'}" style="width: 12px; height: 12px;"></div>
-                    </button>
-                {/each}
-            </div>
-        {/each}
+<div class="flex h-screen w-full bg-zinc-900 overflow-hidden">
+    <Sidebar bind:sidebarElement={sidebarElement} bind:isSidebarOpen={isSidebarOpen}/>
+        
+    <div 
+        class="absolute top-0 right-0 bottom-0 transition-all duration-300 z-0 bg-zinc-900 overflow-hidden"
+        style="left: {sidebarWidth}px;"
+    >
+        <Canvas 
+            width={width}
+            height={height} 
+            golRule={$golRule} 
+            tilingRule={$tilingRule} 
+            transformSteps={$transformSteps} 
+            side={$side} 
+            showConstructionPoints={$showConstructionPoints} 
+            showGameOfLife={showGameOfLife}
+            showInfo={$showInfo}
+            speed={$speed}
+        />
     </div>
-
-    <div class="flex flex-row justify-center items-center gap-4">
-        <Button content="Clear" func={() => grid.clear()}/>
-        <Button content="Random" func={() => grid.random()}/>
-        <Button content={isPlaying ? 'Pause' : 'Play'} func={() => isPlaying = !isPlaying}/>
-        <Button content="Next" func={() => grid.update($birth, $survive)}/>
-        <Button content={shape} func={() => shape = shape === 'square' ? 'circle' : 'square'}/>
-    </div>
-
-    <a href="/tilings">Tilings</a>
 </div>

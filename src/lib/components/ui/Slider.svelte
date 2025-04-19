@@ -10,13 +10,13 @@
 	} = $props();
 </script>
 
-<div class="grid w-full gap-4">
+<div class="grid w-full gap-2">
 	{#if label}
 		<div class="flex flex-row justify-between items-center">
-			<label for={id} class="text-sm font-medium leading-none text-zinc-900 dark:text-zinc-50">
+			<label for={id} class="text-sm font-medium text-white/80">
 				{label}
 			</label>
-			<span class="text-xs text-zinc-500 dark:text-zinc-400">{value} iterations/s</span>
+			<span class="text-xs text-green-400/90 font-medium">{value} iterations/s</span>
 		</div>
 	{/if}
 
@@ -29,6 +29,6 @@
 		max={max}
 		step={step}
 		disabled={disabled}
-		class="w-full h-2 rounded-md appearance-none cursor-pointer bg-zinc-200 dark:bg-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+		class="w-full h-2 rounded-full appearance-none cursor-pointer bg-zinc-700/70 accent-green-500 focus:outline-none focus-visible:ring-1 focus-visible:ring-green-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
 	/>
 </div> 
