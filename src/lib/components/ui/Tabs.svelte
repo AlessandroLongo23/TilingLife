@@ -6,8 +6,8 @@
 	} = $props();
 </script>
 
-<div class="w-full">
-	<div class="flex border-b border-zinc-600">
+<div class="w-full h-full flex flex-col">
+	<div class="flex border-b border-zinc-600 flex-shrink-0">
 		{#each tabs as tab}
 			<button
 				onclick={() => { $activeTab = tab }}
@@ -20,7 +20,7 @@
 		{/each}
 	</div>
 	
-	<div class="py-4 overflow-y-auto">
+	<div class="flex-1 overflow-hidden">
 		{#if $activeTab === tabs[0]}
 			<slot name='tab-0' />
 		{:else if $activeTab === tabs[1]}

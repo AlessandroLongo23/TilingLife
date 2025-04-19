@@ -1,6 +1,7 @@
 <script>
-    import { onMount } from 'svelte';
     import { ruleType, golRule, golRules } from '$lib/stores/configuration';
+    import { Check, Camera, RefreshCw } from 'lucide-svelte';
+    import { onMount } from 'svelte';
     
     let possibleAngles = [30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
     let possibleSides = [0, 3, 4, 6, 8, 10, 12];
@@ -27,6 +28,9 @@
 
     let tolerance = $state(0.01);
     let frameMod = $derived(Math.max(1, Math.floor(60 / speed)));
+    let takeScreenshot = $state(false);
+    let showNotification = $state(false);
+    let notificationMessage = $state('');
 
     let prevWidth = $state(width);   
     let prevHeight = $state(height);
@@ -39,8 +43,9 @@
     let prevGolRules = $state($golRules);
     let rule = $state({});
     let rules = $state({});
-
     let tiling = $state();
+
+    let resetGameOfLife = $state(false);
 
 	let sketch = function(p5) {
         // svelte-ignore perf_avoid_nested_class
@@ -70,6 +75,7 @@
                         transform = {
                             type: phases[i][0] === 'r' ? 'rotation' : 'mirror',
                             relativeTo: phases[i].split('(')[1].split(')')[0],
+                            anchor: null
                         }
                     } else {
                         let type = phases[i][0] === 'r' ? 'rotation' : 'mirror';
@@ -78,6 +84,7 @@
                             type: type,
                             angle: angle
                         }
+
                         if (!possibleAngles.includes(parseInt(transform.angle))) {
                             throw new Error('Invalid angle');
                         }
@@ -163,15 +170,15 @@
 
                         if (this.transforms[i].type === 'mirror') {
                             if (this.transforms[i].relativeTo) {
-                                this.mirrorRelativeTo(this.transforms[i].relativeTo)
+                                this.mirrorRelativeTo(i)
                             } else if (this.transforms[i].angle) {
                                 this.mirrorByAngle(this.transforms[i].angle)
                             }
                         } else if (this.transforms[i].type === 'rotation') {
-                            if (this.transforms[i].angle) {
+                            if (this.transforms[i].relativeTo) {
+                                this.rotateRelativeTo(i)
+                            } else if (this.transforms[i].angle) {
                                 this.rotateByAngle(this.transforms[i].angle)
-                            } else if (this.transforms[i].relativeTo) {
-                                this.rotateRelativeTo(this.transforms[i].relativeTo)
                             }
                         }
 
@@ -198,12 +205,16 @@
                 console.log(this.nodes);
             }
 
-            mirrorRelativeTo = (relativeTo) => {
-                let type = relativeTo[0];
-                let index = relativeTo[1];
+            mirrorRelativeTo = (transformationIndex) => {
+                let origin = this.transforms[transformationIndex].anchor; 
+                if (!origin) {
+                    let type = this.transforms[transformationIndex].relativeTo[0];
+                    let index = this.transforms[transformationIndex].relativeTo.slice(1);
 
-                let origin = p5.findOrigin(this.anchorNodes, type, index);
-
+                    origin = p5.findOrigin(this.anchorNodes, type, index);
+                    this.transforms[transformationIndex].anchor = origin;
+                }
+                
                 let newNodes = [];
                 for (let j = 0; j < this.nodes.length; j++) {
                     let newNode = new Node(
@@ -215,16 +226,79 @@
                         this.nodes[j].angle
                     );
 
-                    newNode.pos.x = 2 * origin.x - newNode.pos.x;
-                    newNode.pos.y = 2 * origin.y - newNode.pos.y;
-                    
-                    newNode.angle = Math.PI + newNode.angle;
+                    if (this.transforms[transformationIndex].relativeTo[0] === 'h') {
+                        let lineVector = null;
+                        
+                        for (let i = 0; i < this.anchorNodes.length; i++) {
+                            for (let k = 0; k < this.anchorNodes[i].halfways.length; k++) {
+                                if (p5.isWithinTolerance(this.anchorNodes[i].halfways[k], origin)) {
+                                    const v1 = this.anchorNodes[i].vertices[k];
+                                    const v2 = this.anchorNodes[i].vertices[(k + 1) % this.anchorNodes[i].n];
+                                    
+                                    lineVector = {
+                                        x: v2.x - v1.x,
+                                        y: v2.y - v1.y
+                                    };
+                                    
+                                    const length = Math.sqrt(lineVector.x * lineVector.x + lineVector.y * lineVector.y);
+                                    lineVector.x /= length;
+                                    lineVector.y /= length;
+                                    
+                                    break;
+                                }
+                            }
+
+                            if (lineVector) 
+                                break;
+                        }
+                        
+                        const pointVector = {
+                            x: newNode.pos.x - origin.x,
+                            y: newNode.pos.y - origin.y
+                        };
+                        
+                        const dot = pointVector.x * lineVector.x + pointVector.y * lineVector.y;
+                        const projection = {
+                            x: dot * lineVector.x,
+                            y: dot * lineVector.y
+                        };
+                        
+                        const perpendicular = {
+                            x: pointVector.x - projection.x,
+                            y: pointVector.y - projection.y
+                        };
+                        
+                        newNode.pos.x = origin.x + projection.x - perpendicular.x;
+                        newNode.pos.y = origin.y + projection.y - perpendicular.y;
+                        
+                        const lineAngle = Math.atan2(lineVector.y, lineVector.x);
+                        newNode.angle = 2 * lineAngle - newNode.angle;
+                    } else {
+                        newNode.pos.x = 2 * origin.x - newNode.pos.x;
+                        newNode.pos.y = 2 * origin.y - newNode.pos.y;
+                        newNode.angle = Math.PI + newNode.angle;
+                    }
 
                     newNode.calculateCentroid();
                     newNode.calculateVertices();
                     newNode.calculateHalfways();
                     
-                    newNodes.push(newNode);
+                    // Check for special overlap cases before adding to newNodes
+                    let shouldSkip = false;
+                    
+                    // Skip triangles overlapping hexagons
+                    // if (newNode.n === 3 && p5.isTriangleOverlappingHexagon(newNode, this.nodes)) {
+                    //     shouldSkip = true;
+                    // }
+                    
+                    // // Skip hexagons covered by triangles
+                    // if (newNode.n === 6 && p5.isHexagonCoveredByTriangles(newNode, this.nodes)) {
+                    //     shouldSkip = true;
+                    // }
+                    
+                    if (!shouldSkip) {
+                        newNodes.push(newNode);
+                    }
                 }
 
                 this.nodes = this.nodes.concat(newNodes);
@@ -261,7 +335,22 @@
                         newNode.calculateVertices();
                         newNode.calculateHalfways();
                         
-                        newNodes.push(newNode);
+                        // Check for special overlap cases before adding to newNodes
+                        let shouldSkip = false;
+                        
+                        // Skip triangles overlapping hexagons
+                        // if (newNode.n === 3 && p5.isTriangleOverlappingHexagon(newNode, this.nodes)) {
+                        //     shouldSkip = true;
+                        // }
+                        
+                        // // Skip hexagons covered by triangles
+                        // if (newNode.n === 6 && p5.isHexagonCoveredByTriangles(newNode, this.nodes)) {
+                        //     shouldSkip = true;
+                        // }
+                        
+                        if (!shouldSkip) {
+                            newNodes.push(newNode);
+                        }
                     }
 
                     this.nodes = this.nodes.concat(newNodes);
@@ -271,6 +360,58 @@
                 }
             }
 
+            rotateRelativeTo = (transformationIndex) => {
+                let origin = this.transforms[transformationIndex].anchor;
+
+                if (!origin) {
+                    let type = this.transforms[transformationIndex].relativeTo[0];
+                    let index = this.transforms[transformationIndex].relativeTo.slice(1);
+
+                    origin = p5.findOrigin(this.anchorNodes, type, index);
+                    this.transforms[transformationIndex].anchor = origin;
+                }
+
+                let newNodes = [];
+                for (let j = 0; j < this.nodes.length; j++) {
+                    let newNode = new Node(
+                        {
+                            x: this.nodes[j].pos.x,
+                            y: this.nodes[j].pos.y
+                        },
+                        this.nodes[j].n,
+                        this.nodes[j].angle
+                    );
+
+                    newNode.pos.x = 2 * origin.x - newNode.pos.x;
+                    newNode.pos.y = 2 * origin.y - newNode.pos.y;
+                    newNode.angle = Math.PI + newNode.angle;
+
+                    newNode.calculateCentroid();
+                    newNode.calculateVertices();
+                    newNode.calculateHalfways();
+                    
+                    // Check for special overlap cases before adding to newNodes
+                    let shouldSkip = false;
+                    
+                    // // Skip triangles overlapping hexagons
+                    // if (newNode.n === 3 && p5.isTriangleOverlappingHexagon(newNode, this.nodes)) {
+                    //     shouldSkip = true;
+                    // }
+                    
+                    // // Skip hexagons covered by triangles
+                    // if (newNode.n === 6 && p5.isHexagonCoveredByTriangles(newNode, this.nodes)) {
+                    //     shouldSkip = true;
+                    // }
+                    
+                    if (!shouldSkip) {
+                        newNodes.push(newNode);
+                    }
+                }
+
+                this.nodes = this.nodes.concat(newNodes);
+                this.nodes = p5.removeDuplicates(this.nodes);
+            }
+            
             rotateByAngle = (alfa) => {
                 let angle = alfa * Math.PI / 180;
                 while (angle < 2 * Math.PI) {
@@ -294,8 +435,23 @@
                         newNode.calculateCentroid();
                         newNode.calculateVertices();
                         newNode.calculateHalfways();
-
-                        newNodes.push(newNode);
+                        
+                        // Check for special overlap cases before adding to newNodes
+                        let shouldSkip = false;
+                        
+                        // // Skip triangles overlapping hexagons
+                        // if (newNode.n === 3 && p5.isTriangleOverlappingHexagon(newNode, this.nodes)) {
+                        //     shouldSkip = true;
+                        // }
+                        
+                        // // // Skip hexagons covered by triangles
+                        // if (newNode.n === 6 && p5.isHexagonCoveredByTriangles(newNode, this.nodes)) {
+                        //     shouldSkip = true;
+                        // }
+                        
+                        if (!shouldSkip) {
+                            newNodes.push(newNode);
+                        }
                     }
 
                     this.nodes = this.nodes.concat(newNodes);
@@ -303,39 +459,6 @@
                     
                     angle += alfa * Math.PI / 180;
                 }
-            }
-
-
-            rotateRelativeTo = (relativeTo) => {
-                let type = relativeTo[0];
-                let index = relativeTo[1];
-
-                let origin = p5.findOrigin(this.anchorNodes, type, index);
-
-                let newNodes = [];
-                for (let j = 0; j < this.nodes.length; j++) {
-                    let newNode = new Node(
-                        {
-                            x: this.nodes[j].pos.x,
-                            y: this.nodes[j].pos.y
-                        },
-                        this.nodes[j].n,
-                        this.nodes[j].angle
-                    );
-
-                    newNode.pos.x = 2 * origin.x - newNode.pos.x;
-                    newNode.pos.y = 2 * origin.y - newNode.pos.y;
-                    newNode.angle = Math.PI + newNode.angle;
-
-                    newNode.calculateCentroid();
-                    newNode.calculateVertices();
-                    newNode.calculateHalfways();
-                    
-                    newNodes.push(newNode);
-                }
-
-                this.nodes = this.nodes.concat(newNodes);
-                this.nodes = p5.removeDuplicates(this.nodes);
             }
 
             calculateNeighbors = () => {
@@ -720,9 +843,11 @@
                     if (
                         prevRuleType != $ruleType || 
                         ($ruleType == "Single" && !p5.isSameRule(prevGolRule, $golRule)) || 
-                        ($ruleType == "By Shape" && !p5.isSameRule(prevGolRules, $golRules))
+                        ($ruleType == "By Shape" && !p5.isSameRule(prevGolRules, $golRules)) ||
+                        resetGameOfLife
                     ) {
                         tiling.setupGameOfLife();
+                        resetGameOfLife = false;
                     }
 
                     if (p5.frameCount % frameMod == 0) {
@@ -735,6 +860,11 @@
                         p5.drawInfo();
                     }
                     tiling.drawGraphTiling();
+                    
+                    if (takeScreenshot) {
+                        p5.takeScreenshot();
+                        takeScreenshot = false;
+                    }
                 }
             } catch (e) {
                 console.log(e);
@@ -947,6 +1077,105 @@
             return uniqueNodes;
         }
 
+        // Check if a triangle would overlap with an existing hexagon
+        p5.isTriangleOverlappingHexagon = (triangle, existingNodes) => {
+            if (triangle.n !== 3) return false;
+            
+            // Find hexagons that could potentially be overlapped by this triangle
+            const hexagons = existingNodes.filter(node => node.n === 6);
+            if (hexagons.length === 0) return false;
+            
+            for (let i = 0; i < hexagons.length; i++) {
+                const hexagon = hexagons[i];
+                
+                // Only consider hexagons close to the triangle
+                if (p5.dist(triangle.pos.x, triangle.pos.y, hexagon.pos.x, hexagon.pos.y) > side * 2) {
+                    continue;
+                }
+                
+                // Check if one vertex of the triangle matches the centroid of the hexagon
+                let centroidMatchFound = false;
+                let centroidMatchVertex = -1;
+                
+                for (let j = 0; j < triangle.vertices.length; j++) {
+                    if (p5.isWithinTolerance(triangle.vertices[j], hexagon.centroid)) {
+                        centroidMatchFound = true;
+                        centroidMatchVertex = j;
+                        break;
+                    }
+                }
+                
+                if (!centroidMatchFound) continue;
+                
+                // Check if at least two other vertices of the triangle match vertices of the hexagon
+                let vertexMatches = 0;
+                
+                for (let j = 0; j < triangle.vertices.length; j++) {
+                    if (j === centroidMatchVertex) continue;
+                    
+                    for (let k = 0; k < hexagon.vertices.length; k++) {
+                        if (p5.isWithinTolerance(triangle.vertices[j], hexagon.vertices[k])) {
+                            vertexMatches++;
+                            break;
+                        }
+                    }
+                }
+                
+                // If we found one vertex matching the centroid and at least two other vertices matching hexagon vertices
+                if (vertexMatches >= 2) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        // Add new helper function to check if a hexagon is covered by triangles
+        p5.isHexagonCoveredByTriangles = (hexagon, existingNodes) => {
+            if (hexagon.n !== 6) return false;
+            
+            const triangles = existingNodes.filter(node => node.n === 3);
+            const coveredVertices = new Set();
+            
+            for (let i = 0; i < hexagon.vertices.length; i++) {
+                const hexVertex = hexagon.vertices[i];
+                
+                for (let j = 0; j < triangles.length; j++) {
+                    const triangle = triangles[j];
+                    
+                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > side * 2) {
+                        continue;
+                    }
+                    
+                    for (let k = 0; k < triangle.vertices.length; k++) {
+                        if (p5.isWithinTolerance(hexVertex, triangle.vertices[k])) {
+                            coveredVertices.add(i);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (coveredVertices.size >= 2) {
+                const trianglesPointingInward = triangles.filter(triangle => {
+                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > side * 2) {
+                        return false;
+                    }
+                    
+                    for (let i = 0; i < triangle.vertices.length; i++) {
+                        if (p5.isWithinTolerance(triangle.vertices[i], hexagon.centroid)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+                
+                return trianglesPointingInward.length >= 2;
+            }
+            
+            return false;
+        }
+
         p5.findOrigin = (nodes, type, index) => {
             const startTime = performance.now();
             if (debug) console.time(`findOrigin (${type}${index})`);
@@ -1057,11 +1286,145 @@
                 prevHeight = height;
             }
         }
+        
+        p5.takeScreenshot = () => {
+            // Create a screenshot from the current canvas
+            const filename = `${tilingRule}.png`;
+            
+            // Create a temporary canvas for the screenshot
+            let screenshotCanvas = p5.createGraphics(600, 600);
+            
+            // Set color mode to match the main canvas
+            screenshotCanvas.colorMode(p5.HSB, 360, 100, 100);
+            
+            // Flip the y-axis like in the main canvas
+            screenshotCanvas.push();
+            screenshotCanvas.translate(0, 600);
+            screenshotCanvas.scale(1, -1);
+            
+            // Set white background
+            screenshotCanvas.background(255);
+            
+            // Translate to center the tiling in the screenshot
+            screenshotCanvas.translate(300, 300);
+            
+            // Draw the tiling on the screenshot canvas
+            screenshotCanvas.stroke(0);
+            screenshotCanvas.strokeWeight(2);
+            
+            // Draw each node
+            for (let i = 0; i < tiling.nodes.length; i++) {
+                screenshotCanvas.push();
+                screenshotCanvas.fill(p5.map(tiling.nodes[i].n, 3, 12, 0, 300), 100, 100, 0.2);
+                screenshotCanvas.beginShape();
+                for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
+                    screenshotCanvas.vertex(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y);
+                }
+                screenshotCanvas.endShape(screenshotCanvas.CLOSE);
+                screenshotCanvas.pop();
+            }
+            
+            // If showing info points, draw them too
+            if (showInfo) {
+                const drawInfoOnScreenshot = () => {
+                    // Similar implementation to p5.drawInfo but for the screenshot canvas
+                    let uniqueCentroids = [];
+                    for (let i = 0; i < tiling.anchorNodes.length; i++) {
+                        let centroid = tiling.anchorNodes[i].centroid;
+                        if (!uniqueCentroids.some(c => p5.isWithinTolerance(c, centroid))) {
+                            uniqueCentroids.push(centroid);
+                        }
+                    }
+                    
+                    let uniqueCentroidsSorted = p5.sortPointsByAngleAndDistance(uniqueCentroids);
+                    uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !p5.isWithinTolerance(centroid, {x: 0, y: 0}));
+                    
+                    for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
+                        let centroid = uniqueCentroidsSorted[i];
+                        screenshotCanvas.text('c' + (i + 1), centroid.x, centroid.y);
+                    }
+                    
+                    let uniqueHalfways = [];
+                    for (let i = 0; i < tiling.anchorNodes.length; i++) {
+                        for (let j = 0; j < tiling.anchorNodes[i].halfways.length; j++) {
+                            let halfway = tiling.anchorNodes[i].halfways[j];
+                            if (!uniqueHalfways.some(h => p5.isWithinTolerance(h, halfway))) {
+                                uniqueHalfways.push(halfway);
+                            }
+                        }
+                    }
+                    
+                    let uniqueHalfwaysSorted = p5.sortPointsByAngleAndDistance(uniqueHalfways);
+                    for (let i = 0; i < uniqueHalfwaysSorted.length; i++) {
+                        let halfway = uniqueHalfwaysSorted[i];
+                        screenshotCanvas.text('h' + (i + 1), halfway.x, halfway.y);
+                    }
+                    
+                    let uniqueVertices = [];
+                    for (let i = 0; i < tiling.anchorNodes.length; i++) {
+                        for (let j = 0; j < tiling.anchorNodes[i].vertices.length; j++) {
+                            let vertex = tiling.anchorNodes[i].vertices[j];
+                            if (!uniqueVertices.some(v => p5.isWithinTolerance(v, vertex))) {
+                                uniqueVertices.push(vertex);
+                            }
+                        }
+                    }
+                    
+                    let uniqueVerticesSorted = p5.sortPointsByAngleAndDistance(uniqueVertices);
+                    for (let i = 0; i < uniqueVerticesSorted.length; i++) {
+                        let vertex = uniqueVerticesSorted[i];
+                        screenshotCanvas.text('v' + (i + 1), vertex.x, vertex.y);
+                    }
+                };
+                
+                drawInfoOnScreenshot();
+            }
+            
+            // If showing construction points, draw them too
+            if (showConstructionPoints) {
+                for (let i = 0; i < tiling.nodes.length; i++) {
+                    // Draw centroid
+                    screenshotCanvas.fill(0, 100, 100);
+                    screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5);
+                    
+                    // Draw halfways
+                    screenshotCanvas.fill(120, 100, 100);
+                    for (let j = 0; j < tiling.nodes[i].halfways.length; j++) {
+                        screenshotCanvas.ellipse(tiling.nodes[i].halfways[j].x, tiling.nodes[i].halfways[j].y, 5);
+                    }
+                    
+                    // Draw vertices
+                    screenshotCanvas.fill(240, 100, 100);
+                    for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
+                        screenshotCanvas.ellipse(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y, 5);
+                    }
+                }
+            }
+            
+            screenshotCanvas.pop();
+            
+            // Save the screenshot
+            p5.saveCanvas(screenshotCanvas, filename, 'png');
+            
+            // Clean up
+            screenshotCanvas.remove();
+            
+            // Show success notification
+            notificationMessage = `Screenshot saved as ${filename}`;
+            showNotification = true;
+            setTimeout(() => {
+                showNotification = false;
+            }, 3000);
+        }
 	};
 
     let canvasContainer = $state();
     let p5;
     let myp5 = $state();
+    
+    const captureScreenshot = () => {
+        takeScreenshot = true;
+    }
     
     onMount(async () => {
         if (typeof window !== 'undefined') {
@@ -1087,3 +1450,28 @@
 </script>
 
 <div bind:this={canvasContainer}></div>
+
+{#if !showGameOfLife}
+    <button 
+        class="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2 z-10"
+        onclick={captureScreenshot}
+    >
+        <Camera />
+        Screenshot
+    </button>
+{:else}
+    <button 
+        class="absolute top-4 right-4 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2 z-10"
+        onclick={() => resetGameOfLife = true}
+    >
+        <RefreshCw />
+        Randomize
+    </button>
+{/if}
+
+{#if showNotification}
+    <div class="fixed bottom-4 right-4 bg-green-500 text-white py-2 px-4 rounded-md shadow-md animate-fade-in-out flex items-center gap-2 z-20">
+        <Check />
+        {notificationMessage}
+    </div>
+{/if}

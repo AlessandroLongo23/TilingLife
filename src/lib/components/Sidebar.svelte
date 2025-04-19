@@ -1,22 +1,44 @@
 <script>
-	import { createEventDispatcher } from 'svelte';
 	import { golRule, golRules, tilingRule, transformSteps, side, showConstructionPoints, showInfo, speed, ruleType } from '$lib/stores/configuration';
+	import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-svelte';
 	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
 	import { tilingRules } from '$lib/stores/tilingRules.js';
+	import { createEventDispatcher } from 'svelte';
+	import { slide } from 'svelte/transition';
 
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import ShapeIcon from '$lib/components/ShapeIcon.svelte';
 	import RuleCard from '$lib/components/RuleCard.svelte';
 	import Slider from '$lib/components/ui/Slider.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
-	import ShapeIcon from '$lib/components/ShapeIcon.svelte';
 
 	let { 
 		isSidebarOpen = $bindable(true),
 		sidebarElement = $bindable(''),
 	} = $props();
+
+	// Track expanded state of each group
+	let expandedGroups = $state({});
+	
+	// Initialize all groups as expanded by default
+	$effect(() => {
+		// Only set initial state if expandedGroups is empty
+		if (Object.keys(expandedGroups).length === 0) {
+			let initialState = {};
+			tilingRules.forEach(group => {
+				initialState[group.title] = true; // Start expanded
+			});
+			expandedGroups = initialState;
+		}
+	});
+	
+	// Toggle group expansion
+	const toggleGroup = (groupTitle) => {
+		expandedGroups[groupTitle] = !expandedGroups[groupTitle];
+	};
 
 	let shapes = $derived.by(() => {
 		let shapes = new Set();
@@ -42,8 +64,8 @@
         $tilingRule = selectedTiling;
     }
 
-	const startSimulation = () => {
-		console.log('startSimulation');
+	const randomize = () => {
+		console.log('randomize');
 	}
 </script>
 
@@ -59,154 +81,172 @@
 				class="p-1 rounded-md hover:bg-zinc-700 transition-colors text-white"
 				aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="24"
-					height="24"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					class="transition-transform"
-					class:rotate-180={!isSidebarOpen}
-				>
-					{#if isSidebarOpen}
-						<path d="M15 18l-6-6 6-6" />
-					{:else}
-						<path d="M9 18l6-6-6-6" />
-					{/if}
-				</svg>
+				{#if isSidebarOpen}
+					<ChevronLeft size={24} />
+				{:else}
+					<ChevronRight size={24} />
+				{/if}
 			</button>
 		</div>
 		
 		{#if isSidebarOpen}
-			<div class="flex-1 overflow-y-auto">
+			<div class="flex-1 overflow-hidden">
 				<Tabs tabs={["Tilings", "Game of Life"]}>
-					<div slot="tab-0" class="p-4 h-full overflow-y-auto flex flex-col gap-8">
-						<div class="flex flex-col gap-4">
-							<Input 
-								id="tilingRule"
-								label="Tiling Rule"
-								bind:value={$tilingRule}
-								placeholder="4/m90/r(h1)"
-							/>
-
-							<div class="flex flex-row gap-4">
-								<Input
-									id="transformSteps"
-									type="number"
-									label="Transform Steps"
-									bind:value={$transformSteps}
-									min={0}
-								/>
-								
+					<div slot="tab-0" class="h-full flex flex-col">
+						<!-- Fixed options section -->
+						<div class="p-4 flex-shrink-0 border-b border-zinc-700">
+							<div class="flex flex-col gap-4">
 								<Input 
-									id="side"
-									type="number"
-									label="Side Length"
-									bind:value={$side}
-									min={1}
+									id="tilingRule"
+									label="Tiling Rule"
+									bind:value={$tilingRule}
+									placeholder="4/m90/r(h1)"
 								/>
-							</div>
 
-							<div class="space-y-2 pt-2">
-								<Checkbox 
-									id="showConstructionPoints"
-									label="Show Construction Points"
-									bind:checked={$showConstructionPoints}
-								/>
-								
-								<Checkbox 
-									id="showInfo"
-									label="Show Info"
-									bind:checked={$showInfo}
-								/>
+								<div class="flex flex-row gap-4">
+									<Input
+										id="transformSteps"
+										type="number"
+										label="Transform Steps"
+										bind:value={$transformSteps}
+										min={0}
+									/>
+									
+									<Input 
+										id="side"
+										type="number"
+										label="Side Length"
+										bind:value={$side}
+										min={1}
+									/>
+								</div>
+
+								<div class="space-y-2 pt-2">
+									<Checkbox 
+										id="showConstructionPoints"
+										label="Show Construction Points"
+										bind:checked={$showConstructionPoints}
+									/>
+									
+									<Checkbox 
+										id="showInfo"
+										label="Show Info"
+										bind:checked={$showInfo}
+									/>
+								</div>
 							</div>
 						</div>
 						
-						<hr class="border-zinc-700">
-
-						<div class="flex flex-col gap-4">
-							<h3 class="font-medium text-base mb-4 text-white">Tiling Patterns</h3>
-							<div>
-								{#each tilingRules as tilingPattern}
-									<RuleCard 
-										title={tilingPattern}
-										value={tilingPattern}
-										onClick={loadTiling}
-									/>
-								{/each}
+						<!-- Scrollable rules section -->
+						<div class="flex-1 overflow-y-auto p-4">
+							<div class="flex flex-col gap-4">
+								<h3 class="font-medium text-base mb-4 text-white">Tiling Patterns</h3>
+								<div>
+									{#each tilingRules as tilingPatternGroup}
+										<div class="mb-4">
+											<button 
+												class="w-full flex items-center justify-between font-medium text-zinc-200 mb-2 hover:text-white focus:outline-none"
+												onclick={() => toggleGroup(tilingPatternGroup.title)}
+												aria-expanded={expandedGroups[tilingPatternGroup.title]}
+											>
+												<span>{tilingPatternGroup.title} ({tilingPatternGroup.rules.length})</span>
+												<ChevronDown 
+                                                    size={16} 
+                                                    class="transition-transform duration-200 {expandedGroups[tilingPatternGroup.title] ? 'rotate-180' : ''}"
+                                                />
+											</button>
+											
+											{#if expandedGroups[tilingPatternGroup.title]}
+												<div class="pl-1 space-y-1" transition:slide={{ duration: 200 }}>
+													{#each tilingPatternGroup.rules as tilingPattern}
+														<RuleCard 
+															title={tilingPattern}
+															value={tilingPattern}
+															onClick={loadTiling}
+														/>
+													{/each}
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
 							</div>
 						</div>
 					</div>
 
-					<div slot="tab-1" class="p-4 h-full overflow-y-auto flex flex-col gap-8">
-						<div class="flex flex-col gap-4">
-							<h3 class="font-medium text-base text-white">Game of Life Simulation</h3>
-							<Toggle
-								id="debug"
-								leftValue="Single"
-								rightValue="By Shape"
-								bind:value={$ruleType}
-							/>
-
-							{#if $ruleType === 'Single'}
-								<Input 
-									id="golRule"
-									label="Rule"
-									bind:value={$golRule}
-									placeholder="B3/S23"
-								/>
-							{:else}
-								<div class="mb-2 font-medium">Rules by Shape</div>
-								{#each shapes as shape}
-									<div class="flex flex-row gap-4 items-center mb-2">
-										<div class="w-8 flex justify-center">
-											<ShapeIcon sides={shape} size={32} />
-										</div>
-
-										<Input 
-											id={`golRule-${shape}`}
-											label=""
-											value={$golRules[shape] ?? 'B3/S23'}
-											onChangeFunction={(e) => {
-												$golRules = { ...$golRules, [shape]: e.target.value };
-											}}
-											placeholder="B3/S23"
-										/>
-									</div>
-								{/each}
-							{/if}
-
-							<Slider
-								id="speed"
-								label="Simulation Speed"
-								bind:value={$speed}
-								min={1}
-								max={60}
-								step={1}
-							/>
-
-							<Button
-								id="startSimulation"
-								label="Start Simulation"
-								onclick={startSimulation}
-							/>
-						</div>
-
-						{#if $ruleType === 'Single'}
+					<div slot="tab-1" class="h-full flex flex-col">
+						<!-- Fixed options section -->
+						<div class="p-4 flex-shrink-0 border-b border-zinc-700">
 							<div class="flex flex-col gap-4">
-								<h3 class="font-medium text-base text-white">Game of Life Rules</h3>
-								<div class="flex flex-col gap-2">
-									{#each gameOfLifeRules as gameRule}
-									<RuleCard 
-										title={gameRule}
-										value={gameRule}
-										onClick={loadGameRule}
+								<h3 class="font-medium text-base text-white">Game of Life Simulation</h3>
+								<Toggle
+									id="debug"
+									leftValue="Single"
+									rightValue="By Shape"
+									bind:value={$ruleType}
+								/>
+
+								{#if $ruleType === 'Single'}
+									<Input 
+										id="golRule"
+										label="Rule"
+										bind:value={$golRule}
+										placeholder="B3/S23"
 									/>
-									{/each}
+								{:else}
+									<div class="mb-2 font-medium">Rules by Shape</div>
+									<div class="max-h-48 overflow-y-auto pr-2 mb-2">
+										{#each shapes as shape}
+											<div class="flex flex-row gap-4 items-center mb-2">
+												<div class="w-8 flex justify-center">
+													<ShapeIcon sides={shape} size={32} />
+												</div>
+
+												<Input 
+													id={`golRule-${shape}`}
+													label=""
+													value={$golRules[shape] ?? 'B3/S23'}
+													onChangeFunction={(e) => {
+														$golRules = { ...$golRules, [shape]: e.target.value };
+													}}
+													placeholder="B3/S23"
+												/>
+											</div>
+										{/each}
+									</div>
+								{/if}
+
+								<Slider
+									id="speed"
+									label="Simulation Speed"
+									bind:value={$speed}
+									min={1}
+									max={60}
+									step={1}
+								/>
+
+								<!-- <Button
+									id="randomize"
+									label="Randomize"
+									onclick={randomize}
+								/> -->
+							</div>
+						</div>
+						
+						<!-- Scrollable rules section -->
+						{#if $ruleType === 'Single'}
+							<div class="flex-1 overflow-y-auto p-4">
+								<div class="flex flex-col gap-4">
+									<h3 class="font-medium text-base text-white">Game of Life Rules</h3>
+									<div class="flex flex-col gap-2">
+										{#each gameOfLifeRules as gameRule}
+										<RuleCard 
+											title={gameRule}
+											value={gameRule}
+											onClick={loadGameRule}
+										/>
+										{/each}
+									</div>
 								</div>
 							</div>
 						{/if}
