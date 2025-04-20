@@ -1,8 +1,11 @@
 <script>
+    import { debugManager, debugStore, updateDebugStore } from '$lib/stores/debug';
     import { ruleType, golRule, golRules } from '$lib/stores/configuration';
     import { Check, Camera, RefreshCw } from 'lucide-svelte';
     import { onMount } from 'svelte';
+
     import LiveChart from '$lib/components/LiveChart.svelte';
+    import PieChart from '$lib/components/PieChart.svelte';
     
     let possibleAngles = [30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
     let possibleSides = [0, 3, 4, 6, 8, 10, 12];
@@ -18,7 +21,7 @@
         width = 600,
         height = 600,
         tilingRule,
-        isDual,
+        // isDual,
         transformSteps,
         side,
         showConstructionPoints,
@@ -36,7 +39,6 @@
     let alivePercentage = $state(0);
     let iterationCount = $state(0);
     
-    // Track canvas element to update dimensions
     let canvasElement = $state(null);
 
     let prevWidth = $state(width);   
@@ -54,15 +56,32 @@
 
     let resetGameOfLife = $state(false);
     
-    // Handle dimension changes
     $effect(() => {
         if (width !== prevWidth || height !== prevHeight) {
             prevWidth = width;
             prevHeight = height;
             
             if (canvasElement && canvasElement.resizeCanvas) {
-                // Force canvas resize
                 canvasElement.resizeCanvas(width, height);
+            }
+        }
+    });
+
+    $effect(() => {
+        debugManager.isEnabled = debug;
+        if (debug) {
+            debugManager.reset();
+        } else {
+            debugManager.disable();
+        }
+        updateDebugStore();
+    });
+
+    $effect(() => {
+        if (tilingRule !== prevTilingRule || transformSteps !== prevTransformSteps) {
+            if (debug) {
+                debugManager.reset();
+                updateDebugStore();
             }
         }
     });
@@ -77,6 +96,62 @@
 
                 this.shapeSeed = [];
                 this.transforms = [];
+
+                this.angleCache = new Map();
+                this.distanceCache = new Map();
+                this.toleranceCache = new Map();
+            }
+
+            isWithinTolerance = (a, b) => {
+                const key = `${a.x},${a.y}-${b.x},${b.y}`;
+                const reverseKey = `${b.x},${b.y}-${a.x},${a.y}`;
+                
+                if (this.toleranceCache.has(key)) {
+                    return this.toleranceCache.get(key);
+                }
+                
+                if (this.toleranceCache.has(reverseKey)) {
+                    return this.toleranceCache.get(reverseKey);
+                }
+                
+                const result = p5.isWithinTolerance(a, b);
+                this.toleranceCache.set(key, result);
+                return result;
+            }
+            
+            getClockwiseAngle = (point) => {
+                const key = `${point.x},${point.y}`;
+                
+                if (this.angleCache.has(key)) {
+                    return this.angleCache.get(key);
+                }
+                
+                const angle = p5.getClockwiseAngle(point);
+                this.angleCache.set(key, angle);
+                return angle;
+            }
+            
+            getDistance = (x1, y1, x2, y2) => {
+                const key = `${x1},${y1}-${x2},${y2}`;
+                const reverseKey = `${x2},${y2}-${x1},${y1}`;
+                
+                if (this.distanceCache.has(key)) {
+                    return this.distanceCache.get(key);
+                }
+                
+                if (this.distanceCache.has(reverseKey)) {
+                    return this.distanceCache.get(reverseKey);
+                }
+                
+                const result = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+                this.distanceCache.set(key, result);
+                return result;
+            }
+            
+            clearCaches = () => {
+                this.angleCache.clear();
+                this.distanceCache.clear();
+                this.toleranceCache.clear();
             }
 
             parseRule = (tilingRule) => {
@@ -121,26 +196,25 @@
             }
 
             createGraph = () => {
-                if (debug) console.time("Total tilingRule generation");
-                const perfStart = performance.now();
-                if (debug) console.log("Starting tilingRule generation...");
+                if (debug) {
+                    debugManager.reset();
+                    debugManager.startTimer("Tiling generation");
+                }
                 this.nodes = [];
                 
-                // shape seed
-                if (debug) console.time("Creating seed shapes");
-                const seedStart = performance.now();
+                this.clearCaches();
                 
-                // first group
-                this.nodes.push(new Node(
+                if (debug) debugManager.startTimer("Seed");
+                this.coreNode = new Node(
                     {
                         x: this.shapeSeed[0][0] == 3 ? Math.sqrt(3) / 6 : 0,
                         y: this.shapeSeed[0][0] == 3 ? 0.5 : 0,
                     },
                     this.shapeSeed[0][0],
                     this.shapeSeed[0][0] == 3 ? 0 : Math.PI / this.shapeSeed[0][0]
-                ));
+                );
+                this.nodes.push(this.coreNode);
 
-                // additional groups
                 for (let i = 1; i < this.shapeSeed.length; i++) {
                     let newNodes = [];
                     let indexOff = 0;
@@ -174,64 +248,45 @@
 
                     this.nodes = this.nodes.concat(newNodes);
                 }
-                const seedEnd = performance.now();
-                if (debug) console.timeEnd("Creating seed shapes");
-                if (debug) console.log(`Seed shapes created in ${seedEnd - seedStart}ms`);
+                if (debug) debugManager.endTimer("Seed");
 
-                // transformations
-                if (debug) console.time("Applying transformations");
-                const transformStart = performance.now();
+                this.newLayerNodes = [...this.nodes];
+
+                if (debug) debugManager.startTimer("Transformations");
                 for (let s = 0; s < transformSteps; s++) {
-                    const stepStart = performance.now();
-                    if (debug) console.time(`Transform step ${s+1}`);
+                    if (debug) debugManager.startTimer(`Transform ${s+1}`);
                     for (let i = 0; i < this.transforms.length; i++) {
-                        const transformTypeStart = performance.now();
-                        if (debug) console.time(`Transform ${s+1}.${i+1}`);
-                        if (s == transformSteps - 1 && i == this.transforms.length - 1) {
+                        if (debug) debugManager.startTimer(`Transform ${s+1}.${i+1}`);
+                        if (s == transformSteps - 1 && i == this.transforms.length - 1)
                             break;
-                        }
 
-                        if (s == 0) {
+                        if (s == 0)
                             this.anchorNodes = [...this.nodes];
-                        }
 
                         if (this.transforms[i].type === 'mirror') {
-                            if (this.transforms[i].relativeTo) {
+                            if (this.transforms[i].relativeTo)
                                 this.mirrorRelativeTo(i)
-                            } else if (this.transforms[i].angle) {
+                            else if (this.transforms[i].angle)
                                 this.mirrorByAngle(this.transforms[i].angle)
-                            }
                         } else if (this.transforms[i].type === 'rotation') {
-                            if (this.transforms[i].relativeTo) {
+                            if (this.transforms[i].relativeTo)
                                 this.rotateRelativeTo(i)
-                            } else if (this.transforms[i].angle) {
+                            else if (this.transforms[i].angle)
                                 this.rotateByAngle(this.transforms[i].angle)
-                            }
                         }
-
-                        const transformTypeEnd = performance.now();
-                        if (debug) console.timeEnd(`Transform ${s+1}.${i+1}`);
-                        if (debug) console.log(`Transform ${s+1}.${i+1} took ${transformTypeEnd - transformTypeStart}ms, Nodes: ${this.nodes.length}`);
+                        if (debug) debugManager.endTimer(`Transform ${s+1}.${i+1}`);
                     }
-                    
-                    const stepEnd = performance.now();
-                    if (debug) console.timeEnd(`Transform step ${s+1}`);
-                    if (debug) console.log(`Transform step ${s+1} completed in ${stepEnd - stepStart}ms, Total nodes: ${this.nodes.length}`);
+                    if (debug) debugManager.endTimer(`Transform ${s+1}`);
                 }
+                if (debug) debugManager.endTimer("Transformations");
 
-                const transformEnd = performance.now();
-                if (debug) console.timeEnd("Applying transformations");
-                if (debug) console.log(`All transformations applied in ${transformEnd - transformStart}ms`);
-
-                if (this.dual) {
+                if (this.dual)
                     this.computeDual();
-                }
-
+                
                 this.calculateNeighbors();
 
-                const perfEnd = performance.now();
-                if (debug) console.timeEnd("Total tiling generation");
-                if (debug) console.log(`Total tiling generation completed in ${perfEnd - perfStart}ms, Total nodes: ${this.nodes.length}`);
+                if (debug) debugManager.endTimer("Tiling generation");
+                updateDebugStore();
             }
 
             mirrorRelativeTo = (transformationIndex) => {
@@ -244,15 +299,17 @@
                     this.transforms[transformationIndex].anchor = origin;
                 }
                 
+                // let newNodes = [this.coreNode];
                 let newNodes = [];
-                for (let j = 0; j < this.nodes.length; j++) {
+                for (let newLayerNode of this.nodes) {
+                // for (let newLayerNode of this.newLayerNodes) {
                     let newNode = new Node(
                         {
-                            x: this.nodes[j].pos.x,
-                            y: this.nodes[j].pos.y
+                            x: newLayerNode.pos.x,
+                            y: newLayerNode.pos.y
                         },
-                        this.nodes[j].n,
-                        this.nodes[j].angle
+                        newLayerNode.n,
+                        newLayerNode.angle
                     );
 
                     if (this.transforms[transformationIndex].relativeTo[0] === 'h') {
@@ -312,81 +369,56 @@
                     newNode.calculateVertices();
                     newNode.calculateHalfways();
                     
-                    // Check for special overlap cases before adding to newNodes
-                    let shouldSkip = false;
-                    
-                    // Skip triangles overlapping hexagons
-                    // if (newNode.n === 3 && p5.isTriangleOverlappingHexagon(newNode, this.nodes)) {
-                    //     shouldSkip = true;
-                    // }
-                    
-                    // // Skip hexagons covered by triangles
-                    // if (newNode.n === 6 && p5.isHexagonCoveredByTriangles(newNode, this.nodes)) {
-                    //     shouldSkip = true;
-                    // }
-                    
-                    if (!shouldSkip) {
-                        newNodes.push(newNode);
-                    }
+                    newNodes.push(newNode);
                 }
 
                 this.nodes = this.nodes.concat(newNodes);
-                this.nodes = p5.removeDuplicates(this.nodes);
+                this.nodes = this.removeDuplicates(this.nodes);
+                // this.newLayerNodes = this.addNewNodes(newNodes.concat(this.coreNode));
             }
 
             mirrorByAngle = (angle) => {
-                while (angle < 360) {
+                const anglesToProcess = [];
+                let currentAngle = angle;
+                while (currentAngle < 360) {
+                    anglesToProcess.push(currentAngle);
+                    currentAngle *= 2;
+                }
+                
+                // let newNodes = [this.coreNode];
+                for (const processAngle of anglesToProcess) {
+                    const angleRad = processAngle * Math.PI / 180 - Math.PI / 2;
+                    const vx = Math.cos(angleRad);
+                    const vy = Math.sin(angleRad);
+                    
+                    // for (let newLayerNode of this.newLayerNodes.concat(newNodes)) {
                     let newNodes = [];
-                    for (let j = 0; j < this.nodes.length; j++) {
+                    for (let newLayerNode of this.nodes) {
                         let newNode = new Node(
                             {
-                                x: this.nodes[j].pos.x,
-                                y: this.nodes[j].pos.y
+                                x: newLayerNode.pos.x,
+                                y: newLayerNode.pos.y
                             },
-                            this.nodes[j].n,
-                            this.nodes[j].angle
+                            newLayerNode.n,
+                            newLayerNode.angle
                         );
 
-                        let angleRad = angle * Math.PI / 180 - Math.PI / 2;
-                        
-                        let vx = Math.cos(angleRad);
-                        let vy = Math.sin(angleRad);
-                        
-                        let dotProduct = newNode.pos.x * vx + newNode.pos.y * vy;
-                        let projX = dotProduct * vx;
-                        let projY = dotProduct * vy;
-                        
-                        newNode.pos.x = 2 * projX - newNode.pos.x;
-                        newNode.pos.y = 2 * projY - newNode.pos.y;
+                        const dotProduct = newNode.pos.x * vx + newNode.pos.y * vy;
+                        newNode.pos.x = 2 * dotProduct * vx - newNode.pos.x;
+                        newNode.pos.y = 2 * dotProduct * vy - newNode.pos.y;
                         newNode.angle = 2 * angleRad - newNode.angle;
 
                         newNode.calculateCentroid();
                         newNode.calculateVertices();
                         newNode.calculateHalfways();
                         
-                        // Check for special overlap cases before adding to newNodes
-                        let shouldSkip = false;
-                        
-                        // Skip triangles overlapping hexagons
-                        // if (newNode.n === 3 && p5.isTriangleOverlappingHexagon(newNode, this.nodes)) {
-                        //     shouldSkip = true;
-                        // }
-                        
-                        // // Skip hexagons covered by triangles
-                        // if (newNode.n === 6 && p5.isHexagonCoveredByTriangles(newNode, this.nodes)) {
-                        //     shouldSkip = true;
-                        // }
-                        
-                        if (!shouldSkip) {
-                            newNodes.push(newNode);
-                        }
+                        newNodes.push(newNode);
                     }
 
                     this.nodes = this.nodes.concat(newNodes);
-                    this.nodes = p5.removeDuplicates(this.nodes);
-                    
-                    angle *= 2;
+                    this.nodes = this.removeDuplicates(this.nodes);
                 }
+                // this.newLayerNodes = this.addNewNodes(newNodes.concat(this.coreNode));
             }
 
             rotateRelativeTo = (transformationIndex) => {
@@ -400,15 +432,17 @@
                     this.transforms[transformationIndex].anchor = origin;
                 }
 
+                // let newNodes = [this.coreNode];
                 let newNodes = [];
-                for (let j = 0; j < this.nodes.length; j++) {
+                for (let newLayerNode of this.nodes) {
+                // for (let newLayerNode of this.newLayerNodes.concat(newNodes)) {
                     let newNode = new Node(
                         {
-                            x: this.nodes[j].pos.x,
-                            y: this.nodes[j].pos.y
+                            x: newLayerNode.pos.x,
+                            y: newLayerNode.pos.y
                         },
-                        this.nodes[j].n,
-                        this.nodes[j].angle
+                        newLayerNode.n,
+                        newLayerNode.angle
                     );
 
                     newNode.pos.x = 2 * origin.x - newNode.pos.x;
@@ -419,78 +453,127 @@
                     newNode.calculateVertices();
                     newNode.calculateHalfways();
                     
-                    // Check for special overlap cases before adding to newNodes
-                    let shouldSkip = false;
-                    
-                    // // Skip triangles overlapping hexagons
-                    // if (newNode.n === 3 && p5.isTriangleOverlappingHexagon(newNode, this.nodes)) {
-                    //     shouldSkip = true;
-                    // }
-                    
-                    // // Skip hexagons covered by triangles
-                    // if (newNode.n === 6 && p5.isHexagonCoveredByTriangles(newNode, this.nodes)) {
-                    //     shouldSkip = true;
-                    // }
-                    
-                    if (!shouldSkip) {
-                        newNodes.push(newNode);
-                    }
+                    newNodes.push(newNode);
                 }
 
                 this.nodes = this.nodes.concat(newNodes);
-                this.nodes = p5.removeDuplicates(this.nodes);
+                this.nodes = this.removeDuplicates(this.nodes);
+                // this.newLayerNodes = this.addNewNodes(newNodes.concat(this.coreNode));
             }
             
             rotateByAngle = (alfa) => {
-                let angle = alfa * Math.PI / 180;
-                while (angle < 2 * Math.PI) {
+                const angleRad = alfa * Math.PI / 180;
+                
+                const anglesToProcess = [];
+                let currentAngle = angleRad;
+                while (currentAngle < 2 * Math.PI) {
+                    anglesToProcess.push(currentAngle);
+                    currentAngle += angleRad;
+                }
+                
+                const rotationCache = new Map();
+                
+                for (const angle of anglesToProcess) {
                     let newNodes = [];
-                    for (let j = 0; j < this.nodes.length; j++) {
+                    // let newNodes = [this.coreNode];
+                    for (let newLayerNode of this.nodes) {
+                    // for (let newLayerNode of this.newLayerNodes) {
+                        const cacheKey = `${newLayerNode.pos.x},${newLayerNode.pos.y}-${angle}`;
+                        let newPos;
+                        
+                        if (rotationCache.has(cacheKey)) {
+                            newPos = rotationCache.get(cacheKey);
+                        } else {
+                            const d = Math.sqrt(newLayerNode.pos.x ** 2 + newLayerNode.pos.y ** 2);
+                            if (d < tolerance) {
+                                newPos = { x: 0, y: 0 };
+                            } else {
+                                const a = Math.atan2(newLayerNode.pos.y, newLayerNode.pos.x);
+                                newPos = {
+                                    x: d * Math.cos(a + angle),
+                                    y: d * Math.sin(a + angle)
+                                };
+                            }
+                            rotationCache.set(cacheKey, newPos);
+                        }
+                        
                         let newNode = new Node(
                             {
-                                x: this.nodes[j].pos.x,
-                                y: this.nodes[j].pos.y
+                                x: newPos.x,
+                                y: newPos.y
                             },
-                            this.nodes[j].n,
-                            this.nodes[j].angle
+                            newLayerNode.n,
+                            newLayerNode.angle + angle
                         );
-
-                        let d = Math.sqrt(newNode.pos.x ** 2 + newNode.pos.y ** 2);
-                        let a = Math.atan2(newNode.pos.y, newNode.pos.x);
-                        newNode.pos.x = d * Math.cos(a + angle);
-                        newNode.pos.y = d * Math.sin(a + angle);
-                        newNode.angle = newNode.angle + angle;
 
                         newNode.calculateCentroid();
                         newNode.calculateVertices();
                         newNode.calculateHalfways();
                         
-                        // Check for special overlap cases before adding to newNodes
-                        let shouldSkip = false;
-                        
-                        // // Skip triangles overlapping hexagons
-                        // if (newNode.n === 3 && p5.isTriangleOverlappingHexagon(newNode, this.nodes)) {
-                        //     shouldSkip = true;
-                        // }
-                        
-                        // // // Skip hexagons covered by triangles
-                        // if (newNode.n === 6 && p5.isHexagonCoveredByTriangles(newNode, this.nodes)) {
-                        //     shouldSkip = true;
-                        // }
-                        
-                        if (!shouldSkip) {
-                            newNodes.push(newNode);
-                        }
+                        newNodes.push(newNode);
                     }
 
                     this.nodes = this.nodes.concat(newNodes);
-                    this.nodes = p5.removeDuplicates(this.nodes);
-                    
-                    angle += alfa * Math.PI / 180;
+                    this.nodes = this.removeDuplicates(this.nodes);
+                    // this.newLayerNodes = this.addNewNodes(newNodes.concat(this.coreNode));
                 }
+                
+                rotationCache.clear();
+            }
+
+            addNewNodes = (newNodes) => {
+                let newLayerNodes = [];
+                
+                const spatialMap = new Map();
+                for (let i = 0; i < this.nodes.length; i++) {
+                    const node = this.nodes[i];
+                    const key = p5.getSpatialKey(node.pos.x, node.pos.y);
+                    
+                    if (!spatialMap.has(key)) {
+                        spatialMap.set(key, []);
+                    }
+                    spatialMap.get(key).push(i);
+                }
+                
+                for (let i = 0; i < newNodes.length; i++) {
+                    const newNode = newNodes[i];
+                    const key = p5.getSpatialKey(newNode.pos.x, newNode.pos.y);
+                    
+                    let isDuplicate = false;
+                    
+                    const baseX = Math.floor(newNode.pos.x / (tolerance * 2));
+                    const baseY = Math.floor(newNode.pos.y / (tolerance * 2));
+                    
+                    for (const [dx, dy] of offsets) {
+                        const adjKey = `${baseX + dx},${baseY + dy}`;
+                        const existingIndices = spatialMap.get(adjKey) || [];
+                        
+                        for (const idx of existingIndices) {
+                            if (p5.isWithinTolerance(this.nodes[idx].pos, newNode.pos)) {
+                                isDuplicate = true;
+                                break;
+                            }
+                        }
+                        
+                        if (isDuplicate) break;
+                    }
+                    
+                    if (!isDuplicate) {
+                        this.nodes.push(newNode);
+                        newLayerNodes.push(newNode);
+                        
+                        if (!spatialMap.has(key)) {
+                            spatialMap.set(key, []);
+                        }
+                        spatialMap.get(key).push(this.nodes.length - 1);
+                    }
+                }
+
+                return newLayerNodes;
             }
 
             computeDual = () => {
+                if (debug) debugManager.startTimer("Dual");
                 let originalVertices = this.nodes.map(node => node.vertices).flat();
 
                 let uniqueOriginalVertices = [];
@@ -594,19 +677,25 @@
                 }
 
                 this.nodes = [...dualNodes];
+
+                if (debug) debugManager.endTimer("Dual");
             }
 
             calculateNeighbors = () => {
-                if (debug) console.time("Calculating neighbors");
-                const neighborsStart = performance.now();
+                if (debug) debugManager.startTimer("Computing Neighbors");
                 
-                if (debug) console.time("Creating spatial indices");
-                const spatialIndexStart = performance.now();
+                const neighborSet = new Set();
                 
+                if (debug) debugManager.startTimer("Creating spatial indices");
                 const halfwaysSpatialMap = new Map();
                 const verticesSpatialMap = new Map();
                 
                 for (let i = 0; i < this.nodes.length; i++) {
+                    this.nodes[i].neighbors = {
+                        side: [],
+                        vertex: []
+                    };
+                    
                     for (let j = 0; j < this.nodes[i].halfways.length; j++) {
                         const hw = this.nodes[i].halfways[j];
                         const key = p5.getSpatialKey(hw.x, hw.y);
@@ -614,7 +703,6 @@
                         if (!halfwaysSpatialMap.has(key)) {
                             halfwaysSpatialMap.set(key, []);
                         }
-
                         halfwaysSpatialMap.get(key).push({
                             nodeIndex: i,
                             halfwayIndex: j
@@ -634,86 +722,187 @@
                         });
                     }
                 }
+                if (debug) debugManager.endTimer("Creating spatial indices");
                 
-                const spatialIndexEnd = performance.now();
-                if (debug) console.timeEnd("Creating spatial indices");
-                if (debug) console.log(`Created spatial indices in ${spatialIndexEnd - spatialIndexStart}ms`);
-                
-                if (debug) console.time("Calculating halfways neighbors");
-                const halfwaysStart = performance.now();
-                
-                for (let i = 0; i < this.nodes.length; i++) {
-                    for (let j = 0; j < this.nodes[i].halfways.length; j++) {
-                        const hw = this.nodes[i].halfways[j];
-                        const baseX = Math.floor(hw.x / (tolerance * 2));
-                        const baseY = Math.floor(hw.y / (tolerance * 2));
-                        
-                        for (const [dx, dy] of offsets) {
-                            const key = `${baseX + dx},${baseY + dy}`;
-                            
-                            const potentialMatches = halfwaysSpatialMap.get(key) || [];
-                            
-                            for (const match of potentialMatches) {
-                                const k = match.nodeIndex;
-                                const l = match.halfwayIndex;
-                                
-                                if (i >= k) 
-                                    continue;
-                                
-                                if (p5.isWithinTolerance(hw, this.nodes[k].halfways[l])) {
-                                    this.nodes[i].neighbors.push(this.nodes[k]);
-                                    this.nodes[k].neighbors.push(this.nodes[i]);
-                                }
-                            }
+                const addNeighbor = (type, i, k) => {
+                    const pairKey = i < k ? `${i}-${k}` : `${k}-${i}`;
+                    
+                    if (!neighborSet.has(pairKey)) {
+                        neighborSet.add(pairKey);
+                        if (type === 'halfways') {
+                            this.nodes[i].neighbors.side.push(this.nodes[k]);
+                            this.nodes[k].neighbors.side.push(this.nodes[i]);
+                        } else if (type === 'vertices') {
+                            this.nodes[i].neighbors.vertex.push(this.nodes[k]);
+                            this.nodes[k].neighbors.vertex.push(this.nodes[i]);
                         }
                     }
-                }
-                
-                const halfwaysEnd = performance.now();
-                if (debug) console.timeEnd("Calculating halfways neighbors");
-                if (debug) console.log(`Halfways neighbors calculated in ${halfwaysEnd - halfwaysStart}ms`);
+                };
 
-                if (debug) console.time("Calculating vertices neighbors");
-                const verticesStart = performance.now();
+                if (debug) debugManager.startTimer("Calculating halfways neighbors");
+                const processedHalfwayCells = new Set();
                 
-                for (let i = 0; i < this.nodes.length; i++) {
-                    for (let j = 0; j < this.nodes[i].vertices.length; j++) {
-                        const vertex = this.nodes[i].vertices[j];
-                        const baseX = Math.floor(vertex.x / (tolerance * 2));
-                        const baseY = Math.floor(vertex.y / (tolerance * 2));
+                for (const [key, entries] of halfwaysSpatialMap.entries()) {
+                    if (entries.length < 2) continue;
+                    
+                    for (let i = 0; i < entries.length; i++) {
+                        const entry1 = entries[i];
+                        const node1 = this.nodes[entry1.nodeIndex];
+                        const hw1 = node1.halfways[entry1.halfwayIndex];
+                        
+                        for (let j = i + 1; j < entries.length; j++) {
+                            const entry2 = entries[j];
+                            const node2 = this.nodes[entry2.nodeIndex];
+                            const hw2 = node2.halfways[entry2.halfwayIndex];
+                            
+                            if (p5.isWithinTolerance(hw1, hw2)) {
+                                addNeighbor('halfways', entry1.nodeIndex, entry2.nodeIndex);
+                            }
+                        }
+                    }
+                    
+                    processedHalfwayCells.add(key);
+                }
+                
+                for (const [key, entries] of halfwaysSpatialMap.entries()) {
+                    if (processedHalfwayCells.has(key)) continue;
+                    
+                    const [baseX, baseY] = key.split(',').map(Number);
+                    
+                    for (const entry1 of entries) {
+                        const node1 = this.nodes[entry1.nodeIndex];
+                        const hw1 = node1.halfways[entry1.halfwayIndex];
                         
                         for (const [dx, dy] of offsets) {
-                            const key = `${baseX + dx},${baseY + dy}`;
+                            if (dx === 0 && dy === 0) continue;
                             
-                            const potentialMatches = verticesSpatialMap.get(key) || [];
+                            const adjKey = `${baseX + dx},${baseY + dy}`;
+                            const adjEntries = halfwaysSpatialMap.get(adjKey) || [];
                             
-                            for (const match of potentialMatches) {
-                                const k = match.nodeIndex;
-                                const l = match.vertexIndex;
+                            for (const entry2 of adjEntries) {
+                                const node2 = this.nodes[entry2.nodeIndex];
+                                const hw2 = node2.halfways[entry2.halfwayIndex];
                                 
-                                if (i >= k) 
-                                    continue;
-                                
-                                if (this.nodes[i].neighbors.some(neighbor => p5.isWithinTolerance(neighbor.pos, this.nodes[k].pos))) {
-                                    continue;
-                                }
-                                
-                                if (p5.isWithinTolerance(vertex, this.nodes[k].vertices[l])) {
-                                    this.nodes[i].neighbors.push(this.nodes[k]);
-                                    this.nodes[k].neighbors.push(this.nodes[i]);
+                                if (p5.isWithinTolerance(hw1, hw2)) {
+                                    addNeighbor('halfways', entry1.nodeIndex, entry2.nodeIndex);
                                 }
                             }
                         }
                     }
                 }
+                if (debug) debugManager.endTimer("Calculating halfways neighbors");
+
+                if (debug) debugManager.startTimer("Calculating vertices neighbors");
+                const processedVertexCells = new Set();
                 
-                const verticesEnd = performance.now();
-                if (debug) console.timeEnd("Calculating vertices neighbors");
-                if (debug) console.log(`Vertices neighbors calculated in ${verticesEnd - verticesStart}ms`);
+                for (const [key, entries] of verticesSpatialMap.entries()) {
+                    if (entries.length < 2) continue;
+                    
+                    for (let i = 0; i < entries.length; i++) {
+                        const entry1 = entries[i];
+                        const node1 = this.nodes[entry1.nodeIndex];
+                        const v1 = node1.vertices[entry1.vertexIndex];
+                        
+                        for (let j = i + 1; j < entries.length; j++) {
+                            const entry2 = entries[j];
+                            const node2 = this.nodes[entry2.nodeIndex];
+                            const v2 = node2.vertices[entry2.vertexIndex];
+                            
+                            const pairKey = entry1.nodeIndex < entry2.nodeIndex ? 
+                                `${entry1.nodeIndex}-${entry2.nodeIndex}` : 
+                                `${entry2.nodeIndex}-${entry1.nodeIndex}`;
+                                
+                            if (neighborSet.has(pairKey)) continue;
+                            
+                            if (p5.isWithinTolerance(v1, v2)) {
+                                addNeighbor('vertices', entry1.nodeIndex, entry2.nodeIndex);
+                            }
+                        }
+                    }
+                    
+                    processedVertexCells.add(key);
+                }
                 
-                const neighborsEnd = performance.now();
-                if (debug) console.timeEnd("Calculating neighbors");
-                if (debug) console.log(`All neighbors calculated in ${neighborsEnd - neighborsStart}ms`);
+                for (const [key, entries] of verticesSpatialMap.entries()) {
+                    if (processedVertexCells.has(key)) continue;
+                    
+                    const [baseX, baseY] = key.split(',').map(Number);
+                    
+                    for (const entry1 of entries) {
+                        const node1 = this.nodes[entry1.nodeIndex];
+                        const v1 = node1.vertices[entry1.vertexIndex];
+                        
+                        for (const [dx, dy] of offsets) {
+                            if (dx === 0 && dy === 0) continue;
+                            
+                            const adjKey = `${baseX + dx},${baseY + dy}`;
+                            const adjEntries = verticesSpatialMap.get(adjKey) || [];
+                            
+                            for (const entry2 of adjEntries) {
+                                const pairKey = entry1.nodeIndex < entry2.nodeIndex ? 
+                                    `${entry1.nodeIndex}-${entry2.nodeIndex}` : 
+                                    `${entry2.nodeIndex}-${entry1.nodeIndex}`;
+                                    
+                                if (neighborSet.has(pairKey)) continue;
+                                
+                                const node2 = this.nodes[entry2.nodeIndex];
+                                const v2 = node2.vertices[entry2.vertexIndex];
+                                
+                                if (p5.isWithinTolerance(v1, v2)) {
+                                    addNeighbor('vertices', entry1.nodeIndex, entry2.nodeIndex);
+                                }
+                            }
+                        }
+                    }
+                }
+                if (debug) debugManager.endTimer("Calculating vertices neighbors");
+
+                if (debug) debugManager.endTimer("Computing Neighbors");
+                updateDebugStore();
+            }
+
+            removeDuplicates = (nodes) => {
+                if (debug) debugManager.startTimer("Remove Duplicates");
+                
+                const spatialMap = new Map();
+                for (let i = 0; i < nodes.length; i++) {
+                    const node = nodes[i];
+                    const key = p5.getSpatialKey(node.pos.x, node.pos.y);
+                    
+                    if (!spatialMap.has(key)) {
+                        spatialMap.set(key, []);
+                    }
+                    spatialMap.get(key).push(i);
+                }
+                
+                const processed = new Set();
+                let uniqueNodes = [];
+                
+                for (let i = 0; i < nodes.length; i++) {
+                    if (processed.has(i)) continue;
+                    
+                    const node = nodes[i];
+                    uniqueNodes.push(node);
+                    processed.add(i);
+                    
+                    const baseX = Math.floor(node.pos.x / (tolerance * 2));
+                    const baseY = Math.floor(node.pos.y / (tolerance * 2));
+                    
+                    for (const [dx, dy] of offsets) {
+                        const key = `${baseX + dx},${baseY + dy}`;
+                        const candidates = spatialMap.get(key) || [];
+                        
+                        for (const candidateIdx of candidates) {
+                            if (candidateIdx !== i && !processed.has(candidateIdx) && 
+                                p5.isWithinTolerance(node.pos, nodes[candidateIdx].pos)) {
+                                processed.add(candidateIdx);
+                            }
+                        }
+                    }
+                }
+
+                if (debug) debugManager.endTimer("Remove Duplicates");
+                return uniqueNodes;
             }
 
             setupGameOfLife = () => {
@@ -743,7 +932,7 @@
 
             updateGameOfLife = () => {
                 for (let i = 0; i < this.nodes.length; i++) {
-                    let aliveNeighbors = this.nodes[i].neighbors.filter(neighbor => neighbor.state).length;
+                    let aliveNeighbors = [...this.nodes[i].neighbors.side, ...this.nodes[i].neighbors.vertex].filter(neighbor => neighbor.state).length;
 
                     if ($ruleType === 'Single') {
                         if (this.nodes[i].state && !rule.survival.includes(aliveNeighbors)) {
@@ -791,23 +980,23 @@
 
                 p5.stroke(0);
                 p5.strokeWeight(1 / side);
-                for (let i = 0; i < this.nodes.length; i++) {
+                for (let node of this.nodes) {
                     if (
-                        p5.dist((p5.mouseX - p5.width / 2) / side, (-p5.mouseY + p5.height / 2) / side, this.nodes[i].pos.x, this.nodes[i].pos.y) < p5.apothem(this.nodes[i].n)
+                        p5.dist((p5.mouseX - p5.width / 2) / side, (-p5.mouseY + p5.height / 2) / side, node.pos.x, node.pos.y) < p5.apothem(node.n)
                     ) {
-                        this.nodes[i].show(p5.color(0, 0, 100));
+                        node.show(p5.color(0, 0, 100));
 
-                        for (let j = 0; j < this.nodes[i].neighbors.length; j++) {
-                            this.nodes[i].neighbors[j].show(p5.color(240, 100, 100, 0.5));
+                        for (let neighbor of [...node.neighbors.side, ...node.neighbors.vertex]) {
+                            neighbor.show(p5.color(240, 100, 100, 0.5));
                             p5.line(
-                                this.nodes[i].pos.x,
-                                this.nodes[i].pos.y,
-                                this.nodes[i].neighbors[j].pos.x,
-                                this.nodes[i].neighbors[j].pos.y
+                                node.pos.x,
+                                node.pos.y,
+                                neighbor.pos.x,
+                                neighbor.pos.y
                             );
                             p5.ellipse(
-                                this.nodes[i].neighbors[j].pos.x,
-                                this.nodes[i].neighbors[j].pos.y,
+                                neighbor.pos.x,
+                                neighbor.pos.y,
                                 1/5,
                                 1/5
                             );
@@ -815,8 +1004,8 @@
 
                         p5.fill(0, 0, 0);
                         p5.ellipse(
-                            this.nodes[i].pos.x,
-                            this.nodes[i].pos.y,
+                            node.pos.x,
+                            node.pos.y,
                             1/5,
                             1/5
                         );
@@ -832,7 +1021,10 @@
                 this.pos = pos;
                 this.n = n;
                 this.angle = angle;
-                this.neighbors = [];
+                this.neighbors = {
+                    side: [],
+                    vertex: []
+                };
                 this.state = false;
                 this.nextState = false;
 
@@ -847,6 +1039,9 @@
             }
 
             show = (customColor = null) => {
+                if (this.centroid.x < -p5.width / 2 - 10 || this.centroid.y < -p5.height / 2 - 10 || this.centroid.x > p5.width / 2 + 10 || this.centroid.y > p5.height / 2 + 10)
+                    return;
+
                 p5.push();
                 p5.stroke(0, 0, 0);
                 p5.fill(customColor || this.hue, 40, 100, 0.80);
@@ -959,6 +1154,9 @@
             }
 
             show = (customColor = null) => {
+                if (this.centroid.x < -p5.width / 2 - 10 || this.centroid.y < -p5.height / 2 - 10 || this.centroid.x > p5.width / 2 + 10 || this.centroid.y > p5.height / 2 + 10)
+                    return;
+
                 p5.push();
                 p5.stroke(0, 0, 0);
                 p5.fill(customColor || this.hue, 40, 100, 0.80);
@@ -1007,7 +1205,7 @@
                     const dot = v1.x * v2.x + v1.y * v2.y;
                     
                     const angle = Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2)))) * 180 / Math.PI;
-                    angles.push(Math.round(angle)); // Round to reduce floating point errors
+                    angles.push(Math.round(angle)); 
                 }
 
                 let minRotation = [...angles]; 
@@ -1050,8 +1248,14 @@
 
             try {
                 tiling.parseRule(tilingRule);
+                if (debug) {
+                    debugManager.reset();
+                }
                 tiling.createGraph();
                 tiling.setupGameOfLife();
+                if (debug) {
+                    updateDebugStore();
+                }
             } catch (e) {
                 console.log(e);
             }
@@ -1164,6 +1368,244 @@
             return p5.dist(a.x, a.y, b.x, b.y) < tolerance;
         }
 
+        p5.findAnchor = (newNodes, indexOff) => {
+            const startTime = performance.now();
+            const allNodes = tiling.nodes.concat(newNodes);
+
+            let anchors = [];
+            for (let i = 0; i < tiling.nodes.length; i++) {
+                for (let s = 0; s < tiling.nodes[i].halfways.length; s++) {
+                    let isFree = true;
+
+                    for (let j = 0; j < allNodes.length; j++) {
+                        if (p5.isWithinTolerance(tiling.nodes[i].centroid, allNodes[j].centroid))
+                            continue;
+
+                        for (let k = 0; k < allNodes[j].halfways.length; k++) {
+                            if (p5.isWithinTolerance(tiling.nodes[i].halfways[s], allNodes[j].halfways[k])) {
+                                isFree = false;
+                                break;
+                            }
+                        }
+                        
+                        if (!isFree) 
+                            break;
+                    }
+
+                    if (isFree) {
+                        anchors.push({
+                            node: tiling.nodes[i],
+                            halfwayPoint: tiling.nodes[i].halfways[s]
+                        });
+                    }
+                }
+            }
+
+            anchors = anchors.sort((a, b) => {
+                const angleA = p5.getClockwiseAngle(a.halfwayPoint);
+                const angleB = p5.getClockwiseAngle(b.halfwayPoint);
+                
+                if (Math.abs(angleA - angleB) < tolerance) {
+                    const distA = Math.sqrt(a.halfwayPoint.x ** 2 + a.halfwayPoint.y ** 2);
+                    const distB = Math.sqrt(b.halfwayPoint.x ** 2 + b.halfwayPoint.y ** 2);
+                    return distA - distB;
+                }
+                
+                return angleA - angleB;
+            }).filter(anchor => !(anchor.node.n == 3 && anchor.node.angle == 0) || Math.abs(anchor.halfwayPoint.x) > tolerance);
+
+            return anchors[indexOff];
+        }
+
+        p5.isTriangleOverlappingHexagon = (triangle, existingNodes) => {
+            if (triangle.n !== 3) return false;
+            
+            const hexagons = existingNodes.filter(node => node.n === 6);
+            if (hexagons.length === 0) return false;
+            
+            for (let i = 0; i < hexagons.length; i++) {
+                const hexagon = hexagons[i];
+                
+                if (p5.dist(triangle.pos.x, triangle.pos.y, hexagon.pos.x, hexagon.pos.y) > 2) {
+                    continue;
+                }
+                
+                let centroidMatchFound = false;
+                let centroidMatchVertex = -1;
+                
+                for (let j = 0; j < triangle.vertices.length; j++) {
+                    if (p5.isWithinTolerance(triangle.vertices[j], hexagon.centroid)) {
+                        centroidMatchFound = true;
+                        centroidMatchVertex = j;
+                        break;
+                    }
+                }
+                
+                if (!centroidMatchFound) continue;
+                
+                let vertexMatches = 0;
+                
+                for (let j = 0; j < triangle.vertices.length; j++) {
+                    if (j === centroidMatchVertex) continue;
+                    
+                    for (let k = 0; k < hexagon.vertices.length; k++) {
+                        if (p5.isWithinTolerance(triangle.vertices[j], hexagon.vertices[k])) {
+                            vertexMatches++;
+                            break;
+                        }
+                    }
+                }
+                
+                if (vertexMatches >= 2) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        p5.isHexagonCoveredByTriangles = (hexagon, existingNodes) => {
+            if (hexagon.n !== 6) return false;
+            
+            const triangles = existingNodes.filter(node => node.n === 3);
+            const coveredVertices = new Set();
+            
+            for (let i = 0; i < hexagon.vertices.length; i++) {
+                const hexVertex = hexagon.vertices[i];
+                
+                for (let j = 0; j < triangles.length; j++) {
+                    const triangle = triangles[j];
+                    
+                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > 2) {
+                        continue;
+                    }
+                    
+                    for (let k = 0; k < triangle.vertices.length; k++) {
+                        if (p5.isWithinTolerance(hexVertex, triangle.vertices[k])) {
+                            coveredVertices.add(i);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (coveredVertices.size >= 2) {
+                const trianglesPointingInward = triangles.filter(triangle => {
+                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > 2) {
+                        return false;
+                    }
+                    
+                    for (let i = 0; i < triangle.vertices.length; i++) {
+                        if (p5.isWithinTolerance(triangle.vertices[i], hexagon.centroid)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+                
+                return trianglesPointingInward.length >= 2;
+            }
+            
+            return false;
+        }
+
+        p5.findOrigin = (nodes, type, index) => {
+            if (debug) debugManager.startTimer(`findOrigin (${type}${index})`);
+            
+            const deduplicatePoints = (points) => {
+                const spatialMap = new Map();
+                let uniquePoints = [];
+                
+                for (let i = 0; i < points.length; i++) {
+                    const point = points[i];
+                    const baseKey = p5.getSpatialKey(point.x, point.y);
+                    const baseX = Math.floor(point.x / (tolerance * 2));
+                    const baseY = Math.floor(point.y / (tolerance * 2));
+                    
+                    let isDuplicate = false;
+                    
+                    for (const [dx, dy] of offsets) {
+                        const key = `${baseX + dx},${baseY + dy}`;
+                        
+                        const potentialDuplicates = spatialMap.get(key) || [];
+                        
+                        for (const uniqueIndex of potentialDuplicates) {
+                            if (p5.isWithinTolerance(uniquePoints[uniqueIndex], point)) {
+                                isDuplicate = true;
+                                break;
+                            }
+                        }
+                        
+                        if (isDuplicate) break;
+                    }
+                    
+                    if (!isDuplicate) {
+                        const newIndex = uniquePoints.length;
+                        uniquePoints.push(point);
+                        
+                        if (!spatialMap.has(baseKey)) {
+                            spatialMap.set(baseKey, []);
+                        }
+                        spatialMap.get(baseKey).push(newIndex);
+                    }
+                }
+                
+                return uniquePoints;
+            };
+            
+            let result;
+            
+            if (type === 'c') {
+                let centroids = nodes.map(node => node.centroid);
+                
+                let uniqueCentroids = deduplicatePoints(centroids);
+                let sortedCentroids = p5.sortPointsByAngleAndDistance(uniqueCentroids);
+
+                sortedCentroids = sortedCentroids.filter(centroid => !p5.isWithinTolerance(centroid, {x: 0, y: 0}));
+
+                result = sortedCentroids[index - 1];
+            } 
+            
+            else if (type === 'h') {
+                let halfways = nodes.map(node => node.halfways).flat();
+                
+                let uniqueHalfways = deduplicatePoints(halfways);
+                let sortedHalfways = p5.sortPointsByAngleAndDistance(uniqueHalfways);
+
+                result = sortedHalfways[index - 1];
+            } 
+            
+            else if (type === 'v') {
+                let vertices = nodes.map(node => node.vertices).flat();
+                
+                let uniqueVertices = deduplicatePoints(vertices);
+                let sortedVertices = p5.sortPointsByAngleAndDistance(uniqueVertices);
+
+                result = sortedVertices[index - 1];
+            }
+            
+            if (debug) debugManager.endTimer(`findOrigin (${type}${index})`);
+            
+            return result;
+        }
+
+        p5.getClockwiseAngle = (point) => {
+            if (Math.abs(point.x) < tolerance)
+                return point.y > 0 ? 0 : Math.PI;
+
+            let angle = Math.PI / 2 - Math.atan2(point.y, point.x);
+            
+            if (angle < 0) {
+                angle += 2 * Math.PI;
+            }
+
+            return angle;
+        }
+
+        p5.apothem = (n) => {
+            return 0.5 / Math.tan(Math.PI / n);
+        }
+
         p5.drawInfo = () => {
             p5.push();
             p5.translate(0, p5.height);
@@ -1233,308 +1675,6 @@
             const hashY = Math.floor(y / gridSize);
             return `${hashX},${hashY}`;
         };
-
-        p5.findAnchor = (newNodes, indexOff) => {
-            const startTime = performance.now();
-            const allNodes = tiling.nodes.concat(newNodes);
-
-            let anchors = [];
-            for (let i = 0; i < tiling.nodes.length; i++) {
-                for (let s = 0; s < tiling.nodes[i].halfways.length; s++) {
-                    let isFree = true;
-
-                    for (let j = 0; j < allNodes.length; j++) {
-                        if (p5.isWithinTolerance(tiling.nodes[i].centroid, allNodes[j].centroid))
-                            continue;
-
-                        for (let k = 0; k < allNodes[j].halfways.length; k++) {
-                            if (p5.isWithinTolerance(tiling.nodes[i].halfways[s], allNodes[j].halfways[k])) {
-                                isFree = false;
-                                break;
-                            }
-                        }
-                        
-                        if (!isFree) 
-                            break;
-                    }
-
-                    if (isFree) {
-                        anchors.push({
-                            node: tiling.nodes[i],
-                            halfwayPoint: tiling.nodes[i].halfways[s]
-                        });
-                    }
-                }
-            }
-
-            anchors = anchors.sort((a, b) => {
-                const angleA = p5.getClockwiseAngle(a.halfwayPoint);
-                const angleB = p5.getClockwiseAngle(b.halfwayPoint);
-                
-                if (Math.abs(angleA - angleB) < tolerance) {
-                    const distA = Math.sqrt(a.halfwayPoint.x ** 2 + a.halfwayPoint.y ** 2);
-                    const distB = Math.sqrt(b.halfwayPoint.x ** 2 + b.halfwayPoint.y ** 2);
-                    return distA - distB;
-                }
-                
-                return angleA - angleB;
-            }).filter(anchor => !(anchor.node.n == 3 && anchor.node.angle == 0) || Math.abs(anchor.halfwayPoint.x) > tolerance);
-
-            const endTime = performance.now();
-            if (debug) console.log(`findAnchor: ${(endTime - startTime).toFixed(2)}ms - Found ${anchors.length} free sides`);
-            
-            return anchors[indexOff];
-        }
-
-        p5.removeDuplicates = (nodes) => {
-            const startTime = performance.now();
-            let nodeCount = nodes.length;
-            
-            const spatialMap = new Map();
-            let uniqueNodes = [];
-            
-            for (let i = 0; i < nodes.length; i++) {
-                const node = nodes[i];
-                const baseKey = p5.getSpatialKey(node.pos.x, node.pos.y);
-                const baseX = Math.floor(node.pos.x / (tolerance * 2));
-                const baseY = Math.floor(node.pos.y / (tolerance * 2));
-                
-                let isDuplicate = false;
-                
-                for (const [dx, dy] of offsets) {
-                    const key = `${baseX + dx},${baseY + dy}`;
-                    
-                    const potentialDuplicates = spatialMap.get(key) || [];
-                    
-                    for (const uniqueIndex of potentialDuplicates) {
-                        if (p5.isWithinTolerance(uniqueNodes[uniqueIndex].pos, node.pos)) {
-                            isDuplicate = true;
-                            break;
-                        }
-                    }
-                    
-                    if (isDuplicate) break;
-                }
-                
-                if (!isDuplicate) {
-                    const newIndex = uniqueNodes.length;
-                    uniqueNodes.push(node);
-                    
-                    if (!spatialMap.has(baseKey)) {
-                        spatialMap.set(baseKey, []);
-                    }
-                    spatialMap.get(baseKey).push(newIndex);
-                }
-            }
-            
-            const endTime = performance.now();
-            const duration = endTime - startTime;
-            if (debug) console.log(`removeDuplicates: ${duration.toFixed(2)}ms - Reduced ${nodeCount} nodes to ${uniqueNodes.length} nodes (${(nodeCount - uniqueNodes.length)} duplicates removed)`);
-            
-            return uniqueNodes;
-        }
-
-        // Check if a triangle would overlap with an existing hexagon
-        p5.isTriangleOverlappingHexagon = (triangle, existingNodes) => {
-            if (triangle.n !== 3) return false;
-            
-            // Find hexagons that could potentially be overlapped by this triangle
-            const hexagons = existingNodes.filter(node => node.n === 6);
-            if (hexagons.length === 0) return false;
-            
-            for (let i = 0; i < hexagons.length; i++) {
-                const hexagon = hexagons[i];
-                
-                // Only consider hexagons close to the triangle
-                if (p5.dist(triangle.pos.x, triangle.pos.y, hexagon.pos.x, hexagon.pos.y) > 2) {
-                    continue;
-                }
-                
-                // Check if one vertex of the triangle matches the centroid of the hexagon
-                let centroidMatchFound = false;
-                let centroidMatchVertex = -1;
-                
-                for (let j = 0; j < triangle.vertices.length; j++) {
-                    if (p5.isWithinTolerance(triangle.vertices[j], hexagon.centroid)) {
-                        centroidMatchFound = true;
-                        centroidMatchVertex = j;
-                        break;
-                    }
-                }
-                
-                if (!centroidMatchFound) continue;
-                
-                // Check if at least two other vertices of the triangle match vertices of the hexagon
-                let vertexMatches = 0;
-                
-                for (let j = 0; j < triangle.vertices.length; j++) {
-                    if (j === centroidMatchVertex) continue;
-                    
-                    for (let k = 0; k < hexagon.vertices.length; k++) {
-                        if (p5.isWithinTolerance(triangle.vertices[j], hexagon.vertices[k])) {
-                            vertexMatches++;
-                            break;
-                        }
-                    }
-                }
-                
-                // If we found one vertex matching the centroid and at least two other vertices matching hexagon vertices
-                if (vertexMatches >= 2) {
-                    return true;
-                }
-            }
-            
-            return false;
-        }
-
-        // Add new helper function to check if a hexagon is covered by triangles
-        p5.isHexagonCoveredByTriangles = (hexagon, existingNodes) => {
-            if (hexagon.n !== 6) return false;
-            
-            const triangles = existingNodes.filter(node => node.n === 3);
-            const coveredVertices = new Set();
-            
-            for (let i = 0; i < hexagon.vertices.length; i++) {
-                const hexVertex = hexagon.vertices[i];
-                
-                for (let j = 0; j < triangles.length; j++) {
-                    const triangle = triangles[j];
-                    
-                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > 2) {
-                        continue;
-                    }
-                    
-                    for (let k = 0; k < triangle.vertices.length; k++) {
-                        if (p5.isWithinTolerance(hexVertex, triangle.vertices[k])) {
-                            coveredVertices.add(i);
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            if (coveredVertices.size >= 2) {
-                const trianglesPointingInward = triangles.filter(triangle => {
-                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > 2) {
-                        return false;
-                    }
-                    
-                    for (let i = 0; i < triangle.vertices.length; i++) {
-                        if (p5.isWithinTolerance(triangle.vertices[i], hexagon.centroid)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-                
-                return trianglesPointingInward.length >= 2;
-            }
-            
-            return false;
-        }
-
-        p5.findOrigin = (nodes, type, index) => {
-            const startTime = performance.now();
-            if (debug) console.time(`findOrigin (${type}${index})`);
-            
-            const deduplicatePoints = (points) => {
-                const spatialMap = new Map();
-                let uniquePoints = [];
-                
-                for (let i = 0; i < points.length; i++) {
-                    const point = points[i];
-                    const baseKey = p5.getSpatialKey(point.x, point.y);
-                    const baseX = Math.floor(point.x / (tolerance * 2));
-                    const baseY = Math.floor(point.y / (tolerance * 2));
-                    
-                    let isDuplicate = false;
-                    
-                    for (const [dx, dy] of offsets) {
-                        const key = `${baseX + dx},${baseY + dy}`;
-                        
-                        const potentialDuplicates = spatialMap.get(key) || [];
-                        
-                        for (const uniqueIndex of potentialDuplicates) {
-                            if (p5.isWithinTolerance(uniquePoints[uniqueIndex], point)) {
-                                isDuplicate = true;
-                                break;
-                            }
-                        }
-                        
-                        if (isDuplicate) break;
-                    }
-                    
-                    if (!isDuplicate) {
-                        const newIndex = uniquePoints.length;
-                        uniquePoints.push(point);
-                        
-                        if (!spatialMap.has(baseKey)) {
-                            spatialMap.set(baseKey, []);
-                        }
-                        spatialMap.get(baseKey).push(newIndex);
-                    }
-                }
-                
-                return uniquePoints;
-            };
-            
-            let result;
-            
-            if (type === 'c') {
-                let centroids = nodes.map(node => node.centroid);
-                
-                let uniqueCentroids = deduplicatePoints(centroids);
-                let sortedCentroids = p5.sortPointsByAngleAndDistance(uniqueCentroids);
-
-                sortedCentroids = sortedCentroids.filter(centroid => !p5.isWithinTolerance(centroid, {x: 0, y: 0}));
-
-                result = sortedCentroids[index - 1];
-                if (debug) console.log(`findOrigin (${type}${index}): Found ${uniqueCentroids.length} unique centroids`);
-            } 
-            
-            else if (type === 'h') {
-                let halfways = nodes.map(node => node.halfways).flat();
-                
-                let uniqueHalfways = deduplicatePoints(halfways);
-                let sortedHalfways = p5.sortPointsByAngleAndDistance(uniqueHalfways);
-
-                result = sortedHalfways[index - 1];
-                if (debug) console.log(`findOrigin (${type}${index}): Found ${uniqueHalfways.length} unique halfways`);
-            } 
-            
-            else if (type === 'v') {
-                let vertices = nodes.map(node => node.vertices).flat();
-                
-                let uniqueVertices = deduplicatePoints(vertices);
-                let sortedVertices = p5.sortPointsByAngleAndDistance(uniqueVertices);
-
-                result = sortedVertices[index - 1];
-                if (debug) console.log(`findOrigin (${type}${index}): Found ${uniqueVertices.length} unique vertices`);
-            }
-            
-            const endTime = performance.now();
-            if (debug) console.timeEnd(`findOrigin (${type}${index})`);
-            if (debug) console.log(`findOrigin (${type}${index}): ${(endTime - startTime).toFixed(2)}ms`);
-            
-            return result;
-        }
-
-        p5.apothem = (n) => {
-            return 0.5 / Math.tan(Math.PI / n);
-        }
-
-        p5.getClockwiseAngle = (point) => {
-            if (Math.abs(point.x) < tolerance)
-                return point.y > 0 ? 0 : Math.PI;
-
-            let angle = Math.PI / 2 - Math.atan2(point.y, point.x);
-            
-            if (angle < 0) {
-                angle += 2 * Math.PI;
-            }
-            
-            return angle;
-        }
 
         p5.windowResized = () => {
             if (prevWidth !== width || prevHeight !== height) {
@@ -1686,7 +1826,6 @@
 
     $effect(() => {
         if (myp5 && (width !== prevWidth || height !== prevHeight)) {
-            // Force immediate canvas resize when width or height changes
             myp5.resizeCanvas(width, height);
             prevWidth = width;
             prevHeight = height;
@@ -1698,13 +1837,31 @@
     <div bind:this={canvasContainer}></div>
     
     {#if !showGameOfLife}
-        <button 
-            class="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2 z-10"
-            onclick={captureScreenshot}
-        >
-            <Camera />
-            Screenshot
-        </button>
+        <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
+            <button 
+                class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
+                onclick={captureScreenshot}
+            >
+                <Camera />
+                Screenshot
+            </button>
+            
+            <button 
+                class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
+                onclick={() => {
+                    debug = !debug;
+                    if (debug) {
+                        debugManager.reset();
+                        setTimeout(() => {
+                            tiling.createGraph();
+                            updateDebugStore();
+                        }, 0);
+                    }
+                }}
+            >
+                {debug ? 'Disable Debug' : 'Enable Debug'}
+            </button>
+        </div>
     {:else}
         <div class="absolute top-4 right-4 flex flex-col gap-4 z-10">
             <button 
@@ -1720,6 +1877,17 @@
             </div>
         </div>
     {/if}
+    
+    {#if debug}
+        <div class="absolute bottom-4 right-4 w-96 z-20">
+            <PieChart />
+            {#if $debugStore.timingData.phases.length === 0}
+                <div class="mt-2 p-3 bg-amber-500/80 text-white text-sm rounded-lg">
+                    No timing data available. Try changing the tilingRule or transformSteps to generate data.
+                </div>
+            {/if}
+        </div>
+    {/if}
 </div>
 
 {#if showNotification}
@@ -1728,3 +1896,12 @@
         {notificationMessage}
     </div>
 {/if}
+
+<div class="flex flex-col gap-3">
+    {#if showInfo && !debug}
+        <LiveChart 
+            bind:alivePercentage={alivePercentage}
+            bind:iterationCount={iterationCount}
+        />
+    {/if}
+</div>
