@@ -174,7 +174,6 @@ class DebugManager {
 			});
 		}
 		
-		// Create breadcrumbs for navigation
 		const breadcrumbs = path.map((label, index) => ({
 			label,
 			path: path.slice(0, index + 1)
@@ -195,7 +194,6 @@ export const debugStore = writable({
 	timingData: { phases: [], totalTime: 0, currentPath: [], breadcrumbs: [] }
 });
 
-// Updates the store when timing data changes
 export function updateDebugStore(path = []) {
 	const data = debugManager.getTimingData(path);
 	

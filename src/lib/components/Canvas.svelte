@@ -224,7 +224,7 @@
                             continue;
                         }
 
-                        let anchor = p5.findAnchor(newNodes, indexOff);
+                        let anchor = this.findAnchor(newNodes, indexOff);
                         let v = p5.createVector(
                             anchor.halfwayPoint.x - anchor.node.centroid.x,
                             anchor.halfwayPoint.y - anchor.node.centroid.y
@@ -295,7 +295,7 @@
                     let type = this.transforms[transformationIndex].relativeTo[0];
                     let index = this.transforms[transformationIndex].relativeTo.slice(1);
 
-                    origin = p5.findOrigin(this.anchorNodes, type, index);
+                    origin = this.findOrigin(this.anchorNodes, type, index);
                     this.transforms[transformationIndex].anchor = origin;
                 }
                 
@@ -428,7 +428,7 @@
                     let type = this.transforms[transformationIndex].relativeTo[0];
                     let index = this.transforms[transformationIndex].relativeTo.slice(1);
 
-                    origin = p5.findOrigin(this.anchorNodes, type, index);
+                    origin = this.findOrigin(this.anchorNodes, type, index);
                     this.transforms[transformationIndex].anchor = origin;
                 }
 
@@ -519,6 +519,134 @@
                 }
                 
                 rotationCache.clear();
+            }
+
+            findAnchor = (newNodes, indexOff) => {
+                const allNodes = this.nodes.concat(newNodes);
+
+                let anchors = [];
+                for (let i = 0; i < this.nodes.length; i++) {
+                    for (let s = 0; s < this.nodes[i].halfways.length; s++) {
+                        let isFree = true;
+
+                        for (let j = 0; j < allNodes.length; j++) {
+                            if (p5.isWithinTolerance(this.nodes[i].centroid, allNodes[j].centroid))
+                                continue;
+
+                            for (let k = 0; k < allNodes[j].halfways.length; k++) {
+                                if (p5.isWithinTolerance(this.nodes[i].halfways[s], allNodes[j].halfways[k])) {
+                                    isFree = false;
+                                    break;
+                                }
+                            }
+                            
+                            if (!isFree) 
+                                break;
+                        }
+
+                        if (isFree) {
+                            anchors.push({
+                                node: this.nodes[i],
+                                halfwayPoint: this.nodes[i].halfways[s]
+                            });
+                        }
+                    }
+                }
+
+                anchors = anchors.sort((a, b) => {
+                    const angleA = p5.getClockwiseAngle(a.halfwayPoint);
+                    const angleB = p5.getClockwiseAngle(b.halfwayPoint);
+                    
+                    if (Math.abs(angleA - angleB) < tolerance) {
+                        const distA = Math.sqrt(a.halfwayPoint.x ** 2 + a.halfwayPoint.y ** 2);
+                        const distB = Math.sqrt(b.halfwayPoint.x ** 2 + b.halfwayPoint.y ** 2);
+                        return distA - distB;
+                    }
+                    
+                    return angleA - angleB;
+                }).filter(anchor => !(anchor.node.n == 3 && anchor.node.angle == 0) || Math.abs(anchor.halfwayPoint.x) > tolerance);
+
+                return anchors[indexOff];
+            }
+
+            findOrigin = (nodes, type, index) => {
+                if (debug) debugManager.startTimer(`findOrigin (${type}${index})`);
+                
+                const deduplicatePoints = (points) => {
+                    const spatialMap = new Map();
+                    let uniquePoints = [];
+                    
+                    for (let i = 0; i < points.length; i++) {
+                        const point = points[i];
+                        const baseKey = p5.getSpatialKey(point.x, point.y);
+                        const baseX = Math.floor(point.x / (tolerance * 2));
+                        const baseY = Math.floor(point.y / (tolerance * 2));
+                        
+                        let isDuplicate = false;
+                        
+                        for (const [dx, dy] of offsets) {
+                            const key = `${baseX + dx},${baseY + dy}`;
+                            
+                            const potentialDuplicates = spatialMap.get(key) || [];
+                            
+                            for (const uniqueIndex of potentialDuplicates) {
+                                if (p5.isWithinTolerance(uniquePoints[uniqueIndex], point)) {
+                                    isDuplicate = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (isDuplicate) break;
+                        }
+                        
+                        if (!isDuplicate) {
+                            const newIndex = uniquePoints.length;
+                            uniquePoints.push(point);
+                            
+                            if (!spatialMap.has(baseKey)) {
+                                spatialMap.set(baseKey, []);
+                            }
+                            spatialMap.get(baseKey).push(newIndex);
+                        }
+                    }
+                    
+                    return uniquePoints;
+                };
+                
+                let result;
+                
+                if (type === 'c') {
+                    let centroids = nodes.map(node => node.centroid);
+                    
+                    let uniqueCentroids = deduplicatePoints(centroids);
+                    let sortedCentroids = p5.sortPointsByAngleAndDistance(uniqueCentroids);
+
+                    sortedCentroids = sortedCentroids.filter(centroid => !p5.isWithinTolerance(centroid, {x: 0, y: 0}));
+
+                    result = sortedCentroids[index - 1];
+                } 
+                
+                else if (type === 'h') {
+                    let halfways = nodes.map(node => node.halfways).flat();
+                    
+                    let uniqueHalfways = deduplicatePoints(halfways);
+                    let sortedHalfways = p5.sortPointsByAngleAndDistance(uniqueHalfways);
+
+                    result = sortedHalfways[index - 1];
+                } 
+                
+                else if (type === 'v') {
+                    let vertices = nodes.map(node => node.vertices).flat();
+                    
+                    let uniqueVertices = deduplicatePoints(vertices);
+                    let sortedVertices = p5.sortPointsByAngleAndDistance(uniqueVertices);
+
+                    result = sortedVertices[index - 1];
+                }
+                
+                if (debug) debugManager.endTimer(`findOrigin (${type}${index})`);
+                
+                return result;
             }
 
             addNewNodes = (newNodes) => {
@@ -792,64 +920,89 @@
                 }
                 if (debug) debugManager.endTimer("Calculating halfways neighbors");
 
+
                 if (debug) debugManager.startTimer("Calculating vertices neighbors");
                 const processedVertexCells = new Set();
                 
-                for (const [key, entries] of verticesSpatialMap.entries()) {
-                    if (entries.length < 2) continue;
-                    
-                    for (let i = 0; i < entries.length; i++) {
-                        const entry1 = entries[i];
-                        const node1 = this.nodes[entry1.nodeIndex];
-                        const v1 = node1.vertices[entry1.vertexIndex];
+                // Create a map to track which nodes share each vertex
+                const vertexToNodesMap = new Map();
+                
+                // First, collect all vertices and which nodes they belong to
+                for (let i = 0; i < this.nodes.length; i++) {
+                    for (let j = 0; j < this.nodes[i].vertices.length; j++) {
+                        const vertex = this.nodes[i].vertices[j];
+                        const key = p5.getSpatialKey(vertex.x, vertex.y);
                         
-                        for (let j = i + 1; j < entries.length; j++) {
-                            const entry2 = entries[j];
-                            const node2 = this.nodes[entry2.nodeIndex];
-                            const v2 = node2.vertices[entry2.vertexIndex];
+                        // Check all neighboring spatial cells
+                        const baseX = Math.floor(vertex.x / (tolerance * 2));
+                        const baseY = Math.floor(vertex.y / (tolerance * 2));
+                        
+                        // Find the "canonical" vertex for this spatial region
+                        let canonicalVertex = vertex;
+                        let canonicalKey = null;
+                        
+                        // Search for an existing vertex in nearby cells that matches this one
+                        for (const [dx, dy] of offsets) {
+                            const nearbyKey = `${baseX + dx},${baseY + dy}`;
+                            const existingVertices = vertexToNodesMap.get(nearbyKey);
                             
-                            const pairKey = entry1.nodeIndex < entry2.nodeIndex ? 
-                                `${entry1.nodeIndex}-${entry2.nodeIndex}` : 
-                                `${entry2.nodeIndex}-${entry1.nodeIndex}`;
-                                
-                            if (neighborSet.has(pairKey)) continue;
+                            if (!existingVertices) continue;
                             
-                            if (p5.isWithinTolerance(v1, v2)) {
-                                addNeighbor('vertices', entry1.nodeIndex, entry2.nodeIndex);
+                            for (const {v, nodeIndexes} of existingVertices) {
+                                if (p5.isWithinTolerance(vertex, v)) {
+                                    canonicalVertex = v;
+                                    canonicalKey = nearbyKey;
+                                    break;
+                                }
+                            }
+                            
+                            if (canonicalKey) break;
+                        }
+                        
+                        // If no existing vertex was found, use this one as canonical
+                        if (!canonicalKey) {
+                            canonicalKey = key;
+                            
+                            if (!vertexToNodesMap.has(canonicalKey)) {
+                                vertexToNodesMap.set(canonicalKey, []);
+                            }
+                            
+                            vertexToNodesMap.get(canonicalKey).push({
+                                v: canonicalVertex,
+                                nodeIndexes: new Set([i])
+                            });
+                        } else {
+                            // Add this node to the set of nodes that share the canonical vertex
+                            for (const entry of vertexToNodesMap.get(canonicalKey)) {
+                                if (p5.isWithinTolerance(entry.v, canonicalVertex)) {
+                                    entry.nodeIndexes.add(i);
+                                    break;
+                                }
                             }
                         }
                     }
-                    
-                    processedVertexCells.add(key);
                 }
                 
-                for (const [key, entries] of verticesSpatialMap.entries()) {
-                    if (processedVertexCells.has(key)) continue;
-                    
-                    const [baseX, baseY] = key.split(',').map(Number);
-                    
-                    for (const entry1 of entries) {
-                        const node1 = this.nodes[entry1.nodeIndex];
-                        const v1 = node1.vertices[entry1.vertexIndex];
+                // Now create vertex neighbor connections from the collected data
+                for (const entries of vertexToNodesMap.values()) {
+                    for (const {nodeIndexes} of entries) {
+                        if (nodeIndexes.size < 2) continue;
                         
-                        for (const [dx, dy] of offsets) {
-                            if (dx === 0 && dy === 0) continue;
-                            
-                            const adjKey = `${baseX + dx},${baseY + dy}`;
-                            const adjEntries = verticesSpatialMap.get(adjKey) || [];
-                            
-                            for (const entry2 of adjEntries) {
-                                const pairKey = entry1.nodeIndex < entry2.nodeIndex ? 
-                                    `${entry1.nodeIndex}-${entry2.nodeIndex}` : 
-                                    `${entry2.nodeIndex}-${entry1.nodeIndex}`;
-                                    
-                                if (neighborSet.has(pairKey)) continue;
+                        // Convert the Set to an Array for iteration
+                        const nodeIndexArray = Array.from(nodeIndexes);
+                        
+                        for (let i = 0; i < nodeIndexArray.length; i++) {
+                            for (let j = i + 1; j < nodeIndexArray.length; j++) {
+                                const node1Index = nodeIndexArray[i];
+                                const node2Index = nodeIndexArray[j];
                                 
-                                const node2 = this.nodes[entry2.nodeIndex];
-                                const v2 = node2.vertices[entry2.vertexIndex];
+                                // Skip if these nodes are already side neighbors (they share an edge)
+                                const isSideNeighbors = this.nodes[node1Index].neighbors.side.some(
+                                    neighbor => p5.isWithinTolerance(neighbor.pos, this.nodes[node2Index].pos)
+                                );
                                 
-                                if (p5.isWithinTolerance(v1, v2)) {
-                                    addNeighbor('vertices', entry1.nodeIndex, entry2.nodeIndex);
+                                if (!isSideNeighbors) {
+                                    addNeighbor('vertices', node1Index, node2Index);
                                 }
                             }
                         }
@@ -968,7 +1121,7 @@
                 p5.pop();
             }
 
-            drawGraphTiling = () => {
+            showNeighbors = () => {
                 p5.push();
                 p5.translate(p5.width / 2, p5.height / 2);
                 p5.scale(side);
@@ -980,14 +1133,35 @@
 
                 p5.stroke(0);
                 p5.strokeWeight(1 / side);
+                
+                // Get mouse position in world coordinates
+                const mouseWorldX = (p5.mouseX - p5.width / 2) / side;
+                const mouseWorldY = (-p5.mouseY + p5.height / 2) / side;
+                const mousePoint = { x: mouseWorldX, y: mouseWorldY };
+                
                 for (let node of this.nodes) {
-                    if (
-                        p5.dist((p5.mouseX - p5.width / 2) / side, (-p5.mouseY + p5.height / 2) / side, node.pos.x, node.pos.y) < p5.apothem(node.n)
-                    ) {
+                    // Use polygon hit test instead of center distance
+                    if (node.containsPoint(mousePoint)) {
                         node.show(p5.color(0, 0, 100));
 
-                        for (let neighbor of [...node.neighbors.side, ...node.neighbors.vertex]) {
+                        for (let neighbor of node.neighbors.side) {
                             neighbor.show(p5.color(240, 100, 100, 0.5));
+                            p5.line(
+                                node.pos.x,
+                                node.pos.y,
+                                neighbor.pos.x,
+                                neighbor.pos.y
+                            );
+                            p5.ellipse(
+                                neighbor.pos.x,
+                                neighbor.pos.y,
+                                1/5,
+                                1/5
+                            );
+                        }
+
+                        for (let neighbor of node.neighbors.vertex) {
+                            neighbor.show(p5.color(120, 100, 100, 0.5));
                             p5.line(
                                 node.pos.x,
                                 node.pos.y,
@@ -1036,6 +1210,10 @@
 
             calculateHue = () => {
                 this.hue = p5.map(this.vertices.length, 3, 12, 0, 300);
+            }
+
+            containsPoint = (point) => {
+                return p5.isPointInPolygon(point, this.vertices);
             }
 
             show = (customColor = null) => {
@@ -1309,9 +1487,9 @@
                     tiling.drawGameOfLife();
                 } else {
                     if (showInfo) {
-                        p5.drawInfo();
+                        p5.showConstructionPoints();
                     }
-                    tiling.drawGraphTiling();
+                    tiling.showNeighbors();
                     
                     if (takeScreenshot) {
                         p5.takeScreenshot();
@@ -1366,55 +1544,6 @@
 
         p5.isWithinTolerance = (a, b) => {
             return p5.dist(a.x, a.y, b.x, b.y) < tolerance;
-        }
-
-        p5.findAnchor = (newNodes, indexOff) => {
-            const startTime = performance.now();
-            const allNodes = tiling.nodes.concat(newNodes);
-
-            let anchors = [];
-            for (let i = 0; i < tiling.nodes.length; i++) {
-                for (let s = 0; s < tiling.nodes[i].halfways.length; s++) {
-                    let isFree = true;
-
-                    for (let j = 0; j < allNodes.length; j++) {
-                        if (p5.isWithinTolerance(tiling.nodes[i].centroid, allNodes[j].centroid))
-                            continue;
-
-                        for (let k = 0; k < allNodes[j].halfways.length; k++) {
-                            if (p5.isWithinTolerance(tiling.nodes[i].halfways[s], allNodes[j].halfways[k])) {
-                                isFree = false;
-                                break;
-                            }
-                        }
-                        
-                        if (!isFree) 
-                            break;
-                    }
-
-                    if (isFree) {
-                        anchors.push({
-                            node: tiling.nodes[i],
-                            halfwayPoint: tiling.nodes[i].halfways[s]
-                        });
-                    }
-                }
-            }
-
-            anchors = anchors.sort((a, b) => {
-                const angleA = p5.getClockwiseAngle(a.halfwayPoint);
-                const angleB = p5.getClockwiseAngle(b.halfwayPoint);
-                
-                if (Math.abs(angleA - angleB) < tolerance) {
-                    const distA = Math.sqrt(a.halfwayPoint.x ** 2 + a.halfwayPoint.y ** 2);
-                    const distB = Math.sqrt(b.halfwayPoint.x ** 2 + b.halfwayPoint.y ** 2);
-                    return distA - distB;
-                }
-                
-                return angleA - angleB;
-            }).filter(anchor => !(anchor.node.n == 3 && anchor.node.angle == 0) || Math.abs(anchor.halfwayPoint.x) > tolerance);
-
-            return anchors[indexOff];
         }
 
         p5.isTriangleOverlappingHexagon = (triangle, existingNodes) => {
@@ -1509,86 +1638,6 @@
             return false;
         }
 
-        p5.findOrigin = (nodes, type, index) => {
-            if (debug) debugManager.startTimer(`findOrigin (${type}${index})`);
-            
-            const deduplicatePoints = (points) => {
-                const spatialMap = new Map();
-                let uniquePoints = [];
-                
-                for (let i = 0; i < points.length; i++) {
-                    const point = points[i];
-                    const baseKey = p5.getSpatialKey(point.x, point.y);
-                    const baseX = Math.floor(point.x / (tolerance * 2));
-                    const baseY = Math.floor(point.y / (tolerance * 2));
-                    
-                    let isDuplicate = false;
-                    
-                    for (const [dx, dy] of offsets) {
-                        const key = `${baseX + dx},${baseY + dy}`;
-                        
-                        const potentialDuplicates = spatialMap.get(key) || [];
-                        
-                        for (const uniqueIndex of potentialDuplicates) {
-                            if (p5.isWithinTolerance(uniquePoints[uniqueIndex], point)) {
-                                isDuplicate = true;
-                                break;
-                            }
-                        }
-                        
-                        if (isDuplicate) break;
-                    }
-                    
-                    if (!isDuplicate) {
-                        const newIndex = uniquePoints.length;
-                        uniquePoints.push(point);
-                        
-                        if (!spatialMap.has(baseKey)) {
-                            spatialMap.set(baseKey, []);
-                        }
-                        spatialMap.get(baseKey).push(newIndex);
-                    }
-                }
-                
-                return uniquePoints;
-            };
-            
-            let result;
-            
-            if (type === 'c') {
-                let centroids = nodes.map(node => node.centroid);
-                
-                let uniqueCentroids = deduplicatePoints(centroids);
-                let sortedCentroids = p5.sortPointsByAngleAndDistance(uniqueCentroids);
-
-                sortedCentroids = sortedCentroids.filter(centroid => !p5.isWithinTolerance(centroid, {x: 0, y: 0}));
-
-                result = sortedCentroids[index - 1];
-            } 
-            
-            else if (type === 'h') {
-                let halfways = nodes.map(node => node.halfways).flat();
-                
-                let uniqueHalfways = deduplicatePoints(halfways);
-                let sortedHalfways = p5.sortPointsByAngleAndDistance(uniqueHalfways);
-
-                result = sortedHalfways[index - 1];
-            } 
-            
-            else if (type === 'v') {
-                let vertices = nodes.map(node => node.vertices).flat();
-                
-                let uniqueVertices = deduplicatePoints(vertices);
-                let sortedVertices = p5.sortPointsByAngleAndDistance(uniqueVertices);
-
-                result = sortedVertices[index - 1];
-            }
-            
-            if (debug) debugManager.endTimer(`findOrigin (${type}${index})`);
-            
-            return result;
-        }
-
         p5.getClockwiseAngle = (point) => {
             if (Math.abs(point.x) < tolerance)
                 return point.y > 0 ? 0 : Math.PI;
@@ -1606,7 +1655,7 @@
             return 0.5 / Math.tan(Math.PI / n);
         }
 
-        p5.drawInfo = () => {
+        p5.showConstructionPoints = () => {
             p5.push();
             p5.translate(0, p5.height);
             p5.scale(1, -1);
@@ -1799,6 +1848,24 @@
                 showNotification = false;
             }, 3000);
         }
+
+        p5.isPointInPolygon = (point, vertices) => {
+            let inside = false;
+            
+            for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+                const xi = vertices[i].x;
+                const yi = vertices[i].y;
+                const xj = vertices[j].x;
+                const yj = vertices[j].y;
+                
+                const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+                
+                if (intersect) 
+                    inside = !inside;
+            }
+            
+            return inside;
+        };
 	};
 
     let canvasContainer = $state();

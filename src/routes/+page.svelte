@@ -25,13 +25,11 @@
 
     let showGameOfLife = $derived($activeTab == "Game of Life");
 
-    // Track sidebar state changes
     $effect(() => {
         if (prevSidebarState !== isSidebarOpen) {
             prevSidebarState = isSidebarOpen;
             
-            // Use appropriate delay based on whether sidebar is opening or closing
-            const delay = isSidebarOpen ? 300 : 10; // Longer delay for opening
+            const delay = isSidebarOpen ? 300 : 10;
             
             setTimeout(() => {
                 updateDimensions();
@@ -52,10 +50,8 @@
     const updateDimensions = () => {
         if (!sidebarElement) return;
         
-        // Calculate correct sidebar width based on open/closed state
-        sidebarWidth = isSidebarOpen ? sidebarElement.clientWidth : 48; // Width when closed is 48px (w-12)
+        sidebarWidth = isSidebarOpen ? sidebarElement.clientWidth : 48;
         
-        // Immediately update canvas dimensions
         width = window.innerWidth - sidebarWidth;
         height = window.innerHeight;
     }
