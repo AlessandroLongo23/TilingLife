@@ -1137,50 +1137,92 @@
                 return uniqueNodes;
             }
 
+            parseGameOfLifeRule = (rule) => {
+                let pieces = rule.split('/');
+                let birth = pieces[0].slice(1).split('').map(Number);
+                let survival = pieces[1].slice(1).split('').map(Number);
+                let generations = pieces[2] ? parseInt(pieces[2]) : 1;
+
+                return {
+                    birth: birth,
+                    survival: survival,
+                    generations: generations
+                }
+            }
+
             setupGameOfLife = () => {
                 if ($ruleType === 'Single') {
-                    rule = {
-                        birth: $golRule.split('/')[0].slice(1).split('').map(Number),
-                        survival: $golRule.split('/')[1].slice(1).split('').map(Number)
-                    }
+                    rule = this.parseGameOfLifeRule($golRule)
+                    
                 } else {
                     rules = {}
 
                     for (let i = 0; i < Object.keys($golRules).length; i++) {
                         let key = Object.keys($golRules)[i];
                         let value = $golRules[key];
-
-                        rules[key] = {
-                            birth: value.split('/')[0].slice(1).split('').map(Number),
-                            survival: value.split('/')[1].slice(1).split('').map(Number)
-                        }
+                        rules[key] = this.parseGameOfLifeRule(value);
                     }
                 }
 
                 for (let i = 0; i < this.nodes.length; i++) {
-                    this.nodes[i].state = Math.random() < 0.5;
+                    this.nodes[i].state = Math.random() < 0.5 ? 1 : 0;
                 }
             }
 
             updateGameOfLife = () => {
                 for (let i = 0; i < this.nodes.length; i++) {
-                    let aliveNeighbors = [...this.nodes[i].neighbors.side, ...this.nodes[i].neighbors.vertex].filter(neighbor => neighbor.state).length;
+                    let aliveNeighbors = [...this.nodes[i].neighbors.side, ...this.nodes[i].neighbors.vertex].filter(neighbor => neighbor.state === 1).length;
 
                     if ($ruleType === 'Single') {
-                        if (this.nodes[i].state && !rule.survival.includes(aliveNeighbors)) {
-                            this.nodes[i].nextState = false;
-                        } else if (!this.nodes[i].state && rule.birth.includes(aliveNeighbors)) {
-                            this.nodes[i].nextState = true;
+                        if (this.nodes[i].state === 1) {
+                            // Cell is alive (state = 1)
+                            if (rule.survival.includes(aliveNeighbors)) {
+                                // Cell survives
+                                this.nodes[i].nextState = 1;
+                            } else {
+                                // Cell dies - transition to next generation
+                                this.nodes[i].nextState = 2;
+                            }
+                        } else if (this.nodes[i].state === 0) {
+                            // Cell is dead
+                            if (rule.birth.includes(aliveNeighbors)) {
+                                // Cell becomes alive
+                                this.nodes[i].nextState = 1;
+                            } else {
+                                // Cell stays dead
+                                this.nodes[i].nextState = 0;
+                            }
                         } else {
-                            this.nodes[i].nextState = this.nodes[i].state;
+                            // Cell is in aging state
+                            const nextGeneration = this.nodes[i].state + 1;
+                            // If nextGeneration exceeds the total number of states, cell dies
+                            this.nodes[i].nextState = nextGeneration > rule.generations ? 0 : nextGeneration;
                         }
                     } else {
-                        if (this.nodes[i].state && !rules[this.nodes[i].n].survival.includes(aliveNeighbors)) {
-                            this.nodes[i].nextState = false;
-                        } else if (!this.nodes[i].state && rules[this.nodes[i].n].birth.includes(aliveNeighbors)) {
-                            this.nodes[i].nextState = true;
+                        const nodeRule = rules[this.nodes[i].n];
+                        if (this.nodes[i].state === 1) {
+                            // Cell is alive (state = 1)
+                            if (nodeRule.survival.includes(aliveNeighbors)) {
+                                // Cell survives
+                                this.nodes[i].nextState = 1;
+                            } else {
+                                // Cell dies - transition to next generation
+                                this.nodes[i].nextState = 2;
+                            }
+                        } else if (this.nodes[i].state === 0) {
+                            // Cell is dead
+                            if (nodeRule.birth.includes(aliveNeighbors)) {
+                                // Cell becomes alive
+                                this.nodes[i].nextState = 1;
+                            } else {
+                                // Cell stays dead
+                                this.nodes[i].nextState = 0;
+                            }
                         } else {
-                            this.nodes[i].nextState = this.nodes[i].state;
+                            // Cell is in aging state
+                            const nextGeneration = this.nodes[i].state + 1;
+                            // If nextGeneration exceeds the total number of states, cell dies
+                            this.nodes[i].nextState = nextGeneration > nodeRule.generations ? 0 : nextGeneration;
                         }
                     }
                 }
@@ -1279,8 +1321,8 @@
                     side: [],
                     vertex: []
                 };
-                this.state = false;
-                this.nextState = false;
+                this.state = 0;
+                this.nextState = 0;
 
                 this.calculateCentroid();
                 this.calculateVertices();
@@ -1325,10 +1367,23 @@
                 p5.push();
                 p5.strokeWeight(1 / side);
                 p5.stroke(0, 0, 0);
-                if (this.state) {
+                
+                // If state is 0, cell is dead (black)
+                // If state is 1, cell is alive (white)
+                // If state is > 1, cell is aging (use a color gradient)
+                if (this.state === 0) {
+                    // Dead cell - white
+                    p5.fill(0, 0, 100);
+                } else if (this.state === 1) {
+                    // Alive cell - black
                     p5.fill(0, 0, 0);
                 } else {
-                    p5.fill(0, 0, 100);
+                    // Aging cell - use color based on generation
+                    const maxGenerations = $ruleType === 'Single' ? rule.generations : rules[this.n].generations;
+                    const progress = (this.state - 1) / (maxGenerations - 1); // normalized between 0 and 1
+                    // Use a hue-based color gradient for aging cells (blue → purple → red)
+                    const brightness = progress * 100; // 240 (blue) to 0 (red)
+                    p5.fill(0, 0, brightness);
                 }
 
                 p5.beginShape();
@@ -1629,7 +1684,7 @@
 
                     if (p5.frameCount % frameMod == 0) {
                         tiling.updateGameOfLife();
-                        alivePercentage = tiling.nodes.filter(node => node.state).length / tiling.nodes.length * 100;
+                        alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
                         iterationCount++;
                     }
                     
