@@ -164,24 +164,40 @@
                 let phases = tilingRule.split('/');
                 this.shapeSeed = phases[0].split('-');
                 for (let i = 0; i < this.shapeSeed.length; i++) {
-                    this.shapeSeed[i] = this.shapeSeed[i].split(',').map(Number);
+                    this.shapeSeed[i] = this.shapeSeed[i].split(',');
+                    for (let j = 0; j < this.shapeSeed[i].length; j++) {
+                        if (!this.shapeSeed[i][j].includes('(')) {
+                            this.shapeSeed[i][j] = {
+                                type: 'regular',
+                                n: parseInt(this.shapeSeed[i][j])
+                            }
+                        } else {
+                            let n = this.shapeSeed[i][j].split('(')[0];
+                            let alfa = this.shapeSeed[i][j].split('(')[1].split(')')[0];
+                            this.shapeSeed[i][j] = {
+                                type: 'star',
+                                n: parseInt(n),
+                                alfa: parseInt(alfa) * Math.PI / 180
+                            };
+                        }
+                    }
                 }
-                if (this.shapeSeed.flat().some(n => !possibleSides.includes(n))) {
-                    throw new Error('Invalid shape seed');
-                }
+                // if (this.shapeSeed.flat().some(n => n && !possibleSides.includes(n))) {
+                //     throw new Error('Invalid shape seed');
+                // }
 
                 this.transforms = [];
                 for (let i = 1; i < phases.length; i++) {
                     let transform = {};
                     if (phases[i].includes('(')) {
                         transform = {
-                            type: phases[i][0] === 'r' ? 'rotation' : 'mirror',
+                            type: phases[i][0],
                             relativeTo: phases[i].split('(')[1].split(')')[0],
                             anchor: null
                         }
                     } else {
-                        let type = phases[i][0] === 'r' ? 'rotation' : 'mirror';
-                        let angle = type === 'rotation' ? parseInt(phases[i].split('r')[1]) : parseInt(phases[i].split('m')[1]);
+                        let type = phases[i][0];
+                        let angle = parseInt(phases[i].slice(1));
                         transform = {
                             type: type,
                             angle: angle
@@ -205,49 +221,91 @@
                 this.clearCaches();
                 
                 if (debug) debugManager.startTimer("Seed");
-                this.coreNode = new Node(
-                    {
-                        x: this.shapeSeed[0][0] == 3 ? Math.sqrt(3) / 6 : 0,
-                        y: this.shapeSeed[0][0] == 3 ? 0.5 : 0,
-                    },
-                    this.shapeSeed[0][0],
-                    this.shapeSeed[0][0] == 3 ? 0 : Math.PI / this.shapeSeed[0][0]
-                );
+                if (this.shapeSeed[0][0].type === 'star') {
+                    this.coreNode = new StarPolygon({
+                        centroid: {
+                            x: 0,
+                            y: 0,
+                        },
+                        n: this.shapeSeed[0][0].n,
+                        angle: Math.PI / this.shapeSeed[0][0].n,
+                        alfa: this.shapeSeed[0][0].alfa
+                    });
+                } else {
+                    this.coreNode = new RegularPolygon({
+                        centroid: {
+                            x: this.shapeSeed[0][0].n == 3 ? Math.sqrt(3) / 6 : 0,
+                            y: this.shapeSeed[0][0].n == 3 ? 0.5 : 0,
+                        },
+                        n: this.shapeSeed[0][0].n,
+                        angle: this.shapeSeed[0][0].n == 3 ? 0 : Math.PI / this.shapeSeed[0][0].n
+                    });
+                }
                 this.nodes.push(this.coreNode);
 
                 for (let i = 1; i < this.shapeSeed.length; i++) {
                     let newNodes = [];
                     let indexOff = 0;
                     for (let j = 0; j < this.shapeSeed[i].length; j++) {
-                        if (this.shapeSeed[i][j] == 0) {
+                        if (this.shapeSeed[i][j].n == 0) {
                             indexOff += 1;
                             continue;
                         }
 
                         let anchor = this.findAnchor(newNodes, indexOff);
-                        let v = p5.createVector(
-                            anchor.halfwayPoint.x - anchor.node.centroid.x,
-                            anchor.halfwayPoint.y - anchor.node.centroid.y
-                        );
-                        v.normalize();
+                        let halfwayPoint = anchor.node.halfways[anchor.halfwayPointIndex];
+                        
+                        let newNode;
+                        if (this.shapeSeed[i][j].type === 'regular') {
+                            let apothem = 0.5 / Math.tan(Math.PI / this.shapeSeed[i][j].n);
+                            let newCentroid = {
+                                x: halfwayPoint.x + anchor.dir.x * apothem,
+                                y: halfwayPoint.y + anchor.dir.y * apothem
+                            };
 
-                        let apothem = 0.5 / Math.tan(Math.PI / this.shapeSeed[i][j]);
-                        let newCentroid = {
-                            x: anchor.halfwayPoint.x + v.x * apothem,
-                            y: anchor.halfwayPoint.y + v.y * apothem
-                        };
+                            let angle = Math.atan2(anchor.dir.y, anchor.dir.x);
+                            if (this.shapeSeed[i][j].n % 2 == 0) {
+                                angle += Math.PI / this.shapeSeed[i][j].n;
+                            }
 
-                        let newNode = new Node(
-                            newCentroid,
-                            this.shapeSeed[i][j],
-                            this.shapeSeed[i][j] == 3 ? Math.atan2(v.y, v.x) : Math.atan2(v.y, v.x) + Math.PI / this.shapeSeed[i][j]
-                        );
+                            newNode = new RegularPolygon({
+                                centroid: newCentroid,
+                                n: this.shapeSeed[i][j].n,
+                                angle: angle
+                            });
+                        } else {
+                            let firstVertex = anchor.node.vertices[anchor.halfwayPointIndex];
+                            let secondVertex = anchor.node.vertices[(anchor.halfwayPointIndex + 1) % anchor.node.n];
+                            let sideVector = p5.createVector(
+                                firstVertex.x - secondVertex.x,
+                                firstVertex.y - secondVertex.y
+                            );
+                            sideVector.normalize();
+                            let dir = sideVector.setHeading(sideVector.heading() + this.shapeSeed[i][j].alfa / 2);
+                            
+                            let gamma = Math.PI * (this.shapeSeed[i][j].n - 2) / (2 * this.shapeSeed[i][j].n);
+                            let beta = gamma - this.shapeSeed[i][j].alfa / 2;
+                            let dist = Math.cos(beta) / Math.cos(gamma);
+
+                            let newCentroid = {
+                                x: secondVertex.x + dir.x * dist,
+                                y: secondVertex.y + dir.y * dist
+                            }
+
+                            newNode = new StarPolygon({
+                                centroid: newCentroid,
+                                n: this.shapeSeed[i][j].n,
+                                angle: Math.atan2(dir.y, dir.x),
+                                alfa: this.shapeSeed[i][j].alfa
+                            });
+                        }
 
                         newNodes.push(newNode);
                     }
 
                     this.nodes = this.nodes.concat(newNodes);
                 }
+                console.log(this.nodes)
                 if (debug) debugManager.endTimer("Seed");
 
                 this.newLayerNodes = [...this.nodes];
@@ -263,16 +321,18 @@
                         if (s == 0)
                             this.anchorNodes = [...this.nodes];
 
-                        if (this.transforms[i].type === 'mirror') {
+                        if (this.transforms[i].type === 'm') {
                             if (this.transforms[i].relativeTo)
                                 this.mirrorRelativeTo(i)
                             else if (this.transforms[i].angle)
                                 this.mirrorByAngle(this.transforms[i].angle)
-                        } else if (this.transforms[i].type === 'rotation') {
+                        } else if (this.transforms[i].type === 'r') {
                             if (this.transforms[i].relativeTo)
                                 this.rotateRelativeTo(i)
                             else if (this.transforms[i].angle)
                                 this.rotateByAngle(this.transforms[i].angle)
+                        } else if (this.transforms[i].type === 't') {
+                            this.translateRelativeTo(i)
                         }
                         if (debug) debugManager.endTimer(`Transform ${s+1}.${i+1}`);
                     }
@@ -303,14 +363,7 @@
                 let newNodes = [];
                 for (let newLayerNode of this.nodes) {
                 // for (let newLayerNode of this.newLayerNodes) {
-                    let newNode = new Node(
-                        {
-                            x: newLayerNode.pos.x,
-                            y: newLayerNode.pos.y
-                        },
-                        newLayerNode.n,
-                        newLayerNode.angle
-                    );
+                    let newNode = newLayerNode.clone();
 
                     if (this.transforms[transformationIndex].relativeTo[0] === 'h') {
                         let lineVector = null;
@@ -339,8 +392,8 @@
                         }
                         
                         const pointVector = {
-                            x: newNode.pos.x - origin.x,
-                            y: newNode.pos.y - origin.y
+                            x: newNode.centroid.x - origin.x,
+                            y: newNode.centroid.y - origin.y
                         };
                         
                         const dot = pointVector.x * lineVector.x + pointVector.y * lineVector.y;
@@ -354,14 +407,14 @@
                             y: pointVector.y - projection.y
                         };
                         
-                        newNode.pos.x = origin.x + projection.x - perpendicular.x;
-                        newNode.pos.y = origin.y + projection.y - perpendicular.y;
+                        newNode.centroid.x = origin.x + projection.x - perpendicular.x;
+                        newNode.centroid.y = origin.y + projection.y - perpendicular.y;
                         
                         const lineAngle = Math.atan2(lineVector.y, lineVector.x);
                         newNode.angle = 2 * lineAngle - newNode.angle;
                     } else {
-                        newNode.pos.x = 2 * origin.x - newNode.pos.x;
-                        newNode.pos.y = 2 * origin.y - newNode.pos.y;
+                        newNode.centroid.x = 2 * origin.x - newNode.centroid.x;
+                        newNode.centroid.y = 2 * origin.y - newNode.centroid.y;
                         newNode.angle = Math.PI + newNode.angle;
                     }
 
@@ -394,18 +447,19 @@
                     // for (let newLayerNode of this.newLayerNodes.concat(newNodes)) {
                     let newNodes = [];
                     for (let newLayerNode of this.nodes) {
-                        let newNode = new Node(
-                            {
-                                x: newLayerNode.pos.x,
-                                y: newLayerNode.pos.y
-                            },
-                            newLayerNode.n,
-                            newLayerNode.angle
-                        );
+                        let newNode = newLayerNode.clone();
+                        // let newNode = new RegularPolygon({
+                        //     centroid: {
+                        //         x: newLayerNode.centroid.x,
+                        //         y: newLayerNode.centroid.y
+                        //     },
+                        //     n: newLayerNode.n,
+                        //     angle: newLayerNode.angle
+                        // });
 
-                        const dotProduct = newNode.pos.x * vx + newNode.pos.y * vy;
-                        newNode.pos.x = 2 * dotProduct * vx - newNode.pos.x;
-                        newNode.pos.y = 2 * dotProduct * vy - newNode.pos.y;
+                        const dotProduct = newNode.centroid.x * vx + newNode.centroid.y * vy;
+                        newNode.centroid.x = 2 * dotProduct * vx - newNode.centroid.x;
+                        newNode.centroid.y = 2 * dotProduct * vy - newNode.centroid.y;
                         newNode.angle = 2 * angleRad - newNode.angle;
 
                         newNode.calculateCentroid();
@@ -436,17 +490,10 @@
                 let newNodes = [];
                 for (let newLayerNode of this.nodes) {
                 // for (let newLayerNode of this.newLayerNodes.concat(newNodes)) {
-                    let newNode = new Node(
-                        {
-                            x: newLayerNode.pos.x,
-                            y: newLayerNode.pos.y
-                        },
-                        newLayerNode.n,
-                        newLayerNode.angle
-                    );
+                    let newNode = newLayerNode.clone();
 
-                    newNode.pos.x = 2 * origin.x - newNode.pos.x;
-                    newNode.pos.y = 2 * origin.y - newNode.pos.y;
+                    newNode.centroid.x = 2 * origin.x - newNode.centroid.x;
+                    newNode.centroid.y = 2 * origin.y - newNode.centroid.y;
                     newNode.angle = Math.PI + newNode.angle;
 
                     newNode.calculateCentroid();
@@ -478,17 +525,17 @@
                     // let newNodes = [this.coreNode];
                     for (let newLayerNode of this.nodes) {
                     // for (let newLayerNode of this.newLayerNodes) {
-                        const cacheKey = `${newLayerNode.pos.x},${newLayerNode.pos.y}-${angle}`;
+                        const cacheKey = `${newLayerNode.centroid.x},${newLayerNode.centroid.y}-${angle}`;
                         let newPos;
                         
                         if (rotationCache.has(cacheKey)) {
                             newPos = rotationCache.get(cacheKey);
                         } else {
-                            const d = Math.sqrt(newLayerNode.pos.x ** 2 + newLayerNode.pos.y ** 2);
+                            const d = Math.sqrt(newLayerNode.centroid.x ** 2 + newLayerNode.centroid.y ** 2);
                             if (d < tolerance) {
                                 newPos = { x: 0, y: 0 };
                             } else {
-                                const a = Math.atan2(newLayerNode.pos.y, newLayerNode.pos.x);
+                                const a = Math.atan2(newLayerNode.centroid.y, newLayerNode.centroid.x);
                                 newPos = {
                                     x: d * Math.cos(a + angle),
                                     y: d * Math.sin(a + angle)
@@ -497,14 +544,10 @@
                             rotationCache.set(cacheKey, newPos);
                         }
                         
-                        let newNode = new Node(
-                            {
-                                x: newPos.x,
-                                y: newPos.y
-                            },
-                            newLayerNode.n,
-                            newLayerNode.angle + angle
-                        );
+                        let newNode = newLayerNode.clone();
+                        newNode.centroid.x = newPos.x;
+                        newNode.centroid.y = newPos.y;
+                        newNode.angle = newLayerNode.angle + angle;
 
                         newNode.calculateCentroid();
                         newNode.calculateVertices();
@@ -519,6 +562,36 @@
                 }
                 
                 rotationCache.clear();
+            }
+
+            translateRelativeTo = (transformationIndex) => {
+                let origin = this.transforms[transformationIndex].anchor;
+
+                if (!origin) {
+                    let type = this.transforms[transformationIndex].relativeTo[0];
+                    let index = this.transforms[transformationIndex].relativeTo.slice(1);
+
+                    origin = this.findOrigin(this.anchorNodes, type, index);
+                    this.transforms[transformationIndex].anchor = origin;
+                }
+                
+                let newNodes = [];
+                for (let newLayerNode of this.nodes) {
+                // for (let newLayerNode of this.newLayerNodes.concat(newNodes)) {
+                    let newNode = newLayerNode.clone();
+
+                    newNode.centroid.x += origin.x;
+                    newNode.centroid.y += origin.y;
+
+                    newNode.calculateCentroid();
+                    newNode.calculateVertices();
+                    newNode.calculateHalfways();
+                    
+                    newNodes.push(newNode);
+                }
+
+                this.nodes = this.nodes.concat(newNodes);
+                this.nodes = this.removeDuplicates(this.nodes);
             }
 
             findAnchor = (newNodes, indexOff) => {
@@ -547,26 +620,36 @@
                         if (isFree) {
                             anchors.push({
                                 node: this.nodes[i],
-                                halfwayPoint: this.nodes[i].halfways[s]
+                                halfwayPointIndex: s
                             });
                         }
                     }
                 }
 
                 anchors = anchors.sort((a, b) => {
-                    const angleA = p5.getClockwiseAngle(a.halfwayPoint);
-                    const angleB = p5.getClockwiseAngle(b.halfwayPoint);
+                    const angleA = p5.getClockwiseAngle(a.node.halfways[a.halfwayPointIndex]);
+                    const angleB = p5.getClockwiseAngle(b.node.halfways[b.halfwayPointIndex]);
                     
                     if (Math.abs(angleA - angleB) < tolerance) {
-                        const distA = Math.sqrt(a.halfwayPoint.x ** 2 + a.halfwayPoint.y ** 2);
-                        const distB = Math.sqrt(b.halfwayPoint.x ** 2 + b.halfwayPoint.y ** 2);
+                        const distA = Math.sqrt(a.node.halfways[a.halfwayPointIndex].x ** 2 + a.node.halfways[a.halfwayPointIndex].y ** 2);
+                        const distB = Math.sqrt(b.node.halfways[b.halfwayPointIndex].x ** 2 + b.node.halfways[b.halfwayPointIndex].y ** 2);
                         return distA - distB;
                     }
                     
                     return angleA - angleB;
-                }).filter(anchor => !(anchor.node.n == 3 && anchor.node.angle == 0) || Math.abs(anchor.halfwayPoint.x) > tolerance);
+                });
 
-                return anchors[indexOff];
+                let anchor = anchors[indexOff];
+
+                anchor.dir = p5.createVector(
+                    anchor.node.vertices[(anchor.halfwayPointIndex + 1) % anchor.node.vertices.length].x - anchor.node.vertices[anchor.halfwayPointIndex].x,
+                    anchor.node.vertices[(anchor.halfwayPointIndex + 1) % anchor.node.vertices.length].y - anchor.node.vertices[anchor.halfwayPointIndex].y
+                );
+
+                anchor.dir.normalize();
+                anchor.dir.rotate(-Math.PI / 2);
+
+                return anchor;
             }
 
             findOrigin = (nodes, type, index) => {
@@ -655,7 +738,7 @@
                 const spatialMap = new Map();
                 for (let i = 0; i < this.nodes.length; i++) {
                     const node = this.nodes[i];
-                    const key = p5.getSpatialKey(node.pos.x, node.pos.y);
+                    const key = p5.getSpatialKey(node.centroid.x, node.centroid.y);
                     
                     if (!spatialMap.has(key)) {
                         spatialMap.set(key, []);
@@ -665,19 +748,19 @@
                 
                 for (let i = 0; i < newNodes.length; i++) {
                     const newNode = newNodes[i];
-                    const key = p5.getSpatialKey(newNode.pos.x, newNode.pos.y);
+                    const key = p5.getSpatialKey(newNode.centroid.x, newNode.centroid.y);
                     
                     let isDuplicate = false;
                     
-                    const baseX = Math.floor(newNode.pos.x / (tolerance * 2));
-                    const baseY = Math.floor(newNode.pos.y / (tolerance * 2));
+                    const baseX = Math.floor(newNode.centroid.x / (tolerance * 2));
+                    const baseY = Math.floor(newNode.centroid.y / (tolerance * 2));
                     
                     for (const [dx, dy] of offsets) {
                         const adjKey = `${baseX + dx},${baseY + dy}`;
                         const existingIndices = spatialMap.get(adjKey) || [];
                         
                         for (const idx of existingIndices) {
-                            if (p5.isWithinTolerance(this.nodes[idx].pos, newNode.pos)) {
+                            if (p5.isWithinTolerance(this.nodes[idx].centroid, newNode.centroid)) {
                                 isDuplicate = true;
                                 break;
                             }
@@ -792,14 +875,14 @@
                         });
                     }
 
-                    let dualNode = new DualNode(
-                        {
+                    let dualNode = new DualPolygon({
+                        centroid: {
                             x: centroid.x,
                             y: centroid.y
                         },
-                        vertices,
-                        halfways
-                    );
+                        vertices: vertices,
+                        halfways: halfways
+                    });
 
                     dualNodes.push(dualNode);
                 }
@@ -972,7 +1055,6 @@
                                 nodeIndexes: new Set([i])
                             });
                         } else {
-                            // Add this node to the set of nodes that share the canonical vertex
                             for (const entry of vertexToNodesMap.get(canonicalKey)) {
                                 if (p5.isWithinTolerance(entry.v, canonicalVertex)) {
                                     entry.nodeIndexes.add(i);
@@ -983,12 +1065,10 @@
                     }
                 }
                 
-                // Now create vertex neighbor connections from the collected data
                 for (const entries of vertexToNodesMap.values()) {
                     for (const {nodeIndexes} of entries) {
                         if (nodeIndexes.size < 2) continue;
                         
-                        // Convert the Set to an Array for iteration
                         const nodeIndexArray = Array.from(nodeIndexes);
                         
                         for (let i = 0; i < nodeIndexArray.length; i++) {
@@ -996,9 +1076,8 @@
                                 const node1Index = nodeIndexArray[i];
                                 const node2Index = nodeIndexArray[j];
                                 
-                                // Skip if these nodes are already side neighbors (they share an edge)
                                 const isSideNeighbors = this.nodes[node1Index].neighbors.side.some(
-                                    neighbor => p5.isWithinTolerance(neighbor.pos, this.nodes[node2Index].pos)
+                                    neighbor => p5.isWithinTolerance(neighbor.centroid, this.nodes[node2Index].centroid)
                                 );
                                 
                                 if (!isSideNeighbors) {
@@ -1020,7 +1099,7 @@
                 const spatialMap = new Map();
                 for (let i = 0; i < nodes.length; i++) {
                     const node = nodes[i];
-                    const key = p5.getSpatialKey(node.pos.x, node.pos.y);
+                    const key = p5.getSpatialKey(node.centroid.x, node.centroid.y);
                     
                     if (!spatialMap.has(key)) {
                         spatialMap.set(key, []);
@@ -1038,8 +1117,8 @@
                     uniqueNodes.push(node);
                     processed.add(i);
                     
-                    const baseX = Math.floor(node.pos.x / (tolerance * 2));
-                    const baseY = Math.floor(node.pos.y / (tolerance * 2));
+                    const baseX = Math.floor(node.centroid.x / (tolerance * 2));
+                    const baseY = Math.floor(node.centroid.y / (tolerance * 2));
                     
                     for (const [dx, dy] of offsets) {
                         const key = `${baseX + dx},${baseY + dy}`;
@@ -1047,7 +1126,7 @@
                         
                         for (const candidateIdx of candidates) {
                             if (candidateIdx !== i && !processed.has(candidateIdx) && 
-                                p5.isWithinTolerance(node.pos, nodes[candidateIdx].pos)) {
+                                p5.isWithinTolerance(node.centroid, nodes[candidateIdx].centroid)) {
                                 processed.add(candidateIdx);
                             }
                         }
@@ -1147,14 +1226,14 @@
                         for (let neighbor of node.neighbors.side) {
                             neighbor.show(p5.color(240, 100, 100, 0.5));
                             p5.line(
-                                node.pos.x,
-                                node.pos.y,
-                                neighbor.pos.x,
-                                neighbor.pos.y
+                                node.centroid.x,
+                                node.centroid.y,
+                                neighbor.centroid.x,
+                                neighbor.centroid.y
                             );
                             p5.ellipse(
-                                neighbor.pos.x,
-                                neighbor.pos.y,
+                                neighbor.centroid.x,
+                                neighbor.centroid.y,
                                 1/5,
                                 1/5
                             );
@@ -1163,14 +1242,14 @@
                         for (let neighbor of node.neighbors.vertex) {
                             neighbor.show(p5.color(120, 100, 100, 0.5));
                             p5.line(
-                                node.pos.x,
-                                node.pos.y,
-                                neighbor.pos.x,
-                                neighbor.pos.y
+                                node.centroid.x,
+                                node.centroid.y,
+                                neighbor.centroid.x,
+                                neighbor.centroid.y
                             );
                             p5.ellipse(
-                                neighbor.pos.x,
-                                neighbor.pos.y,
+                                neighbor.centroid.x,
+                                neighbor.centroid.y,
                                 1/5,
                                 1/5
                             );
@@ -1178,8 +1257,8 @@
 
                         p5.fill(0, 0, 0);
                         p5.ellipse(
-                            node.pos.x,
-                            node.pos.y,
+                            node.centroid.x,
+                            node.centroid.y,
                             1/5,
                             1/5
                         );
@@ -1190,11 +1269,12 @@
         }
 
         // svelte-ignore perf_avoid_nested_class
-        class Node {
-            constructor(pos, n, angle) {
-                this.pos = pos;
-                this.n = n;
-                this.angle = angle;
+        class Polygon {
+            constructor(data) {
+                this.centroid = data.centroid;
+                this.n = data.n;
+                this.angle = data.angle;
+                
                 this.neighbors = {
                     side: [],
                     vertex: []
@@ -1205,11 +1285,6 @@
                 this.calculateCentroid();
                 this.calculateVertices();
                 this.calculateHalfways();
-                this.calculateHue();
-            }
-
-            calculateHue = () => {
-                this.hue = p5.map(this.vertices.length, 3, 12, 0, 300);
             }
 
             containsPoint = (point) => {
@@ -1265,11 +1340,6 @@
             }
 
             calculateCentroid = () => {
-                this.centroid = {
-                    x: this.pos.x,
-                    y: this.pos.y
-                };
-
                 if (Math.abs(this.centroid.x) < tolerance) {
                     this.centroid.x = 0;
                 }
@@ -1317,48 +1387,45 @@
         }
 
         // svelte-ignore perf_avoid_nested_class
-        class DualNode extends Node {
-            constructor(centroid, vertices, halfways) {
-                super(centroid, 3, 0);
-                this.centroid = centroid;
-                this.vertices = vertices;
-                this.halfways = halfways;
+        class RegularPolygon extends Polygon {
+            constructor(data) {
+                super(data);
+
+                this.calculateHue();
+            }
+
+            calculateHue = () => {
+                this.hue = p5.map(this.vertices.length, 3, 12, 0, 300);
+            }
+
+            clone = () => {
+                return new RegularPolygon({
+                    centroid: {
+                        x: this.centroid.x,
+                        y: this.centroid.y
+                    },
+                    n: this.n,
+                    angle: this.angle
+                });
+            }
+        }
+
+        // svelte-ignore perf_avoid_nested_class
+        class DualPolygon extends Polygon {
+            constructor(data) {
+                super({
+                    centroid: data.centroid,
+                    n: 3,
+                    angle: 0
+                });
+                this.vertices = data.vertices;
+                this.halfways = data.halfways;
 
                 this.calculateHue();
             }
 
             calculateHue = () => {
                 this.hue = this.calculateAnglesHash();
-            }
-
-            show = (customColor = null) => {
-                if (this.centroid.x < -p5.width / 2 - 10 || this.centroid.y < -p5.height / 2 - 10 || this.centroid.x > p5.width / 2 + 10 || this.centroid.y > p5.height / 2 + 10)
-                    return;
-
-                p5.push();
-                p5.stroke(0, 0, 0);
-                p5.fill(customColor || this.hue, 40, 100, 0.80);
-                p5.beginShape();
-                for (let i = 0; i < this.vertices.length; i++) {
-                    p5.vertex(this.vertices[i].x, this.vertices[i].y);
-                }
-                p5.endShape(p5.CLOSE);
-                
-                if (showConstructionPoints) {
-                    p5.fill(0, 100, 100);
-                    p5.ellipse(this.centroid.x, this.centroid.y, 5 / side);
-                    
-                    p5.fill(120, 100, 100);
-                    for (let i = 0; i < this.halfways.length; i++) {
-                        p5.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / side);
-                    }
-                    
-                    p5.fill(240, 100, 100);
-                    for (let i = 0; i < this.vertices.length; i++) {
-                        p5.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / side);
-                    }
-                }
-                p5.pop();
             }
 
             calculateAnglesHash() {
@@ -1414,6 +1481,88 @@
                 }
                 
                 return hash % 300;
+            }
+
+            clone = () => {
+                return new DualPolygon({
+                    centroid: {
+                        x: this.centroid.x,
+                        y: this.centroid.y
+                    },
+                    vertices: [...this.vertices],
+                    halfways: [...this.halfways]
+                });
+            }
+        }
+
+        // svelte-ignore perf_avoid_nested_class
+        class StarPolygon extends Polygon {
+            constructor(data) {
+                super({
+                    centroid: data.centroid,
+                    n: data.n,
+                    angle: data.angle
+                });
+
+                this.alfa = data.alfa;
+                this.calculateVertices();
+                this.calculateHalfways();
+                this.calculateHue();
+            }
+
+            calculateVertices = () => {
+                this.vertices = [];
+                let gamma = Math.PI * (this.n - 2) / (2 * this.n);
+                let alfa = this.alfa / 2;
+                let beta = gamma - alfa;
+
+                let radius = Math.cos(beta) / Math.cos(gamma);
+                let intRadius = Math.tan(gamma) * Math.cos(beta) - Math.sin(beta);
+                for (let i = 0; i < this.n; i++) {
+                    this.vertices.push({
+                        x: this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle + Math.PI),
+                        y: this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle + Math.PI)
+                    });
+
+                    this.vertices.push({
+                        x: this.centroid.x + intRadius * Math.cos((i + .5) * 2 * Math.PI / this.n + this.angle + Math.PI),
+                        y: this.centroid.y + intRadius * Math.sin((i + .5) * 2 * Math.PI / this.n + this.angle + Math.PI)
+                    });
+
+                    if (Math.abs(this.vertices[i].x) < tolerance) {
+                        this.vertices[i].x = 0;
+                    }
+
+                    if (Math.abs(this.vertices[i].y) < tolerance) {
+                        this.vertices[i].y = 0;
+                    }
+                }
+            }
+
+            calculateHalfways = () => {
+                this.halfways = [];
+                for (let i = 0; i < this.vertices.length; i++) {
+                    this.halfways.push({
+                        x: (this.vertices[i].x + this.vertices[(i + 1) % this.vertices.length].x) / 2,
+                        y: (this.vertices[i].y + this.vertices[(i + 1) % this.vertices.length].y) / 2
+                    });
+                }
+            }
+
+            calculateHue = () => {
+                this.hue = p5.map(this.vertices.length / 2, 3, 12, 300, 0) + 300 / 12;
+            }
+
+            clone = () => {
+                return new StarPolygon({
+                    centroid: {
+                        x: this.centroid.x,
+                        y: this.centroid.y
+                    },
+                    n: this.n,
+                    angle: this.angle,
+                    alfa: this.alfa
+                });
             }
         }
 
@@ -1555,7 +1704,7 @@
             for (let i = 0; i < hexagons.length; i++) {
                 const hexagon = hexagons[i];
                 
-                if (p5.dist(triangle.pos.x, triangle.pos.y, hexagon.pos.x, hexagon.pos.y) > 2) {
+                if (p5.dist(triangle.centroid.x, triangle.centroid.y, hexagon.centroid.x, hexagon.centroid.y) > 2) {
                     continue;
                 }
                 
@@ -1605,7 +1754,7 @@
                 for (let j = 0; j < triangles.length; j++) {
                     const triangle = triangles[j];
                     
-                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > 2) {
+                    if (p5.dist(hexagon.centroid.x, hexagon.centroid.y, triangle.centroid.x, triangle.centroid.y) > 2) {
                         continue;
                     }
                     
@@ -1620,7 +1769,7 @@
             
             if (coveredVertices.size >= 2) {
                 const trianglesPointingInward = triangles.filter(triangle => {
-                    if (p5.dist(hexagon.pos.x, hexagon.pos.y, triangle.pos.x, triangle.pos.y) > 2) {
+                    if (p5.dist(hexagon.centroid.x, hexagon.centroid.y, triangle.centroid.x, triangle.centroid.y) > 2) {
                         return false;
                     }
                     
@@ -1675,10 +1824,11 @@
             uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !p5.isWithinTolerance(centroid, {x: 0, y: 0}));
             
             p5.textSize(12 / side);
+            p5.fill(0, 0, 100);
             
             for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
                 let centroid = uniqueCentroidsSorted[i];
-                p5.text('c' + (i + 1), centroid.x, centroid.y);
+                p5.text('c' + (i + 1), centroid.x, -centroid.y);
             }
 
             let uniqueHalfways = [];
@@ -1695,7 +1845,7 @@
 
             for (let i = 0; i < uniqueHalfwaysSorted.length; i++) {
                 let halfway = uniqueHalfwaysSorted[i];
-                p5.text('h' + (i + 1), halfway.x, halfway.y);
+                p5.text('h' + (i + 1), halfway.x, -halfway.y);
             }
 
             let uniqueVertices = [];
@@ -1712,7 +1862,7 @@
 
             for (let i = 0; i < uniqueVerticesSorted.length; i++) {
                 let vertex = uniqueVerticesSorted[i];
-                p5.text('v' + (i + 1), vertex.x, vertex.y);
+                p5.text('v' + (i + 1), vertex.x, -vertex.y);
             }
 
             p5.pop();

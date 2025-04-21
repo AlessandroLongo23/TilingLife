@@ -156,7 +156,7 @@
 						<!-- Scrollable rules section -->
 						<div class="flex-1 overflow-y-auto p-3">
 							<div class="flex flex-col gap-3">
-								<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Tiling Patterns</h3>
+								<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Tiling Patterns <span class="text-white/80 font-normal">({tilingRules.reduce((acc, curr) => acc + curr.rules.length, 0)})</span></h3>
 								<div>
 									{#each tilingRules as tilingPatternGroup}
 										<div class="mb-3">
@@ -173,21 +173,21 @@
 											</button>
 											
 											{#if expandedGroups[tilingPatternGroup.title]}
-												<div class="pl-1 space-y-1" transition:slide={{ duration: 200 }}>
+												<div class="grid grid-cols-2 gap-2 pl-1 space-y-1" transition:slide={{ duration: 200 }}>
 													{#each tilingPatternGroup.rules as tilingPattern}
-														<div class="flex flex-row gap-2">
-															<RuleCard 
-																title={tilingPattern}
-																value={tilingPattern}
-																onClick={loadTiling}
-															/>
+														<RuleCard 
+															title={tilingPattern}
+															value={tilingPattern}
+															onClick={loadTiling}
+														/>
 
+														{#if tilingPatternGroup.dual}
 															<RuleCard 
 																title={'Dual of: ' + tilingPattern}
 																value={tilingPattern.concat('*')}
 																onClick={loadTiling}
 															/>
-														</div>
+														{/if}
 													{/each}
 												</div>
 											{/if}
