@@ -6,9 +6,10 @@
 	import { createEventDispatcher } from 'svelte';
 	import { slide } from 'svelte/transition';
 
+	import GolRuleCard from '$lib/components/GolRuleCard.svelte';
+	import TilingCard from '$lib/components/TilingCard.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import ShapeIcon from '$lib/components/ShapeIcon.svelte';
-	import RuleCard from '$lib/components/RuleCard.svelte';
 	import Slider from '$lib/components/ui/Slider.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
@@ -175,14 +176,14 @@
 											{#if expandedGroups[tilingPatternGroup.title]}
 												<div class="grid grid-cols-2 gap-2 pl-1 space-y-1" transition:slide={{ duration: 200 }}>
 													{#each tilingPatternGroup.rules as tilingPattern}
-														<RuleCard 
+														<TilingCard 
 															title={tilingPattern}
 															value={tilingPattern}
 															onClick={loadTiling}
 														/>
 
 														{#if tilingPatternGroup.dual}
-															<RuleCard 
+															<TilingCard 
 																title={'Dual of: ' + tilingPattern}
 																value={tilingPattern.concat('*')}
 																onClick={loadTiling}
@@ -258,9 +259,10 @@
 									<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Game of Life Rules</h3>
 									<div class="grid grid-cols-2 gap-2">
 										{#each gameOfLifeRules as gameRule}
-										<RuleCard 
-											title={gameRule}
-											value={gameRule}
+										<GolRuleCard 
+											name={gameRule.name}
+											rule={gameRule.rule}
+											description={gameRule.description}
 											onClick={loadGameRule}
 										/>
 										{/each}
