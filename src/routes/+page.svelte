@@ -1,9 +1,10 @@
 <script>
-    import { golRule, tilingRule, isDual, transformSteps, side, showConstructionPoints, showInfo, speed, activeTab } from '$lib/stores/configuration';
+    import { golRule, isDual, transformSteps, showConstructionPoints, showInfo, speed, activeTab } from '$lib/stores/configuration.js';
     import { onMount } from 'svelte';
 
     import Sidebar from '$lib/components/Sidebar.svelte';
     import Canvas from '$lib/components/Canvas.svelte';
+    import TilingModalContent from '$lib/components/TilingModalContent.svelte';
 
     let sidebarElement = $state('');
     let sidebarWidth = $state(320);
@@ -68,14 +69,14 @@
             width={width}
             height={height} 
             golRule={$golRule} 
-            tilingRule={$tilingRule} 
             isDual={$isDual}
             transformSteps={$transformSteps} 
-            side={$side} 
             showConstructionPoints={$showConstructionPoints} 
             showGameOfLife={showGameOfLife}
             showInfo={$showInfo}
             speed={$speed}
         />
     </div>
+    
+    <TilingModalContent />
 </div>

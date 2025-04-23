@@ -1,8 +1,9 @@
 <script>
-	import { golRule, golRules, tilingRule, transformSteps, side, showConstructionPoints, showInfo, speed, ruleType, isDual } from '$lib/stores/configuration';
-	import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-svelte';
+	import { golRule, golRules, selectedTiling, transformSteps, side, showConstructionPoints, showInfo, showCR, speed, ruleType, parameter } from '$lib/stores/configuration.js';
+	import { ChevronDown, ChevronLeft, ChevronRight, Maximize2, ChevronsDownUp, ChevronsUpDown } from 'lucide-svelte';
 	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
 	import { tilingRules } from '$lib/stores/tilingRules.js';
+	import { tilingModalOpen } from '$lib/stores/modalState.js';
 	import { createEventDispatcher } from 'svelte';
 	import { slide } from 'svelte/transition';
 
@@ -20,29 +21,25 @@
 		sidebarElement = $bindable(''),
 	} = $props();
 
-	// Track expanded state of each group
 	let expandedGroups = $state({});
 	
-	// Initialize all groups as expanded by default
 	$effect(() => {
-		// Only set initial state if expandedGroups is empty
 		if (Object.keys(expandedGroups).length === 0) {
 			let initialState = {};
 			tilingRules.forEach(group => {
-				initialState[group.title] = true; // Start expanded
+				initialState[group.title] = true;
 			});
 			expandedGroups = initialState;
 		}
 	});
 	
-	// Toggle group expansion
 	const toggleGroup = (groupTitle) => {
 		expandedGroups[groupTitle] = !expandedGroups[groupTitle];
 	};
 
 	let shapes = $derived.by(() => {
 		let shapes = new Set();
-		let seed = $tilingRule.split('/')[0].replaceAll(',', '-').split('-');
+		let seed = $selectedTiling.rulestring.split('/')[0].replaceAll(',', '-').split('-');
 		for (let shape of seed)
 			shapes.add(parseInt(shape));
 
@@ -54,25 +51,42 @@
 	const toggleSidebar = () => {
 		isSidebarOpen = !isSidebarOpen;
 		
-		// Notify parent of toggling
 		dispatch('toggle', { isSidebarOpen });
 		
-		// Force a repaint after the transition
 		if (isSidebarOpen) {
-			// For opening, emit resize event after transition
 			setTimeout(() => {
 				window.dispatchEvent(new Event('resize'));
 			}, 300);
 		}
 	}
 
-	const loadGameRule = (selectedRule) => {
+	const loadGolRule = (selectedRule) => {
         $golRule = selectedRule;
     }
     
-    const loadTiling = (selectedTiling) => {
-        $tilingRule = selectedTiling;
+    const loadTiling = (tiling) => {
+        $selectedTiling = tiling;
     }
+    
+    const openTilingModal = () => {
+        $tilingModalOpen = true;
+    }
+
+	const expandAll = () => {
+		expandedGroups = tilingRules.reduce((acc, curr) => {
+			acc[curr.title] = true;
+			return acc;
+		}, {});
+	}
+
+	const collapseAll = () => {
+		expandedGroups = tilingRules.reduce((acc, curr) => {
+			acc[curr.title] = false;
+			return acc;
+		}, {});
+	}
+
+	let isParametrized = $derived($selectedTiling.rulestring.includes('a'));
 </script>
 
 <div id="sidebar" class="h-full fixed left-0 top-0 transition-all duration-300 flex flex-col shadow-2xl {isSidebarOpen ? 'w-96' : 'w-12'}" bind:this={sidebarElement}>
@@ -103,12 +117,24 @@
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
 							<div class="flex flex-col gap-3">
 								<div class="flex flex-row gap-3">
-									<Input 
-										id="tilingRule"
-										label="Tiling Rule"
-										bind:value={$tilingRule}
-										placeholder="4/m90/r(h1)"
-									/>
+									<div class="w-2/3">
+										<Input 
+											id="tilingRule"
+											label="Tiling Rule"
+											bind:value={$selectedTiling.rulestring}
+											placeholder="4/m90/r(h1)"
+										/>
+									</div>
+
+									<div class="w-1/3">
+										<Input
+											id="transformSteps"
+											type="number"
+											label="Layers"
+											bind:value={$transformSteps}
+											min={0}
+										/>
+									</div>
 
 									<!-- <Checkbox 
 										id="isDual"
@@ -118,23 +144,27 @@
 									/> -->
 								</div>	
 
-								<div class="flex flex-row gap-3">
-									<Input
-										id="transformSteps"
-										type="number"
-										label="Transform Steps"
-										bind:value={$transformSteps}
-										min={0}
+								<Slider 
+									id="side"
+									label="Side Length"
+									bind:value={$side}
+									min={1}
+									max={100}
+									step={1}
+									unit="px"
+								/>
+
+								{#if isParametrized}
+									<Slider 
+										id="parameter"
+										label="Parameter"
+										bind:value={$parameter}
+										min={15}
+										max={165}
+										step={1}
+										unit="°"
 									/>
-									
-									<Input 
-										id="side"
-										type="number"
-										label="Side Length"
-										bind:value={$side}
-										min={1}
-									/>
-								</div>
+								{/if}
 
 								<div class="space-y-2 pt-1">
 									<Checkbox 
@@ -150,6 +180,13 @@
 										position="right"
 										bind:checked={$showInfo}
 									/>
+
+									<Checkbox 
+										id="cr"
+										label="Show Cundy & Rollett's Notation"
+										position="right"
+										bind:checked={$showCR}
+									/>
 								</div>
 							</div>
 						</div>
@@ -157,35 +194,70 @@
 						<!-- Scrollable rules section -->
 						<div class="flex-1 overflow-y-auto p-3">
 							<div class="flex flex-col gap-3">
-								<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Tiling Patterns <span class="text-white/80 font-normal">({tilingRules.reduce((acc, curr) => acc + curr.rules.length, 0)})</span></h3>
+								<div class="flex items-center justify-between">
+									<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Tiling Patterns <span class="text-white/80 font-normal">({tilingRules.reduce((acc, curr) => acc + curr.rules.length, 0)})</span></h3>
+									
+									<div class="flex flex-row gap-2">
+										{#if Object.keys(expandedGroups).reduce((acc, curr) => acc + expandedGroups[curr], 0) == tilingRules.length}
+											<button
+												class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100"
+												onclick={collapseAll}
+												aria-label="Collapse all"
+												title="Collapse all"
+											>
+												<ChevronsDownUp size={16} />
+											</button>
+										{:else}
+											<button
+												class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100"
+												onclick={expandAll}
+												aria-label="Expand all"
+												title="Expand all"
+											>
+												<ChevronsUpDown size={16} />
+											</button>
+										{/if}
+
+										<button
+											class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100"
+											onclick={openTilingModal}
+											aria-label="View all tilings"
+											title="View all tilings"
+										>
+											<Maximize2 size={16} />
+										</button>
+									</div>
+								</div>
 								<div>
-									{#each tilingRules as tilingPatternGroup}
+									{#each tilingRules as tilingGroup}
 										<div class="mb-3">
 											<button 
 												class="w-full flex items-center justify-between font-medium text-sm text-zinc-300 mb-2 hover:text-white focus:outline-none transition-colors"
-												onclick={() => toggleGroup(tilingPatternGroup.title)}
-												aria-expanded={expandedGroups[tilingPatternGroup.title]}
+												onclick={() => toggleGroup(tilingGroup.title)}
+												aria-expanded={expandedGroups[tilingGroup.title]}
 											>
-												<span>{tilingPatternGroup.title} <span class="text-green-400/80 font-normal">({tilingPatternGroup.rules.length})</span></span>
+												<span>{tilingGroup.title} <span class="text-green-400/80 font-normal">({tilingGroup.rules.length})</span></span>
 												<ChevronDown 
                                                     size={14} 
-                                                    class="transition-transform duration-200 {expandedGroups[tilingPatternGroup.title] ? 'rotate-180' : ''}"
+                                                    class="transition-transform duration-200 {expandedGroups[tilingGroup.title] ? 'rotate-180' : ''}"
                                                 />
 											</button>
 											
-											{#if expandedGroups[tilingPatternGroup.title]}
+											{#if expandedGroups[tilingGroup.title]}
 												<div class="grid grid-cols-2 gap-2 pl-1 space-y-1" transition:slide={{ duration: 200 }}>
-													{#each tilingPatternGroup.rules as tilingPattern}
+													{#each tilingGroup.rules as tiling}
 														<TilingCard 
-															title={tilingPattern}
-															value={tilingPattern}
+															name={tiling.name}
+															cr={tiling.cr}
+															rulestring={tiling.rulestring}
 															onClick={loadTiling}
 														/>
 
-														{#if tilingPatternGroup.dual}
+														{#if tiling.dualname}
 															<TilingCard 
-																title={'Dual of: ' + tilingPattern}
-																value={tilingPattern.concat('*')}
+																name={tiling.dualname}
+																cr={tiling.cr}
+																rulestring={tiling.rulestring.concat('*')}
 																onClick={loadTiling}
 															/>
 														{/if}
@@ -248,6 +320,7 @@
 									min={1}
 									max={60}
 									step={1}
+									unit="iterations/s"
 								/>
 							</div>
 						</div>
@@ -263,7 +336,7 @@
 											name={gameRule.name}
 											rule={gameRule.rule}
 											description={gameRule.description}
-											onClick={loadGameRule}
+											onClick={loadGolRule}
 										/>
 										{/each}
 									</div>

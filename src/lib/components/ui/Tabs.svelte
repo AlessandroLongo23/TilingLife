@@ -1,5 +1,5 @@
 <script>
-	import { activeTab } from '$lib/stores/configuration';
+	import { activeTab } from '$lib/stores/configuration.js';
 
 	let { 
 		tabs = []

@@ -20,7 +20,7 @@
             chart.data.datasets[0].data = [...chartData];
             chart.update('none');
 
-            chart.options.scales.y.max = Math.max(...chartData) * 2;
+            chart.options.scales.y.max = Math.min(Math.max(...chartData) * 2, 100);
         }
     }
     

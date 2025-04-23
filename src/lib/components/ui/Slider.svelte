@@ -6,7 +6,8 @@
 		min = 1,
 		max = 60,
 		step = 1,
-		disabled = false
+		disabled = false,
+		unit = ''
 	} = $props();
 </script>
 
@@ -16,7 +17,7 @@
 			<label for={id} class="text-sm font-medium text-white/80">
 				{label}
 			</label>
-			<span class="text-xs text-green-400/90 font-medium">{value} iterations/s</span>
+			<span class="text-xs text-green-400/90 font-medium">{value} {unit}</span>
 		</div>
 	{/if}
 

@@ -21,13 +21,8 @@ export const gameOfLifeRules = [
 	},
 	{
 		name: "Life without Death",
-		rule: "B2/S34",
-		description: "Cells are born with 2 neighbors and survive with 3-4 neighbors. Once alive, cells never die."
-	},
-	{
-		name: "Life without Death (6 Generations)",
-		rule: "B2/S34/6",
-		description: "Life without Death rules with 6 generations of cell states before death."
+		rule: "B3/S012345678",
+		description: "Cells are born with 3 alive neighbors. Once alive, cells never die."
 	},
 	{
 		name: "Maze",
@@ -43,5 +38,15 @@ export const gameOfLifeRules = [
 		name: "Seeds",
 		rule: "B2/S",
 		description: "Cells are born with exactly 2 neighbors and always die in the next generation."
+	},
+	{
+		name: "Replicator",
+		rule: "B1357/S1357",
+		description: "Edward Fredkin's replicating automaton: every pattern is eventually replaced by multiple copies of itself."
+	},
+	{
+		name: "Anneal",
+		rule: "B4678/S35678",
+		description: "Also called the twisted majority rule. Symmetric under on-off reversal. Approximates the curve-shortening flow on the boundaries between live and dead cells"
 	}
 ]; 
