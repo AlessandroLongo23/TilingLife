@@ -19,17 +19,16 @@ alive_p = 0.15
 iterations = 1000
 random_starts = 5
 
+# Stick with the original grid structure but we'll create a function
+# to run each start in sequence with maximum GPU utilization for each
 current = ti.field(dtype=ti.i32, shape=(n, n))
 next = ti.field(dtype=ti.i32, shape=(n, n))
 
-# Used for computing statistics
-alive_count = ti.field(dtype=ti.i32, shape=()) # Total number of alive cells in the current frame
-population_sum = ti.field(dtype=ti.i32, shape=()) # Total number of alive cells in the simulation since the start
-
-births_sum = ti.field(dtype=ti.i32, shape=()) # Total number of births in the simulation since the start
-deaths_sum = ti.field(dtype=ti.i32, shape=()) # Total number of deaths in the simulation since the start
-
-alive = ti.field(dtype=ti.i32, shape=(n, n))
+# Keep scalar metrics
+alive_count = ti.field(dtype=ti.i32, shape=())
+population_sum = ti.field(dtype=ti.i32, shape=())
+births_sum = ti.field(dtype=ti.i32, shape=())
+deaths_sum = ti.field(dtype=ti.i32, shape=())
 
 current_birth_rule = ti.field(dtype=ti.i8, shape=(9))
 current_survive_rule = ti.field(dtype=ti.i8, shape=(9))
@@ -49,25 +48,20 @@ class RuleMetrics:
 
     @staticmethod
     def from_starts(starts: List[StartMetrics]):
-
-        # Calculate the average population and activity across all starts
         average_population = 0.0
         for start in starts:
             average_population += start.average_population
         average_population /= len(starts)
 
-        # Calculate the average activity across all starts
         activity = 0.0
         for start in starts:
             activity += start.acivity
         activity /= len(starts)
 
-        # Calculate the final alive count across all starts
         final_alive = 0.0
         for start in starts:
             final_alive += start.final_alive
         final_alive /= len(starts)
-
 
         return RuleMetrics(
             average_population=average_population,
@@ -89,10 +83,15 @@ def init():
             current[i, j] = 1
         else:
             current[i, j] = 0
+    
+    # Reset metric fields
+    alive_count[None] = 0
+    population_sum[None] = 0
+    births_sum[None] = 0
+    deaths_sum[None] = 0
 
 @ti.func
 def count_neighbors(i, j):
-    """Count the number of live neighbors for a cell"""
     count = 0
     for di in range(-1, 2):
         for dj in range(-1, 2):
@@ -106,31 +105,9 @@ def update_metrics():
     alive_count[None] = 0
     for i, j in current:
         if current[i, j] == 1:
-            # alive_count += 1
             alive_count[None] += 1
     
     population_sum[None] += alive_count[None]
-
-
-
-def summarize_metrics() -> StartMetrics:
-    average_population = population_sum[None]
-    average_population /= iterations
-    average_population /= (n * n)
-
-    activity = births_sum[None] + deaths_sum[None]
-    activity /= iterations
-    activity /= (n * n)
-
-    # Final alive count
-    final_alive = alive_count[None]
-    final_alive /= (n * n)
-
-    return StartMetrics(
-        average_population=average_population,
-        acivity=activity,
-        final_alive=final_alive
-    )
 
 @ti.func
 def should_birth(count):
@@ -140,10 +117,8 @@ def should_birth(count):
 def should_survive(count):
     return current_survive_rule[count] == 1
 
-
 @ti.kernel
 def update_swap():
-
     update_metrics()
 
     for i, j in next:
@@ -166,35 +141,47 @@ def update_swap():
         current[i, j] = next[i, j]
 
 
-def test_start() -> StartMetrics:
+def single_start_simulation() -> StartMetrics:
+    # Reset metrics
     alive_count[None] = 0
     population_sum[None] = 0
     births_sum[None] = 0
     deaths_sum[None] = 0
 
+    # Initialize a single start
     init()
+    
+    # Run simulation
     for step in range(iterations):
         update_swap()
     
-    return summarize_metrics()
+    # Calculate metrics for this start
+    average_population = population_sum[None] / iterations / (n * n)
+    activity = (births_sum[None] + deaths_sum[None]) / iterations / (n * n)
+    final_alive = alive_count[None] / (n * n)
+    
+    return StartMetrics(
+        average_population=average_population,
+        acivity=activity,
+        final_alive=final_alive
+    )
 
 
 def test_rule() -> RuleMetrics:
+    # Run multiple starts in sequence but with maximum GPU utilization for each
     metrics_list = []
-    for i in range(random_starts):
-        metrics = test_start()
+    for _ in range(random_starts):
+        metrics = single_start_simulation()
         metrics_list.append(metrics)
     
     return RuleMetrics.from_starts(metrics_list)
 
+
 def set_rule_from_i(i):
     """
     Set the birth and survival rules based on the index i
-
     i: index from 0 to 2^18 - 1 (= 262143)
-
     for Conway's Game of Life, the rule is 6152
-    
     """
     for j in range(9):
         if (i >> j) & 1:
@@ -228,15 +215,22 @@ def compute_rule_indices(birth_str: str, survive_str: str) -> List[int]:
     indices = []
     for b_subset in all_subsets(birth_vals):
         for s_subset in all_subsets(survive_vals):
-            # bits 0–8 for birth, bits 9–17 for survive
+            # bits 0–8 for birth, bits 9–17 for survive
             birth_mask   = sum(1 << b       for b in b_subset)
             survive_mask = sum(1 << (s + 9) for s in s_subset)
             indices.append(birth_mask | survive_mask)
 
     return indices
-    
+
 
 def main(args):
+    global random_starts, iterations, alive_p
+    
+    # Update global configuration
+    random_starts = args.random_starts
+    iterations = args.iterations
+    alive_p = args.alive_p
+    
     birth = args.birth
     survive = args.survive
 
@@ -261,25 +255,18 @@ def main(args):
         json.dump([asdict(r) for r in results], f, indent=2)
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Game of Life Simulation")
     parser.add_argument('--iterations', type=int, default=iterations, help="Number of iterations")
     parser.add_argument('--random_starts', type=int, default=random_starts, help="Number of random starts")
     parser.add_argument('--alive_p', type=float, default=alive_p, help="Probability of a cell being alive")
-    # Get logging level
     parser.add_argument('--log_level', type=str, default='INFO', help="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
-
     parser.add_argument('--birth', type=str, default="012345678", help="Birth values")
     parser.add_argument('--survive', type=str, default="012345678", help="Survive values")
-
     parser.add_argument('--output', type=str, help="Output file", required=True)
 
     args = parser.parse_args()
     logger.info(f"Arguments: {args}")
-    iterations = args.iterations
-    random_starts = args.random_starts
-    alive_p = args.alive_p
 
     level = getattr(logging, args.log_level.upper(), None)
     logging.basicConfig(level=level, format='%(asctime)s - %(levelname)s - %(message)s')
