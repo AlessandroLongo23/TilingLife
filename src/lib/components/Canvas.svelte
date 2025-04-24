@@ -1,7 +1,7 @@
 <script>
-    import { ruleType, parameter, selectedTiling, showCR, debugView, side, transformSteps, patch, golRule, golRules, showConstructionPoints } from '$lib/stores/configuration.js';
+    import { ruleType, parameter, selectedTiling, showCR, debugView, side, transformSteps, patch, golRule, golRules, showConstructionPoints, showInfo, speed } from '$lib/stores/configuration.js';
     import { debugManager, debugStore, updateDebugStore } from '$lib/stores/debug.js';
-    import { Check, Camera, RefreshCw } from 'lucide-svelte';
+    import { Check, Camera, RefreshCw, File } from 'lucide-svelte';
     import { Tiling } from '$lib/classes/Tiling.svelte.js';
     import { Cr } from '$lib/classes/Cr.svelte.js';
     import { onMount } from 'svelte';
@@ -13,11 +13,9 @@
         width = 600,
         height = 600,
         showGameOfLife,
-        showInfo,
-        speed,
     } = $props();
 
-    let frameMod = $derived(Math.max(1, Math.floor(60 / speed)));
+    let frameMod = $derived(60 / $speed);
     let takeScreenshot = $state(false);
     let showNotification = $state(false);
     let notificationMessage = $state('');
@@ -101,7 +99,7 @@
                 if ($debugView) {
                     debugManager.reset();
                 }
-                tiling.createGraph();
+                tiling.generateTiling();
                 tiling.setupGameOfLife($ruleType, $golRule, $golRules);
                 if ($debugView) {
                     updateDebugStore();
@@ -129,10 +127,18 @@
                         resetGameOfLife = false;
                     }
 
-                    if (p5.frameCount % frameMod == 0) {
-                        tiling.updateGameOfLife();
-                        alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
-                        iterationCount++;
+                    if (frameMod > 1) {
+                        if (p5.frameCount % Math.round(frameMod) == 0) {
+                            tiling.updateGameOfLife();
+                            alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
+                            iterationCount++;
+                        }
+                    } else {
+                        for (let s = 0; s < Math.round(1 / frameMod); s++) {
+                            tiling.updateGameOfLife();
+                            alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
+                            iterationCount++;
+                        }
                     }
 
                     tiling.drawGameOfLife(p5, $side);
@@ -144,18 +150,14 @@
                         prevParameter != $parameter
                     ) {
                         tiling.parseRule($selectedTiling.rulestring);
-                        tiling.createGraph();
+                        tiling.generateTiling();
                         tiling.setupGameOfLife($ruleType, $golRule, $golRules);
                         cr = new Cr($selectedTiling.cr);
 
                         crCanvases = Array.from({length: cr.vertices.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
-
-                        prevSelectedTiling = $selectedTiling;
-                        prevTransformSteps = $transformSteps;
-                        prevParameter = $parameter;
                     }
 
-                    if (showInfo) {
+                    if ($showConstructionPoints) {
                         tiling.drawConstructionPoints(p5, $side);
                     }
                     tiling.show(p5, $side, $showConstructionPoints);
@@ -170,6 +172,8 @@
                         p5.takeScreenshot();
                         takeScreenshot = false;
                     }
+
+                    
                 }
             } catch (e) {
                 console.log(e);
@@ -180,6 +184,10 @@
             prevRuleType = $ruleType;
             prevGolRule = $golRule;
             prevGolRules = $golRules;
+
+            prevSelectedTiling = {...$selectedTiling};
+            prevTransformSteps = $transformSteps;
+            prevParameter = $parameter;
         }
 
         p5.drawCr = () => {
@@ -256,18 +264,18 @@
                 screenshotCanvas.pop();
             }
             
-            if (showInfo) {
+            if ($showInfo) {
                 const drawInfoOnScreenshot = () => {
                     let uniqueCentroids = [];
                     for (let i = 0; i < tiling.anchorNodes.length; i++) {
                         let centroid = tiling.anchorNodes[i].centroid;
-                        if (!uniqueCentroids.some(c => p5.isWithinTolerance(c, centroid))) {
+                        if (!uniqueCentroids.some(c => isWithinTolerance(c, centroid))) {
                             uniqueCentroids.push(centroid);
                         }
                     }
                     
-                    let uniqueCentroidsSorted = p5.sortPointsByAngleAndDistance(uniqueCentroids);
-                    uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !p5.isWithinTolerance(centroid, {x: 0, y: 0}));
+                    let uniqueCentroidsSorted = sortPointsByAngleAndDistance(uniqueCentroids);
+                    uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, {x: 0, y: 0}));
                     
                     for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
                         let centroid = uniqueCentroidsSorted[i];
@@ -278,13 +286,13 @@
                     for (let i = 0; i < tiling.anchorNodes.length; i++) {
                         for (let j = 0; j < tiling.anchorNodes[i].halfways.length; j++) {
                             let halfway = tiling.anchorNodes[i].halfways[j];
-                            if (!uniqueHalfways.some(h => p5.isWithinTolerance(h, halfway))) {
+                            if (!uniqueHalfways.some(h => isWithinTolerance(h, halfway))) {
                                 uniqueHalfways.push(halfway);
                             }
                         }
                     }
                     
-                    let uniqueHalfwaysSorted = p5.sortPointsByAngleAndDistance(uniqueHalfways);
+                    let uniqueHalfwaysSorted = sortPointsByAngleAndDistance(uniqueHalfways);
                     for (let i = 0; i < uniqueHalfwaysSorted.length; i++) {
                         let halfway = uniqueHalfwaysSorted[i];
                         screenshotCanvas.text('h' + (i + 1), halfway.x, halfway.y);
@@ -294,13 +302,13 @@
                     for (let i = 0; i < tiling.anchorNodes.length; i++) {
                         for (let j = 0; j < tiling.anchorNodes[i].vertices.length; j++) {
                             let vertex = tiling.anchorNodes[i].vertices[j];
-                            if (!uniqueVertices.some(v => p5.isWithinTolerance(v, vertex))) {
+                            if (!uniqueVertices.some(v => isWithinTolerance(v, vertex))) {
                                 uniqueVertices.push(vertex);
                             }
                         }
                     }
                     
-                    let uniqueVerticesSorted = p5.sortPointsByAngleAndDistance(uniqueVertices);
+                    let uniqueVerticesSorted = sortPointsByAngleAndDistance(uniqueVertices);
                     for (let i = 0; i < uniqueVerticesSorted.length; i++) {
                         let vertex = uniqueVerticesSorted[i];
                         screenshotCanvas.text('v' + (i + 1), vertex.x, vertex.y);
@@ -310,7 +318,7 @@
                 drawInfoOnScreenshot();
             }
             
-            if (showConstructionPoints) {
+            if ($showConstructionPoints) {
                 for (let i = 0; i < tiling.nodes.length; i++) {
                     screenshotCanvas.fill(0, 40, 100);
                     screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5 / $side);
@@ -370,13 +378,23 @@
                     if ($debugView) {
                         debugManager.reset();
                         setTimeout(() => {
-                            tiling.createGraph();
+                            tiling.generateTiling();
                             updateDebugStore();
                         }, 0);
                     }
                 }}
             >
                 {$debugView ? 'Disable Debug' : 'Enable Debug'}
+            </button>
+
+            <button 
+                class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
+                onclick={() => {
+                    tiling.exportGraph();
+                }}
+            >
+                <File />
+                Export Graph
             </button>
         </div>
     {:else}

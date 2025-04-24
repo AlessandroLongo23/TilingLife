@@ -2,30 +2,35 @@
 export const tilingRules = [
 	{
 		title: "1-Uniform (Regular)",
+		id: "1Ur",
 		dual: true,
 		rules: [
 			{
 				name: "triangular",
 				cr: "3^6",
 				rulestring: "3/m30/r(h2)",
-				dualname: "hexagonal"
+				dualname: "hexagonal",
+			},
+			{
+				name: "square",
+				cr: "4^4",
+				rulestring: "4/m45/r(h1)",
+				dualname: "square",
+				alternatives: [
+					"4-4-0,4/r90/t(c2)"
+				]
 			},
 			{
 				name: "hexagonal",
 				cr: "6^3",
 				rulestring: "6/m30/r(h1)",
 				dualname: "triangular"
-			},
-			{
-				name: "square",
-				cr: "4^4",
-				rulestring: "4/m45/r(h1)",
-				dualname: "square"
 			}
 		]
 	},
 	{
 		title: "1-Uniform (Semiregular)",
+		id: "1Usr",
 		dual: true,
 		rules: [
 			{
@@ -80,6 +85,7 @@ export const tilingRules = [
 	},
 	{
 		title: "2-Uniform",
+		id: "2U",
 		dual: true,
 		rules: [
 			{
@@ -103,6 +109,11 @@ export const tilingRules = [
 				rulestring: "6-4-3,4-6/m30/r(c4)",
 			},
 			{
+				name: "",
+				cr: "",
+				rulestring: "6-3/r120/m(h1)",
+			},
+			{
 				name: "Diminished rhombitrihexagonal",
 				cr: "4.6.12;3.4.6.4",
 				rulestring: "12-4,6-3/m30/r(c3)",
@@ -116,11 +127,6 @@ export const tilingRules = [
 				name: "",
 				cr: "3.12.12;3.4.3.12",
 				rulestring: "12-0,3,3-0,0,4/r90/r(h1)",
-			},
-			{
-				name: "Hexagonal (1/3 dissected)",
-				cr: "3^6;3^2.6^2",
-				rulestring: "3-0,6/m60/m(c2)",
 			},
 			{
 				name: "hexagonal (2/3 dissected)",
@@ -186,6 +192,7 @@ export const tilingRules = [
 	},
 	{
 		title: "3-Uniform (2 Vertex Types)",
+		id: "3U2",
 		dual: true,
 		rules: [
 			{
@@ -297,12 +304,18 @@ export const tilingRules = [
 	},
 	{
 		title: "3-Uniform (3 Vertex Types)",
+		id: "3U3",
 		dual: true,
 		rules: [
 			{
 				name: "",
 				cr: "",
 				rulestring: "12-6,4-3,3,4/m30/r(c5)",
+			},
+			{
+				name: "",
+				cr: "",
+				rulestring: "3-0,4-0,3,6-0,4/r60/m(c2)",
 			},
 			{
 				name: "",
@@ -318,6 +331,11 @@ export const tilingRules = [
 				name: "",
 				cr: "",
 				rulestring: "6-4-3,3-12-0,0,0,3/m30/r(c2)",
+			},
+			{
+				name: "",
+				cr: "",
+				rulestring: "6-4-3,3-12_r60_r(h10)",
 			},
 			{
 				name: "",
@@ -492,7 +510,20 @@ export const tilingRules = [
 		]
 	},
 	{
-		title: "Uniform Concave (adjustable angles)",
+		title: "6-Uniform",
+		id: "6U",
+		dual: true,
+		rules: [
+			{
+				name: "",
+				cr: "",
+				rulestring: "6-6-0,6,6-0,3,3,3,3,0,0,0,0,0,0,0,0,0,0,3/r60/m(v3)",
+			}
+		]
+	},
+	{
+		title: "Uniform non-Convex (adjustable angles)",
+		id: "UnC-a",
 		dual: false,
 		rules: [
 			{
@@ -518,7 +549,8 @@ export const tilingRules = [
 		]
 	},
 	{
-		title: "Uniform Concave (specific angles)",
+		title: "Uniform non-Convex (specific angles)",
+		id: "UnC-s",
 		dual: false,
 		rules: [
 			{

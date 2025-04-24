@@ -1,5 +1,5 @@
 <script>
-    import { golRule, isDual, transformSteps, showConstructionPoints, showInfo, speed, activeTab } from '$lib/stores/configuration.js';
+    import { speed, activeTab } from '$lib/stores/configuration.js';
     import { onMount } from 'svelte';
 
     import Sidebar from '$lib/components/Sidebar.svelte';
@@ -68,12 +68,7 @@
         <Canvas 
             width={width}
             height={height} 
-            golRule={$golRule} 
-            isDual={$isDual}
-            transformSteps={$transformSteps} 
-            showConstructionPoints={$showConstructionPoints} 
             showGameOfLife={showGameOfLife}
-            showInfo={$showInfo}
             speed={$speed}
         />
     </div>

@@ -79,7 +79,7 @@ export class Tiling {
         }
     }
 
-    createGraph = () => {
+    generateTiling = () => {
         if (debugView) {
             debugManager.reset();
             debugManager.startTimer("Tiling generation");
@@ -147,21 +147,21 @@ export class Tiling {
                         firstVertex.y - secondVertex.y
                     );
                     sideVector.normalize();
-                    let dir = sideVector.rotate(this.shapeSeed[i][j].alfa / 2);
+                    sideVector.rotate(this.shapeSeed[i][j].alfa / 2);
                     
                     let gamma = Math.PI * (this.shapeSeed[i][j].n - 2) / (2 * this.shapeSeed[i][j].n);
                     let beta = gamma - this.shapeSeed[i][j].alfa / 2;
                     let dist = Math.cos(beta) / Math.cos(gamma);
 
                     let newCentroid = {
-                        x: secondVertex.x + dir.x * dist,
-                        y: secondVertex.y + dir.y * dist
+                        x: secondVertex.x + sideVector.x * dist,
+                        y: secondVertex.y + sideVector.y * dist
                     }
 
                     newNode = new StarPolygon({
                         centroid: newCentroid,
                         n: this.shapeSeed[i][j].n,
-                        angle: Math.atan2(dir.y, dir.x),
+                        angle: Math.atan2(sideVector.y, sideVector.x),
                         alfa: this.shapeSeed[i][j].alfa
                     });
                 }
@@ -181,6 +181,10 @@ export class Tiling {
         transformSteps.subscribe((v) => {
             layers = v;
         });
+
+        let start = performance.now();
+        let end;
+        
         for (let s = 0; s < layers; s++) {
             if (debugView) debugManager.startTimer(`Transform ${s+1}`);
             for (let i = 0; i < this.transforms.length; i++) {
@@ -207,6 +211,11 @@ export class Tiling {
                     this.translateRelativeTo(i)
                 }
                 if (debugView) debugManager.endTimer(`Transform ${s+1}.${i+1}`);
+
+            }
+            end = performance.now();
+            if (end - start > 1000) {
+                break;
             }
             if (debugView) debugManager.endTimer(`Transform ${s+1}`);
         }
@@ -1177,28 +1186,31 @@ export class Tiling {
     }
 
     updateGameOfLife = () => {
-        console.log(this.rules)
+        // Helper to convert boolean test to 0/1 without conditionals
+        const toBinary = (test) => +(!!test);
+        
         for (let i = 0; i < this.nodes.length; i++) {
-            let aliveNeighbors = [...this.nodes[i].neighbors.side, ...this.nodes[i].neighbors.vertex].filter(neighbor => neighbor.state === 1).length;
+            const node = this.nodes[i];
+            const state = node.state;
+            
+            let nodeRule = this.golRuleType === 'Single' ? this.parsedGolRule : this.rules[node.n];
+            if (state <= 1) {
+                let aliveNeighbors = [...node.neighbors.side, ...node.neighbors.vertex].filter(neighbor => neighbor.state === 1).length;
+                
+                const alive = state & 1;
+                
+                const hasBirthNeighbors = toBinary(nodeRule.birth.includes(aliveNeighbors));
+                const hasSurvivalNeighbors = toBinary(nodeRule.survival.includes(aliveNeighbors));
+                
+                const keep = (hasBirthNeighbors & (alive ^ 1)) | (hasSurvivalNeighbors & alive);
 
-            let nodeRule = this.golRuleType === 'Single' ? this.parsedGolRule : this.rules[this.nodes[i].n];
-
-            if (this.nodes[i].state === 1) {
-                if (this.parsedGolRule.survival.includes(aliveNeighbors))
-                    this.nodes[i].nextState = 1;
-                else
-                    this.nodes[i].nextState = 2;
-            } else if (this.nodes[i].state === 0) {
-                if (this.parsedGolRule.birth.includes(aliveNeighbors))
-                    this.nodes[i].nextState = 1;
-                else
-                    this.nodes[i].nextState = 0;
+                node.nextState = (keep * 1) | ((keep ^ 1) & alive) * 2;
             } else {
-                this.nodes[i].nextState = this.nodes[i].state + 1;
+                node.nextState = state + 1;
+                
+                if (node.nextState > nodeRule.generations)
+                    node.nextState = 0;
             }
-
-            if (this.nodes[i].nextState > nodeRule.generations)
-                this.nodes[i].nextState = 0;
         }
 
         for (let i = 0; i < this.nodes.length; i++) {
@@ -1214,5 +1226,73 @@ export class Tiling {
             this.nodes[i].showGameOfLife(ctx, side, this.golRuleType, this.parsedGolRule, this.rules);
         }
         ctx.pop();
+    }
+
+    exportGraph = () => {
+        let graph = {
+            n: this.nodes.length,
+            edges: []
+        };
+        
+        const nodeMap = new Map();
+        this.nodes.forEach((node, index) => {
+            nodeMap.set(node, index);
+        });
+        
+        this.nodes.forEach((node, nodeIndex) => {
+            if (node.neighbors && node.neighbors.side) {
+                node.neighbors.side.forEach(neighbor => {
+                    const neighborIndex = nodeMap.get(neighbor);
+                    if (neighborIndex !== undefined) {
+                        const edgeExists = graph.edges.some(e => 
+                            (e.source === nodeIndex && e.target === neighborIndex) || 
+                            (e.source === neighborIndex && e.target === nodeIndex)
+                        );
+                        
+                        if (!edgeExists) {
+                            graph.edges.push({
+                                source: nodeIndex,
+                                target: neighborIndex,
+                                type: 'side'
+                            });
+                        }
+                    }
+                });
+            }
+            
+            if (node.neighbors && node.neighbors.vertex) {
+                node.neighbors.vertex.forEach(neighbor => {
+                    const neighborIndex = nodeMap.get(neighbor);
+                    if (neighborIndex !== undefined) {
+                        const edgeExists = graph.edges.some(e => 
+                            (e.source === nodeIndex && e.target === neighborIndex) || 
+                            (e.source === neighborIndex && e.target === nodeIndex)
+                        );
+                        
+                        if (!edgeExists) {
+                            graph.edges.push({
+                                source: nodeIndex,
+                                target: neighborIndex,
+                                type: 'vertex'
+                            });
+                        }
+                    }
+                });
+            }
+        });
+        
+        const jsonData = JSON.stringify(graph, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'tiling-graph.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        return graph;
     }
 }

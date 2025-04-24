@@ -52,18 +52,22 @@
         return "";
     };
     
-    const hasPolygon = (tiling, sides) => {
+    const matchesPolygon = (tiling, sides) => {
         let polygonParts = tiling.split('/')[0].replaceAll(',', '-').split('-');
         let polygonSides = [];
         
         for (let part of polygonParts) {
             let match = part.match(/^(\d+)/);
             if (match) {
-                polygonSides.push(parseInt(match[1]));
+                let side = parseInt(match[1]);
+                if (side > 0) {
+                    polygonSides.push(side);
+                }
             }
         }
         
-        return sides.some(side => polygonSides.includes(side));
+        // TODO: match/contains toggle
+        return !sides.some(side => !polygonSides.includes(side)) && !polygonSides.some(side => !sides.includes(side));
     };
     
     let filteredTilings = $derived.by(() => {
@@ -77,7 +81,7 @@
             }
             
             group.rules.forEach(rule => {
-                if (selectedPolygons.length > 0 && !hasPolygon(rule.rulestring, selectedPolygons)) {
+                if (selectedPolygons.length > 0 && !matchesPolygon(rule.rulestring, selectedPolygons)) {
                     return;
                 }
                 
@@ -90,13 +94,18 @@
                     return;
                 }
                 
-                result.push(rule);
+                result.push({
+                    ...rule,
+                    group: group.title,
+                    groupId: group.id,
+                });
                 if (showDual && group.dual) {
                     result.push({
                         name: rule.dualname,
                         cr: rule.cr,
                         rulestring: rule.rulestring.concat('*'),
                         group: group.title,
+                        groupId: group.id,
                     });
                 }
             });
@@ -206,6 +215,7 @@
                                 name={tiling.name}
                                 cr={tiling.cr}
                                 rulestring={tiling.rulestring}
+                                groupId={tiling.groupId}
                                 onClick={loadTiling}
                             />
                         </div>

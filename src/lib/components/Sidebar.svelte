@@ -247,14 +247,16 @@
 												<div class="grid grid-cols-2 gap-2 pl-1 space-y-1" transition:slide={{ duration: 200 }}>
 													{#each tilingGroup.rules as tiling}
 														<TilingCard 
+															groupId={tilingGroup.id}
 															name={tiling.name}
 															cr={tiling.cr}
 															rulestring={tiling.rulestring}
 															onClick={loadTiling}
 														/>
 
-														{#if tiling.dualname}
+														{#if tilingGroup.dual}
 															<TilingCard 
+																groupId={tilingGroup.id}
 																name={tiling.dualname}
 																cr={tiling.cr}
 																rulestring={tiling.rulestring.concat('*')}
@@ -318,7 +320,7 @@
 									label="Simulation Speed"
 									bind:value={$speed}
 									min={1}
-									max={60}
+									max={300}
 									step={1}
 									unit="iterations/s"
 								/>
