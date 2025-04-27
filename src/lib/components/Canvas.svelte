@@ -1,13 +1,12 @@
 <script>
-    import { ruleType, parameter, selectedTiling, showCR, debugView, side, transformSteps, patch, golRule, golRules, showConstructionPoints, showInfo, speed } from '$lib/stores/configuration.js';
+    import { ruleType, parameter, selectedTiling, showCR, debugView, side, transformSteps, patch, golRule, golRules, showConstructionPoints, showInfo, speed, screenshotButtonHover } from '$lib/stores/configuration.js';
     import { debugManager, debugStore, updateDebugStore } from '$lib/stores/debug.js';
-    import { Check, Camera, RefreshCw, File } from 'lucide-svelte';
+    import * as ls from 'lucide-svelte';
     import { Tiling } from '$lib/classes/Tiling.svelte.js';
     import { Cr } from '$lib/classes/Cr.svelte.js';
     import { onMount } from 'svelte';
 
     import LiveChart from '$lib/components/LiveChart.svelte';
-    import PieChart from '$lib/components/PieChart.svelte';
 
     let {
         width = 600,
@@ -157,10 +156,10 @@
                         crCanvases = Array.from({length: cr.vertices.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
                     }
 
-                    if ($showConstructionPoints) {
-                        tiling.drawConstructionPoints(p5, $side);
-                    }
                     tiling.show(p5, $side, $showConstructionPoints);
+                    if ($showInfo) {
+                        tiling.drawInfo(p5, $side);
+                    }
                     tiling.showNeighbors(p5, $side, $showConstructionPoints);
                     p5.pop();
 
@@ -172,8 +171,6 @@
                         p5.takeScreenshot();
                         takeScreenshot = false;
                     }
-
-                    
                 }
             } catch (e) {
                 console.log(e);
@@ -206,7 +203,6 @@
         }
 
         p5.isSameRule = (prev, current) => {
-            console.log(prev, current);
             if ($ruleType === 'Single') {
                 return prev === current;
             } else {
@@ -366,8 +362,10 @@
             <button 
                 class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
                 onclick={captureScreenshot}
+                onmouseenter={() => { $screenshotButtonHover = true; }}
+                onmouseleave={() => { $screenshotButtonHover = false; }}
             >
-                <Camera />
+                <ls.Camera />
                 Screenshot
             </button>
             
@@ -384,6 +382,7 @@
                     }
                 }}
             >
+                <ls.Bug />
                 {$debugView ? 'Disable Debug' : 'Enable Debug'}
             </button>
 
@@ -393,7 +392,7 @@
                     tiling.exportGraph();
                 }}
             >
-                <File />
+                <ls.Workflow />
                 Export Graph
             </button>
         </div>
@@ -403,7 +402,7 @@
                 class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
                 onclick={() => resetGameOfLife = true}
             >
-                <RefreshCw size={18} />
+                <ls.RefreshCw size={18} />
                 Randomize
             </button>
             
@@ -415,7 +414,7 @@
     
     {#if $debugView}
         <div class="absolute bottom-4 right-4 w-96 z-20">
-            <PieChart />
+            <ls.PieChart />
             {#if $debugStore.timingData.phases.length === 0}
                 <div class="mt-2 p-3 bg-amber-500/80 text-white text-sm rounded-lg">
                     No timing data available. Try changing the rulestring or layers to generate data.
@@ -427,7 +426,7 @@
 
 {#if showNotification}
     <div class="fixed bottom-4 right-4 bg-green-500 text-white py-2 px-4 rounded-md shadow-md animate-fade-in-out flex items-center gap-2 z-20">
-        <Check />
+        <ls.Check />
         {notificationMessage}
     </div>
 {/if}

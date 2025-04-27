@@ -1,4 +1,5 @@
 <script>
+    import { tilingRules } from '$lib/stores/tilingRules';
     import { Search } from 'lucide-svelte';
     
     let {
@@ -7,16 +8,17 @@
         selectedPolygons = $bindable([]),
         showDual = $bindable(false),
     } = $props();
-    
-    const types = [
-        { id: 'regular', label: '1-Uniform (Regular)' },
-        { id: 'uniform', label: '1-Uniform (Uniform)' },
-        { id: '2-uniform', label: '2-Uniform' },
-        { id: '3-uniform-2', label: '3-Uniform (2 Vertex)' },
-        { id: '3-uniform-3', label: '3-Uniform (3 Vertex)' },
-        { id: 'concave-adj', label: 'Concave (Adjustable)' },
-        { id: 'concave-spec', label: 'Concave (Specific)' }
-    ];
+
+    const types = $derived.by(() => {
+        let types = [];
+        for (let i = 0; i < tilingRules.length; i++) {
+            types.push({
+                id: tilingRules[i].id,
+                label: tilingRules[i].title
+            })
+        }
+        return types;
+    });
     
     // Polygon sides available in the tilings
     const polygons = [3, 4, 5, 6, 8, 9, 12];

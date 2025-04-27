@@ -1,0 +1,2 @@
+- [ ] optimize tiling generation (transform only outer layer)
+- [ ] optimize gol simulation (on aliveNeighbors count)

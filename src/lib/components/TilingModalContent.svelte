@@ -42,13 +42,11 @@
     };
     
     const getTypeId = (title) => {
-        if (title === "1-Uniform (Regular)") return "regular";
-        if (title === "1-Uniform (Semiregular)") return "uniform";
-        if (title === "2-Uniform") return "2-uniform";
-        if (title === "3-Uniform (2 Vertex Types)") return "3-uniform-2";
-        if (title === "3-Uniform (3 Vertex Types)") return "3-uniform-3";
-        if (title === "Uniform Concave (adjustable angles)") return "concave-adj";
-        if (title === "Uniform Concave (specific angles)") return "concave-spec";
+        for (let i = 0; i < tilingRules.length; i++) {
+            if (tilingRules[i].title === title) {
+                return tilingRules[i].id;
+            }
+        }
         return "";
     };
     

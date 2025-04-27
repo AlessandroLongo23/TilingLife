@@ -1,4 +1,4 @@
-import { possibleSides, possibleAngles, tolerance, parameter, debugView, transformSteps, offsets } from '$lib/stores/configuration.js';
+import { possibleSides, possibleAngles, tolerance, parameter, debugView, transformSteps, offsets, screenshotButtonHover } from '$lib/stores/configuration.js';
 import { sortPointsByAngleAndDistance, getClockwiseAngle } from '$lib/utils/geometry.svelte';
 import { RegularPolygon, StarPolygon, DualPolygon} from '$lib/classes/Polygon.svelte';
 import { debugManager, updateDebugStore } from '$lib/stores/debug.js';
@@ -214,7 +214,7 @@ export class Tiling {
 
             }
             end = performance.now();
-            if (end - start > 1000) {
+            if (end - start > 5000) {
                 break;
             }
             if (debugView) debugManager.endTimer(`Transform ${s+1}`);
@@ -224,8 +224,6 @@ export class Tiling {
         if (this.dual)
             this.computeDual();
         
-        this.calculateNeighbors();
-
         if (debugView) debugManager.endTimer("Tiling generation");
         updateDebugStore();
     }
@@ -772,21 +770,22 @@ export class Tiling {
         if (debugView) debugManager.endTimer("Dual");
     }
 
-    calculateNeighbors = () => {
+    calculateNeighbors = (depth, neighborhoodType) => {
         if (debugView) debugManager.startTimer("Computing Neighbors");
         
+        // Create a set to track unique neighbor pairs
         const neighborSet = new Set();
         
         if (debugView) debugManager.startTimer("Creating spatial indices");
         const halfwaysSpatialMap = new Map();
         const verticesSpatialMap = new Map();
         
+        // Initialize all nodes with empty neighbor arrays
         for (let i = 0; i < this.nodes.length; i++) {
-            this.nodes[i].neighbors = {
-                side: [],
-                vertex: []
-            };
+            // We'll fill these with findDirectNeighbors later
+            this.nodes[i].directNeighbors = [];
             
+            // Build spatial index for halfways
             for (let j = 0; j < this.nodes[i].halfways.length; j++) {
                 const hw = this.nodes[i].halfways[j];
                 const key = getSpatialKey(hw.x, hw.y);
@@ -800,6 +799,7 @@ export class Tiling {
                 });
             }
             
+            // Build spatial index for vertices
             for (let j = 0; j < this.nodes[i].vertices.length; j++) {
                 const v = this.nodes[i].vertices[j];
                 const key = getSpatialKey(v.x, v.y);
@@ -815,21 +815,18 @@ export class Tiling {
         }
         if (debugView) debugManager.endTimer("Creating spatial indices");
         
-        const addNeighbor = (type, i, k) => {
+        // Helper function to add a direct neighbor relationship
+        const addDirectNeighbor = (type, i, k) => {
             const pairKey = i < k ? `${i}-${k}` : `${k}-${i}`;
             
             if (!neighborSet.has(pairKey)) {
                 neighborSet.add(pairKey);
-                if (type === 'halfways') {
-                    this.nodes[i].neighbors.side.push(this.nodes[k]);
-                    this.nodes[k].neighbors.side.push(this.nodes[i]);
-                } else if (type === 'vertices') {
-                    this.nodes[i].neighbors.vertex.push(this.nodes[k]);
-                    this.nodes[k].neighbors.vertex.push(this.nodes[i]);
-                }
+                this.nodes[i].directNeighbors.push(this.nodes[k]);
+                this.nodes[k].directNeighbors.push(this.nodes[i]);
             }
         };
 
+        // Find direct (depth=1) neighbors using spatial indexing
         if (debugView) debugManager.startTimer("Calculating halfways neighbors");
         const processedHalfwayCells = new Set();
         
@@ -847,7 +844,7 @@ export class Tiling {
                     const hw2 = node2.halfways[entry2.halfwayIndex];
                     
                     if (isWithinTolerance(hw1, hw2)) {
-                        addNeighbor('halfways', entry1.nodeIndex, entry2.nodeIndex);
+                        addDirectNeighbor('halfways', entry1.nodeIndex, entry2.nodeIndex);
                     }
                 }
             }
@@ -875,7 +872,7 @@ export class Tiling {
                         const hw2 = node2.halfways[entry2.halfwayIndex];
                         
                         if (isWithinTolerance(hw1, hw2)) {
-                            addNeighbor('halfways', entry1.nodeIndex, entry2.nodeIndex);
+                            addDirectNeighbor('halfways', entry1.nodeIndex, entry2.nodeIndex);
                         }
                     }
                 }
@@ -883,85 +880,148 @@ export class Tiling {
         }
         if (debugView) debugManager.endTimer("Calculating halfways neighbors");
 
+        // Calculate vertex neighbors only if using Moore neighborhood
+        if (neighborhoodType === 'moore') {
+            if (debugView) debugManager.startTimer("Calculating vertices neighbors");
+            const vertexToNodesMap = new Map();
+            
+            for (let i = 0; i < this.nodes.length; i++) {
+                for (let j = 0; j < this.nodes[i].vertices.length; j++) {
+                    const vertex = this.nodes[i].vertices[j];
+                    const key = getSpatialKey(vertex.x, vertex.y);
+                    
+                    const baseX = Math.floor(vertex.x / (tolerance * 2));
+                    const baseY = Math.floor(vertex.y / (tolerance * 2));
+                    
+                    let canonicalVertex = vertex;
+                    let canonicalKey = null;
+                    
+                    for (const [dx, dy] of offsets) {
+                        const nearbyKey = `${baseX + dx},${baseY + dy}`;
+                        const existingVertices = vertexToNodesMap.get(nearbyKey);
+                        
+                        if (!existingVertices) continue;
+                        
+                        for (const {v} of existingVertices) {
+                            if (isWithinTolerance(vertex, v)) {
+                                canonicalVertex = v;
+                                canonicalKey = nearbyKey;
+                                break;
+                            }
+                        }
+                        
+                        if (canonicalKey) break;
+                    }
+                    
+                    // If no existing vertex was found, use this one as canonical
+                    if (!canonicalKey) {
+                        canonicalKey = key;
+                        
+                        if (!vertexToNodesMap.has(canonicalKey)) {
+                            vertexToNodesMap.set(canonicalKey, []);
+                        }
+                        
+                        vertexToNodesMap.get(canonicalKey).push({
+                            v: canonicalVertex,
+                            nodeIndexes: new Set([i])
+                        });
+                    } else {
+                        for (const entry of vertexToNodesMap.get(canonicalKey)) {
+                            if (isWithinTolerance(entry.v, canonicalVertex)) {
+                                entry.nodeIndexes.add(i);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            for (const entries of vertexToNodesMap.values()) {
+                for (const {nodeIndexes} of entries) {
+                    if (nodeIndexes.size < 2) continue;
+                    
+                    const nodeIndexArray = Array.from(nodeIndexes);
+                    
+                    for (let i = 0; i < nodeIndexArray.length; i++) {
+                        for (let j = i + 1; j < nodeIndexArray.length; j++) {
+                            const node1Index = nodeIndexArray[i];
+                            const node2Index = nodeIndexArray[j];
+                            
+                            const isSideNeighbors = this.nodes[node1Index].directNeighbors.some(
+                                neighbor => isWithinTolerance(neighbor.centroid, this.nodes[node2Index].centroid)
+                            );
+                            
+                            if (!isSideNeighbors) {
+                                addDirectNeighbor('vertices', node1Index, node2Index);
+                            }
+                        }
+                    }
+                }
+            }
+            if (debugView) debugManager.endTimer("Calculating vertices neighbors");
+        }
 
-        if (debugView) debugManager.startTimer("Calculating vertices neighbors");
-        const vertexToNodesMap = new Map();
+        // Now perform DFS to get all neighbors up to the specified depth
+        if (debugView) debugManager.startTimer("Calculating all neighbors with DFS");
         
         for (let i = 0; i < this.nodes.length; i++) {
-            for (let j = 0; j < this.nodes[i].vertices.length; j++) {
-                const vertex = this.nodes[i].vertices[j];
-                const key = getSpatialKey(vertex.x, vertex.y);
+            const node = this.nodes[i];
+            
+            // Initialize the final neighbors array
+            node.neighbors = [];
+            
+            // If depth is 1, just copy direct neighbors
+            if (depth === 1) {
+                node.neighbors = [...node.directNeighbors];
+                continue;
+            }
+            
+            // Set to track visited nodes during DFS
+            const visited = new Set([node]);
+            const allNeighbors = new Set();
+            
+            // Queue for BFS (node, currentDepth)
+            const queue = [];
+            
+            // Add direct neighbors to start BFS
+            for (const neighbor of node.directNeighbors) {
+                queue.push({ node: neighbor, depth: 1 });
+                visited.add(neighbor);
+                allNeighbors.add(neighbor);
+            }
+            
+            // Perform BFS (Breadth-First Search is better here to ensure we get all neighbors at each depth)
+            while (queue.length > 0) {
+                const { node: currentNode, depth: currentDepth } = queue.shift();
                 
-                const baseX = Math.floor(vertex.x / (tolerance * 2));
-                const baseY = Math.floor(vertex.y / (tolerance * 2));
+                // If we've reached our target depth, don't explore further
+                if (currentDepth >= depth) continue;
                 
-                let canonicalVertex = vertex;
-                let canonicalKey = null;
-                
-                for (const [dx, dy] of offsets) {
-                    const nearbyKey = `${baseX + dx},${baseY + dy}`;
-                    const existingVertices = vertexToNodesMap.get(nearbyKey);
-                    
-                    if (!existingVertices) continue;
-                    
-                    for (const {v} of existingVertices) {
-                        if (isWithinTolerance(vertex, v)) {
-                            canonicalVertex = v;
-                            canonicalKey = nearbyKey;
-                            break;
-                        }
-                    }
-                    
-                    if (canonicalKey) break;
-                }
-                
-                // If no existing vertex was found, use this one as canonical
-                if (!canonicalKey) {
-                    canonicalKey = key;
-                    
-                    if (!vertexToNodesMap.has(canonicalKey)) {
-                        vertexToNodesMap.set(canonicalKey, []);
-                    }
-                    
-                    vertexToNodesMap.get(canonicalKey).push({
-                        v: canonicalVertex,
-                        nodeIndexes: new Set([i])
-                    });
-                } else {
-                    for (const entry of vertexToNodesMap.get(canonicalKey)) {
-                        if (isWithinTolerance(entry.v, canonicalVertex)) {
-                            entry.nodeIndexes.add(i);
-                            break;
-                        }
+                // For each direct neighbor of the current node
+                for (const nextNode of currentNode.directNeighbors) {
+                    if (!visited.has(nextNode)) {
+                        visited.add(nextNode);
+                        allNeighbors.add(nextNode);
+                        
+                        // Add to the queue for further exploration
+                        queue.push({
+                            node: nextNode,
+                            depth: currentDepth + 1
+                        });
                     }
                 }
             }
+            
+            // Assign all discovered neighbors
+            node.neighbors = Array.from(allNeighbors);
         }
         
-        for (const entries of vertexToNodesMap.values()) {
-            for (const {nodeIndexes} of entries) {
-                if (nodeIndexes.size < 2) continue;
-                
-                const nodeIndexArray = Array.from(nodeIndexes);
-                
-                for (let i = 0; i < nodeIndexArray.length; i++) {
-                    for (let j = i + 1; j < nodeIndexArray.length; j++) {
-                        const node1Index = nodeIndexArray[i];
-                        const node2Index = nodeIndexArray[j];
-                        
-                        const isSideNeighbors = this.nodes[node1Index].neighbors.side.some(
-                            neighbor => isWithinTolerance(neighbor.centroid, this.nodes[node2Index].centroid)
-                        );
-                        
-                        if (!isSideNeighbors) {
-                            addNeighbor('vertices', node1Index, node2Index);
-                        }
-                    }
-                }
-            }
+        // Clean up temporary directNeighbors arrays
+        for (let i = 0; i < this.nodes.length; i++) {
+            delete this.nodes[i].directNeighbors;
         }
-        if (debugView) debugManager.endTimer("Calculating vertices neighbors");
-
+        
+        if (debugView) debugManager.endTimer("Calculating all neighbors with DFS");
         if (debugView) debugManager.endTimer("Computing Neighbors");
         updateDebugStore();
     }
@@ -1010,7 +1070,7 @@ export class Tiling {
         return uniqueNodes;
     }
 
-    drawConstructionPoints = (ctx, side) => {
+    drawInfo = (ctx, side) => {
         ctx.push();
         ctx.translate(0, ctx.height);
         ctx.scale(1, -1);
@@ -1084,6 +1144,35 @@ export class Tiling {
             this.nodes[i].show(ctx, side, showConstructionPoints);
         }
         ctx.pop();
+
+        screenshotButtonHover.subscribe(hover => {
+            if (hover) {
+                ctx.push();
+                ctx.noStroke();
+                ctx.fill(0, 0, 0, 0.5);
+                ctx.rect(0, 0, ctx.width / 2 - 600 / 2, ctx.height);
+                ctx.rect(ctx.width / 2 + 600 / 2, 0, ctx.width / 2 - 600 / 2, ctx.height);
+                ctx.rect(ctx.width / 2 - 600 / 2, 0, 600, ctx.height / 2 - 600 / 2);
+                ctx.rect(ctx.width / 2 - 600 / 2, ctx.height / 2 + 600 / 2, 600, ctx.height / 2 - 600 / 2);
+
+                let len = 50;
+                ctx.stroke(255);
+                ctx.strokeWeight(2);
+                ctx.line(ctx.width / 2 - 600 / 2, ctx.height / 2 - 600 / 2, ctx.width / 2 - 600 / 2 + len, ctx.height / 2 - 600 / 2);
+                ctx.line(ctx.width / 2 - 600 / 2, ctx.height / 2 - 600 / 2, ctx.width / 2 - 600 / 2, ctx.height / 2 - 600 / 2 + len);
+
+                ctx.line(ctx.width / 2 + 600 / 2, ctx.height / 2 - 600 / 2, ctx.width / 2 + 600 / 2 - len, ctx.height / 2 - 600 / 2);
+                ctx.line(ctx.width / 2 + 600 / 2, ctx.height / 2 - 600 / 2, ctx.width / 2 + 600 / 2, ctx.height / 2 - 600 / 2 + len);
+
+                ctx.line(ctx.width / 2 - 600 / 2, ctx.height / 2 + 600 / 2, ctx.width / 2 - 600 / 2 + len, ctx.height / 2 + 600 / 2);
+                ctx.line(ctx.width / 2 - 600 / 2, ctx.height / 2 + 600 / 2, ctx.width / 2 - 600 / 2, ctx.height / 2 + 600 / 2 - len);
+
+                ctx.line(ctx.width / 2 + 600 / 2, ctx.height / 2 + 600 / 2, ctx.width / 2 + 600 / 2 - len, ctx.height / 2 + 600 / 2);
+                ctx.line(ctx.width / 2 + 600 / 2, ctx.height / 2 + 600 / 2, ctx.width / 2 + 600 / 2, ctx.height / 2 + 600 / 2 - len);
+
+                ctx.pop();
+            }
+        });
     }
 
     showNeighbors = (ctx, side, showConstructionPoints) => {
@@ -1101,30 +1190,14 @@ export class Tiling {
             if (node.containsPoint(mousePoint)) {
                 node.show(ctx, side, showConstructionPoints, ctx.color(0, 0, 100));
 
-                for (let neighbor of node.neighbors.side) {
+                for (let neighbor of node.neighbors) {
                     neighbor.show(ctx, side, showConstructionPoints, ctx.color(240, 100, 100, 0.5));
-                    ctx.line(
-                        node.centroid.x,
-                        node.centroid.y,
-                        neighbor.centroid.x,
-                        neighbor.centroid.y
-                    );
-                    ctx.ellipse(
-                        neighbor.centroid.x,
-                        neighbor.centroid.y,
-                        1/5,
-                        1/5
-                    );
-                }
-
-                for (let neighbor of node.neighbors.vertex) {
-                    neighbor.show(ctx, side, showConstructionPoints, ctx.color(120, 100, 100, 0.5));
-                    ctx.line(
-                        node.centroid.x,
-                        node.centroid.y,
-                        neighbor.centroid.x,
-                        neighbor.centroid.y
-                    );
+                    // ctx.line(
+                    //     node.centroid.x,
+                    //     node.centroid.y,
+                    //     neighbor.centroid.x,
+                    //     neighbor.centroid.y
+                    // );
                     ctx.ellipse(
                         neighbor.centroid.x,
                         neighbor.centroid.y,
@@ -1173,20 +1246,59 @@ export class Tiling {
     }
 
     parseGameOfLifeRule = (golRule) => {
-        let pieces = golRule.split('/');
-        let birth = pieces[0].slice(1).split('').map(Number);
-        let survival = pieces[1].slice(1).split('').map(Number);
-        let generations = pieces[2] ? parseInt(pieces[2]) : 1;
+        let rule = {
+            birth: [],
+            survival: [],
+            generations: 1,
+            neighborhood: 'moore',
+            range: 1,
+        };
 
-        return {
-            birth: birth,
-            survival: survival,
-            generations: generations
+        let pieces = golRule.split('/');
+        if (pieces.length == 1) {
+            pieces = golRule.split(',');
         }
+
+        let calculatedNeighbors = false;
+
+        for (let i = 0; i < pieces.length; i++) {
+            if (pieces[i].startsWith('B')) {
+                if (pieces[i].slice(1).includes('-')) {
+                    let [min, max] = pieces[i].slice(1).split('-').map(Number);
+                    rule.birth.min = min;
+                    rule.birth.max = max;
+                } else {
+                    rule.birth = pieces[i].slice(1).split('').map(Number);
+                }
+            } else if (pieces[i].startsWith('S')) {
+                if (pieces[i].slice(1).includes('-')) {
+                    let [min, max] = pieces[i].slice(1).split('-').map(Number);
+                    rule.survival.min = min;
+                    rule.survival.max = max;
+                } else {
+                    rule.survival = pieces[i].slice(1).split('').map(Number);
+                }
+            } else if (pieces[i].startsWith('G') || pieces[i].startsWith('C')) {
+                rule.generations = parseInt(pieces[i].slice(1));
+            } else if (pieces[i].startsWith('N')) {
+                rule.neighborhood = pieces[i].slice(1) == 'n' ? 'vonNeumann' : 'moore';
+            } else if (pieces[i].startsWith('R')) {
+                rule.range = parseInt(pieces[i].slice(1)) || 1;
+                this.calculateNeighbors(rule.range, rule.neighborhood);
+                calculatedNeighbors = true;
+            }
+        }
+
+        if (!calculatedNeighbors) {
+            this.calculateNeighbors(rule.range, rule.neighborhood);
+        }
+
+        console.log(rule);
+
+        return rule;
     }
 
     updateGameOfLife = () => {
-        // Helper to convert boolean test to 0/1 without conditionals
         const toBinary = (test) => +(!!test);
         
         for (let i = 0; i < this.nodes.length; i++) {
@@ -1195,12 +1307,32 @@ export class Tiling {
             
             let nodeRule = this.golRuleType === 'Single' ? this.parsedGolRule : this.rules[node.n];
             if (state <= 1) {
-                let aliveNeighbors = [...node.neighbors.side, ...node.neighbors.vertex].filter(neighbor => neighbor.state === 1).length;
+                let aliveNeighbors = node.neighbors.filter(neighbor => neighbor.state == 1).length;
+                let aliveRate = aliveNeighbors / node.neighbors.length;
                 
                 const alive = state & 1;
                 
-                const hasBirthNeighbors = toBinary(nodeRule.birth.includes(aliveNeighbors));
-                const hasSurvivalNeighbors = toBinary(nodeRule.survival.includes(aliveNeighbors));
+                let hasBirthNeighbors = false;
+                if (nodeRule.birth.min) {
+                    if (nodeRule.birth.min <= 1 && nodeRule.birth.max <= 1) {
+                        hasBirthNeighbors = toBinary(nodeRule.birth.min <= aliveRate && nodeRule.birth.max >= aliveRate);
+                    } else {
+                        hasBirthNeighbors = toBinary(nodeRule.birth.min <= aliveNeighbors && nodeRule.birth.max >= aliveNeighbors);
+                    }
+                } else {
+                    hasBirthNeighbors = toBinary(nodeRule.birth.includes(aliveNeighbors));
+                }
+
+                let hasSurvivalNeighbors = false;
+                if (nodeRule.survival.min) {
+                    if (nodeRule.survival.min <= 1 && nodeRule.survival.max <= 1) {
+                        hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= aliveRate && nodeRule.survival.max >= aliveRate);
+                    } else {
+                        hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= aliveNeighbors && nodeRule.survival.max >= aliveNeighbors);
+                    }
+                } else {
+                    hasSurvivalNeighbors = toBinary(nodeRule.survival.includes(aliveNeighbors));
+                }
                 
                 const keep = (hasBirthNeighbors & (alive ^ 1)) | (hasSurvivalNeighbors & alive);
 
@@ -1240,8 +1372,8 @@ export class Tiling {
         });
         
         this.nodes.forEach((node, nodeIndex) => {
-            if (node.neighbors && node.neighbors.side) {
-                node.neighbors.side.forEach(neighbor => {
+            if (node.neighbors && node.neighbors.length > 0) {
+                node.neighbors.forEach(neighbor => {
                     const neighborIndex = nodeMap.get(neighbor);
                     if (neighborIndex !== undefined) {
                         const edgeExists = graph.edges.some(e => 
@@ -1253,27 +1385,7 @@ export class Tiling {
                             graph.edges.push({
                                 source: nodeIndex,
                                 target: neighborIndex,
-                                type: 'side'
-                            });
-                        }
-                    }
-                });
-            }
-            
-            if (node.neighbors && node.neighbors.vertex) {
-                node.neighbors.vertex.forEach(neighbor => {
-                    const neighborIndex = nodeMap.get(neighbor);
-                    if (neighborIndex !== undefined) {
-                        const edgeExists = graph.edges.some(e => 
-                            (e.source === nodeIndex && e.target === neighborIndex) || 
-                            (e.source === neighborIndex && e.target === nodeIndex)
-                        );
-                        
-                        if (!edgeExists) {
-                            graph.edges.push({
-                                source: nodeIndex,
-                                target: neighborIndex,
-                                type: 'vertex'
+                                type: 'neighbor'
                             });
                         }
                     }

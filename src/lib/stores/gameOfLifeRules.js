@@ -6,7 +6,7 @@ export const gameOfLifeRules = [
 	},
 	{
 		name: "Conway's Game of Life (5 Generations)",
-		rule: "B3/S23/5",
+		rule: "B3/S23/G5",
 		description: "Classic Conway's rules with 5 generations of cell states before death."
 	},
 	{
@@ -16,7 +16,7 @@ export const gameOfLifeRules = [
 	},
 	{
 		name: "HighLife (4 Generations)",
-		rule: "B36/S23/4",
+		rule: "B36/S23/G4",
 		description: "HighLife rules with 4 generations of cell states before death."
 	},
 	{
@@ -26,12 +26,12 @@ export const gameOfLifeRules = [
 	},
 	{
 		name: "Maze",
-		rule: "B3/S12/8",
+		rule: "B3/S12345",
 		description: "Cells are born with 3 neighbors and survive with 1-2 neighbors. Creates maze-like patterns with 8 generations."
 	},
 	{
 		name: "Gnarl",
-		rule: "B1/S1/10",
+		rule: "B1/S1/G10",
 		description: "Minimalistic rule where cells are born and survive with exactly 1 neighbor. Creates complex branching patterns with 10 generations."
 	},
 	{

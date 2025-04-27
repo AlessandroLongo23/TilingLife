@@ -1,10 +1,10 @@
 import { writable } from 'svelte/store';
 
-export let golRule = writable('B3/S23/6'); // Conway's Game of Life with 6 generations
+export let golRule = writable('B3/S23'); // Conway's Game of Life with 6 generations
 export let golRules = writable({});
 export let selectedTiling = writable({
 	name: 'square',
-	rulestring: '4/m90/r(h1)',
+	rulestring: '4/m45/r(h1)',
 	cr: '4^4',
 	dualname: 'square'
 });
@@ -19,6 +19,8 @@ export let ruleType = writable('Single');
 export let activeTab = writable('Tilings');
 export let showCR = writable(false);
 export let debugView = writable(false);
+export let screenshotButtonHover = writable(false);
+// export let screenshotSize = writable(600);
 
 export let tolerance = 0.01;
 export let possibleAngles = [30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];

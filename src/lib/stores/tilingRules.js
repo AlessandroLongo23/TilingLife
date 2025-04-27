@@ -14,9 +14,10 @@ export const tilingRules = [
 			{
 				name: "square",
 				cr: "4^4",
-				rulestring: "4/m45/r(h1)",
+				rulestring: "4-4-0,4/r90/t(c2)",
 				dualname: "square",
 				alternatives: [
+					"4/m45/r(h1)",
 					"4-4-0,4/r90/t(c2)"
 				]
 			},
@@ -506,6 +507,29 @@ export const tilingRules = [
 				name: "",
 				cr: "",
 				rulestring: "4-4-3-3-3/m(h9)/r(h1)/r(h3)",
+			}
+		]
+	},
+	// 6-6-0,6,3-0,0,3,3/r60/m(v6)
+	{
+		title: "4-Uniform",
+		id: "4U",
+		dual: true,
+		rules: [
+			{
+				name: "",
+				cr: "",
+				rulestring: "3-0,6-0,0,6,6-0,0,6,6,6/r60/m(c1)",
+			},
+			{
+				name: "",
+				cr: "",
+				rulestring: "6-6-0,6,3-0,0,3,3/r60/m(c1)"
+			},
+			{
+				name: "",
+				cr: "",
+				rulestring: ""
 			}
 		]
 	},
