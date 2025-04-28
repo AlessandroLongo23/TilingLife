@@ -1,60 +1,66 @@
 export class Vector {
-    constructor(x, y) {
+    constructor(x = 0, y = 0) {
         this.x = x;
         this.y = y;
     }
 
+    static fromAngle(angle) {
+        return new Vector(Math.cos(angle), Math.sin(angle));
+    }
+
+    static fromPolar(mag, angle) {
+        return new Vector(mag * Math.cos(angle), mag * Math.sin(angle));
+    }
+
+    static midpoint(v1, v2) {
+        return new Vector((v1.x + v2.x) / 2, (v1.y + v2.y) / 2);
+    }
+
+    static sub(v1, v2) {
+        return new Vector(v1.x - v2.x, v1.y - v2.y);
+    }
+
     copy() {
-        return {
-            x: this.x,
-            y: this.y
-        }
+        return new Vector(this.x, this.y);
     }
     
-    add(vector) {
-        this.x += vector.x;
-        this.y += vector.y;
+    add(other) {
+        this.x += other.x;
+        this.y += other.y;
 
         return this.copy();
     }
     
-    sub(vector) {
-        this.x -= vector.x;
-        this.y -= vector.y;
+    sub(other) {
+        this.x -= other.x;
+        this.y -= other.y;
 
         return this.copy();
     }
 
-    mult(scalar) {
-        this.x *= scalar;
-        this.y *= scalar;
-
-        return this.copy();
-    }
-
-    div(scalar) {
-        this.x /= scalar;
-        this.y /= scalar;
+    set(other) {
+        this.x = other.x;
+        this.y = other.y;
 
         return this.copy();
     }
 
     mag() {
-        return Math.sqrt(this.x ** 2 + this.y ** 2);
+        return Math.sqrt(this.x * this.x + this.y * this.y);
+    }
+
+    dot(other) {
+        return this.x * other.x + this.y * other.y;
     }
 
     normalize() {
-        let mag = this.mag();
-        this.x /= mag;
-        this.y /= mag;
+        this.scale(1 / this.mag());
 
         return this.copy();
     }
 
     setHeading(heading) {
-        let mag = this.mag();
-        this.x = Math.cos(heading) * mag;
-        this.y = Math.sin(heading) * mag;
+        this.set(Vector.fromAngle(heading).scale(this.mag()));
 
         return this.copy();
     }
@@ -63,11 +69,28 @@ export class Vector {
         return Math.atan2(this.y, this.x);
     }
 
+    mirror(angle) {
+        const dir = Vector.fromAngle(angle);
+        const dotProduct = this.dot(dir);
+
+        this.x = 2 * dotProduct * dir.x - this.x;
+        this.y = 2 * dotProduct * dir.y - this.y;
+
+        return this.copy();
+    }
+
     rotate(angle) {
         let newX = this.x * Math.cos(angle) - this.y * Math.sin(angle);
         let newY = this.x * Math.sin(angle) + this.y * Math.cos(angle);
         this.x = newX;
         this.y = newY;
+
+        return this.copy();
+    }
+
+    scale(scalar) {
+        this.x *= scalar;
+        this.y *= scalar;
 
         return this.copy();
     }

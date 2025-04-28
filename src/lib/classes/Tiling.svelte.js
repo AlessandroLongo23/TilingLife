@@ -2,10 +2,10 @@ import { possibleSides, possibleAngles, tolerance, parameter, debugView, transfo
 import { sortPointsByAngleAndDistance, getClockwiseAngle } from '$lib/utils/geometry.svelte';
 import { RegularPolygon, StarPolygon, DualPolygon} from '$lib/classes/Polygon.svelte';
 import { debugManager, updateDebugStore } from '$lib/stores/debug.js';
+import { apothem, angleBetween } from '$lib/utils/geometry.svelte';
 import { getSpatialKey } from '$lib/utils/optimizing.svelte';
 import { isWithinTolerance } from '$lib/utils/math.svelte';
 import { Vector } from '$lib/classes/Vector.svelte.js';
-import { apothem } from '$lib/utils/geometry.svelte';
 
 export class Tiling {
     constructor() {
@@ -42,11 +42,13 @@ export class Tiling {
                 } else {
                     let n = this.shapeSeed[i][j].split('(')[0];
                     let alfa = this.shapeSeed[i][j].split('(')[1].split(')')[0];
-                    this.shapeSeed[i][j] = {
-                        type: 'star',
-                        n: parseInt(n),
-                        alfa: alfa == 'a' ? parameter * Math.PI / 180 : parseInt(alfa) * Math.PI / 180
-                    };
+                    parameter.subscribe((v) => {
+                        this.shapeSeed[i][j] = {
+                            type: 'star',
+                            n: parseInt(n),
+                            alfa: alfa == 'a' ? v * Math.PI / 180 : parseInt(alfa) * Math.PI / 180
+                        };
+                    });
                 }
             }
         }
@@ -86,28 +88,40 @@ export class Tiling {
         }
         this.nodes = [];
         
-        if (debugView) debugManager.startTimer("Seed");
+        this.generateSeed();
+        this.generateTransformations();
+
+        if (this.dual) this.computeDual();
+        
+        if (debugView) debugManager.endTimer("Tiling generation");
+        updateDebugStore();
+    }
+
+    addCoreNode = () => {
         if (this.shapeSeed[0][0].type === 'star') {
             this.coreNode = new StarPolygon({
-                centroid: {
-                    x: 0,
-                    y: 0,
-                },
+                centroid: new Vector(),
                 n: this.shapeSeed[0][0].n,
                 angle: Math.PI / this.shapeSeed[0][0].n,
                 alfa: this.shapeSeed[0][0].alfa
             });
         } else {
             this.coreNode = new RegularPolygon({
-                centroid: {
-                    x: this.shapeSeed[0][0].n == 3 ? Math.sqrt(3) / 6 : 0,
-                    y: this.shapeSeed[0][0].n == 3 ? 0.5 : 0,
-                },
+                centroid: new Vector(
+                    this.shapeSeed[0][0].n == 3 ? Math.sqrt(3) / 6 : 0,
+                    this.shapeSeed[0][0].n == 3 ? 0.5 : 0
+                ),
                 n: this.shapeSeed[0][0].n,
                 angle: this.shapeSeed[0][0].n == 3 ? 0 : Math.PI / this.shapeSeed[0][0].n
             });
         }
+
         this.nodes.push(this.coreNode);
+    }
+
+    generateSeed = () => {
+        if (debugView) debugManager.startTimer("Seed");
+        this.addCoreNode();
 
         for (let i = 1; i < this.shapeSeed.length; i++) {
             let newNodes = [];
@@ -124,12 +138,12 @@ export class Tiling {
                 let newNode;
                 if (this.shapeSeed[i][j].type === 'regular') {
                     let a = apothem(this.shapeSeed[i][j].n);
-                    let newCentroid = {
-                        x: halfwayPoint.x + anchor.dir.x * a,
-                        y: halfwayPoint.y + anchor.dir.y * a
-                    };
+                    let newCentroid = new Vector(
+                        halfwayPoint.x + anchor.dir.x * a,
+                        halfwayPoint.y + anchor.dir.y * a
+                    );
 
-                    let angle = Math.atan2(anchor.dir.y, anchor.dir.x);
+                    let angle = anchor.dir.heading();
                     if (this.shapeSeed[i][j].n % 2 == 0) {
                         angle += Math.PI / this.shapeSeed[i][j].n;
                     }
@@ -153,10 +167,10 @@ export class Tiling {
                     let beta = gamma - this.shapeSeed[i][j].alfa / 2;
                     let dist = Math.cos(beta) / Math.cos(gamma);
 
-                    let newCentroid = {
-                        x: secondVertex.x + sideVector.x * dist,
-                        y: secondVertex.y + sideVector.y * dist
-                    }
+                    let newCentroid = new Vector(
+                        secondVertex.x + sideVector.x * dist,
+                        secondVertex.y + sideVector.y * dist
+                    )
 
                     newNode = new StarPolygon({
                         centroid: newCentroid,
@@ -172,10 +186,12 @@ export class Tiling {
             this.nodes = this.nodes.concat(newNodes);
         }
 
-        if (debugView) debugManager.endTimer("Seed");
-
         this.newLayerNodes = [...this.nodes];
+        this.seedNodes = [...this.nodes];
+        if (debugView) debugManager.endTimer("Seed");
+    }
 
+    generateTransformations = () => {
         if (debugView) debugManager.startTimer("Transformations");
         let layers;
         transformSteps.subscribe((v) => {
@@ -187,32 +203,33 @@ export class Tiling {
         
         for (let s = 0; s < layers; s++) {
             if (debugView) debugManager.startTimer(`Transform ${s+1}`);
+
+            let newNodes = [];
             for (let i = 0; i < this.transforms.length; i++) {
-                if (s == layers - 1 && i == this.transforms.length - 1) {
-                    break;
-                }
+                if (s == layers - 1 && i == this.transforms.length - 1) break;
 
                 if (debugView) debugManager.startTimer(`Transform ${s+1}.${i+1}`);
 
-                if (s == 0)
-                    this.anchorNodes = [...this.nodes];
+                if (s == 0) this.anchorNodes = [...this.nodes, ...newNodes];
 
                 if (this.transforms[i].type === 'm') {
                     if (this.transforms[i].relativeTo)
-                        this.mirrorRelativeTo(i)
+                        newNodes = newNodes.concat(this.mirrorRelativeTo(i, newNodes))
                     else if (this.transforms[i].angle)
-                        this.mirrorByAngle(this.transforms[i].angle)
+                        newNodes = newNodes.concat(this.mirrorByAngle(this.transforms[i].angle, newNodes))
                 } else if (this.transforms[i].type === 'r') {
                     if (this.transforms[i].relativeTo)
-                        this.rotateRelativeTo(i)
+                        newNodes = newNodes.concat(this.rotateRelativeTo(i, newNodes))
                     else if (this.transforms[i].angle)
-                        this.rotateByAngle(this.transforms[i].angle)
+                        newNodes = newNodes.concat(this.rotateByAngle(this.transforms[i].angle, newNodes))
                 } else if (this.transforms[i].type === 't') {
-                    this.translateRelativeTo(i)
+                    newNodes = newNodes.concat(this.translateRelativeTo(i, newNodes))
                 }
+                
                 if (debugView) debugManager.endTimer(`Transform ${s+1}.${i+1}`);
-
             }
+
+            this.newLayerNodes = this.addNewNodes(newNodes);
             end = performance.now();
             if (end - start > 5000) {
                 break;
@@ -220,15 +237,9 @@ export class Tiling {
             if (debugView) debugManager.endTimer(`Transform ${s+1}`);
         }
         if (debugView) debugManager.endTimer("Transformations");
-
-        if (this.dual)
-            this.computeDual();
-        
-        if (debugView) debugManager.endTimer("Tiling generation");
-        updateDebugStore();
     }
 
-    mirrorRelativeTo = (transformationIndex) => {
+    mirrorRelativeTo = (transformationIndex, additionalNodes) => {
         let origin = this.transforms[transformationIndex].anchor; 
         if (!origin) {
             let type = this.transforms[transformationIndex].relativeTo[0];
@@ -238,10 +249,8 @@ export class Tiling {
             this.transforms[transformationIndex].anchor = origin;
         }
         
-        // let newNodes = [this.coreNode];
         let newNodes = [];
-        for (let newLayerNode of this.nodes) {
-        // for (let newLayerNode of this.newLayerNodes) {
+        for (let newLayerNode of  [...this.newLayerNodes, ...this.seedNodes, ...additionalNodes]) {
             let newNode = newLayerNode.clone();
 
             if (this.transforms[transformationIndex].relativeTo[0] === 'h') {
@@ -253,15 +262,7 @@ export class Tiling {
                             const v1 = this.anchorNodes[i].vertices[k];
                             const v2 = this.anchorNodes[i].vertices[(k + 1) % this.anchorNodes[i].n];
                             
-                            lineVector = {
-                                x: v2.x - v1.x,
-                                y: v2.y - v1.y
-                            };
-                            
-                            const length = Math.sqrt(lineVector.x * lineVector.x + lineVector.y * lineVector.y);
-                            lineVector.x /= length;
-                            lineVector.y /= length;
-                            
+                            lineVector = Vector.sub(v2, v1).normalize();
                             break;
                         }
                     }
@@ -269,31 +270,20 @@ export class Tiling {
                     if (lineVector) 
                         break;
                 }
-                
-                const pointVector = {
-                    x: newNode.centroid.x - origin.x,
-                    y: newNode.centroid.y - origin.y
-                };
-                
-                const dot = pointVector.x * lineVector.x + pointVector.y * lineVector.y;
-                const projection = {
-                    x: dot * lineVector.x,
-                    y: dot * lineVector.y
-                };
-                
-                const perpendicular = {
-                    x: pointVector.x - projection.x,
-                    y: pointVector.y - projection.y
-                };
+
+                const pointVector = Vector.sub(newNode.centroid, origin);
+                const dot = pointVector.dot(lineVector);
+                const projection = lineVector.scale(dot);
+                const perpendicular = Vector.sub(pointVector, projection);
                 
                 newNode.centroid.x = origin.x + projection.x - perpendicular.x;
                 newNode.centroid.y = origin.y + projection.y - perpendicular.y;
                 
-                const lineAngle = Math.atan2(lineVector.y, lineVector.x);
+                const lineAngle = lineVector.heading();
                 newNode.angle = 2 * lineAngle - newNode.angle;
             } else {
-                newNode.centroid.x = 2 * origin.x - newNode.centroid.x;
-                newNode.centroid.y = 2 * origin.y - newNode.centroid.y;
+                newNode.centroid.x = origin.x - (newNode.centroid.x - origin.x);
+                newNode.centroid.y = origin.y - (newNode.centroid.y - origin.y);
                 newNode.angle = Math.PI + newNode.angle;
             }
 
@@ -304,41 +294,23 @@ export class Tiling {
             newNodes.push(newNode);
         }
 
-        this.nodes = this.nodes.concat(newNodes);
-        this.nodes = this.removeDuplicates(this.nodes);
-        // this.newLayerNodes = this.addNewNodes(newNodes.concat(this.coreNode));
+        return newNodes;
     }
 
-    mirrorByAngle = (angle) => {
+    mirrorByAngle = (angle, additionalNodes) => {
         const anglesToProcess = [];
-        let currentAngle = angle;
-        while (currentAngle < 360) {
-            anglesToProcess.push(currentAngle);
-            currentAngle *= 2;
+        let angleRad = angle * Math.PI / 180;
+        while (angleRad < 2 * Math.PI) {
+            anglesToProcess.push(angleRad + Math.PI / 2);
+            angleRad *= 2;
         }
         
-        // let newNodes = [this.coreNode];
-        for (const processAngle of anglesToProcess) {
-            const angleRad = processAngle * Math.PI / 180 - Math.PI / 2;
-            const vx = Math.cos(angleRad);
-            const vy = Math.sin(angleRad);
-            
-            // for (let newLayerNode of this.newLayerNodes.concat(newNodes)) {
-            let newNodes = [];
-            for (let newLayerNode of this.nodes) {
+        let newNodes = [];
+        for (const angleRad of anglesToProcess) {
+            for (let newLayerNode of [...this.newLayerNodes, ...this.seedNodes, ...additionalNodes, ...newNodes]) {
                 let newNode = newLayerNode.clone();
-                // let newNode = new RegularPolygon({
-                //     centroid: {
-                //         x: newLayerNode.centroid.x,
-                //         y: newLayerNode.centroid.y
-                //     },
-                //     n: newLayerNode.n,
-                //     angle: newLayerNode.angle
-                // });
 
-                const dotProduct = newNode.centroid.x * vx + newNode.centroid.y * vy;
-                newNode.centroid.x = 2 * dotProduct * vx - newNode.centroid.x;
-                newNode.centroid.y = 2 * dotProduct * vy - newNode.centroid.y;
+                newNode.centroid.mirror(angleRad);
                 newNode.angle = 2 * angleRad - newNode.angle;
 
                 newNode.calculateCentroid();
@@ -347,14 +319,11 @@ export class Tiling {
                 
                 newNodes.push(newNode);
             }
-
-            this.nodes = this.nodes.concat(newNodes);
-            this.nodes = this.removeDuplicates(this.nodes);
         }
-        // this.newLayerNodes = this.addNewNodes(newNodes.concat(this.coreNode));
+        return newNodes;
     }
 
-    rotateRelativeTo = (transformationIndex) => {
+    rotateRelativeTo = (transformationIndex, additionalNodes) => {
         let origin = this.transforms[transformationIndex].anchor;
 
         if (!origin) {
@@ -365,14 +334,12 @@ export class Tiling {
             this.transforms[transformationIndex].anchor = origin;
         }
 
-        // let newNodes = [this.coreNode];
         let newNodes = [];
-        for (let newLayerNode of this.nodes) {
-        // for (let newLayerNode of this.newLayerNodes.concat(newNodes)) {
+        for (let newLayerNode of [...this.newLayerNodes, ...this.seedNodes, ...additionalNodes]) {
             let newNode = newLayerNode.clone();
 
-            newNode.centroid.x = 2 * origin.x - newNode.centroid.x;
-            newNode.centroid.y = 2 * origin.y - newNode.centroid.y;
+            newNode.centroid.x = origin.x - (newNode.centroid.x - origin.x);
+            newNode.centroid.y = origin.y - (newNode.centroid.y - origin.y);
             newNode.angle = Math.PI + newNode.angle;
 
             newNode.calculateCentroid();
@@ -382,12 +349,10 @@ export class Tiling {
             newNodes.push(newNode);
         }
 
-        this.nodes = this.nodes.concat(newNodes);
-        this.nodes = this.removeDuplicates(this.nodes);
-        // this.newLayerNodes = this.addNewNodes(newNodes.concat(this.coreNode));
+        return newNodes;
     }
     
-    rotateByAngle = (alfa) => {
+    rotateByAngle = (alfa, additionalNodes) => {
         const angleRad = alfa * Math.PI / 180;
         
         const anglesToProcess = [];
@@ -399,33 +364,27 @@ export class Tiling {
         
         const rotationCache = new Map();
         
+        let newNodes = [];
         for (const angle of anglesToProcess) {
-            let newNodes = [];
-            // let newNodes = [this.coreNode];
-            for (let newLayerNode of this.nodes) {
-            // for (let newLayerNode of this.newLayerNodes) {
+            for (let newLayerNode of [...this.newLayerNodes, ...this.seedNodes, ...additionalNodes]) {
                 const cacheKey = `${newLayerNode.centroid.x},${newLayerNode.centroid.y}-${angle}`;
                 let newPos;
                 
                 if (rotationCache.has(cacheKey)) {
                     newPos = rotationCache.get(cacheKey);
                 } else {
-                    const d = Math.sqrt(newLayerNode.centroid.x ** 2 + newLayerNode.centroid.y ** 2);
+                    const d = newLayerNode.centroid.mag();
                     if (d < tolerance) {
-                        newPos = { x: 0, y: 0 };
+                        newPos = new Vector();
                     } else {
-                        const a = Math.atan2(newLayerNode.centroid.y, newLayerNode.centroid.x);
-                        newPos = {
-                            x: d * Math.cos(a + angle),
-                            y: d * Math.sin(a + angle)
-                        };
+                        const a = newLayerNode.centroid.heading();
+                        newPos = Vector.fromAngle(a + angle).scale(d);
                     }
                     rotationCache.set(cacheKey, newPos);
                 }
                 
                 let newNode = newLayerNode.clone();
-                newNode.centroid.x = newPos.x;
-                newNode.centroid.y = newPos.y;
+                newNode.centroid.set(newPos);
                 newNode.angle = newLayerNode.angle + angle;
 
                 newNode.calculateCentroid();
@@ -434,16 +393,13 @@ export class Tiling {
                 
                 newNodes.push(newNode);
             }
-
-            this.nodes = this.nodes.concat(newNodes);
-            this.nodes = this.removeDuplicates(this.nodes);
-            // this.newLayerNodes = this.addNewNodes(newNodes.concat(this.coreNode));
         }
-        
+
         rotationCache.clear();
+        return newNodes;
     }
 
-    translateRelativeTo = (transformationIndex) => {
+    translateRelativeTo = (transformationIndex, additionalNodes) => {
         let origin = this.transforms[transformationIndex].anchor;
 
         if (!origin) {
@@ -455,12 +411,10 @@ export class Tiling {
         }
         
         let newNodes = [];
-        for (let newLayerNode of this.nodes) {
-        // for (let newLayerNode of this.newLayerNodes.concat(newNodes)) {
+        for (let newLayerNode of [...this.newLayerNodes, ...this.seedNodes, ...additionalNodes]) {
             let newNode = newLayerNode.clone();
 
-            newNode.centroid.x += origin.x;
-            newNode.centroid.y += origin.y;
+            newNode.centroid.add(origin);
 
             newNode.calculateCentroid();
             newNode.calculateVertices();
@@ -469,8 +423,7 @@ export class Tiling {
             newNodes.push(newNode);
         }
 
-        this.nodes = this.nodes.concat(newNodes);
-        this.nodes = this.removeDuplicates(this.nodes);
+        return newNodes;
     }
 
     findAnchor = (newNodes, indexOff) => {
@@ -510,8 +463,8 @@ export class Tiling {
             const angleB = getClockwiseAngle(b.node.halfways[b.halfwayPointIndex]);
             
             if (Math.abs(angleA - angleB) < tolerance) {
-                const distA = Math.sqrt(a.node.halfways[a.halfwayPointIndex].x ** 2 + a.node.halfways[a.halfwayPointIndex].y ** 2);
-                const distB = Math.sqrt(b.node.halfways[b.halfwayPointIndex].x ** 2 + b.node.halfways[b.halfwayPointIndex].y ** 2);
+                const distA = a.node.halfways[a.halfwayPointIndex].mag();
+                const distB = b.node.halfways[b.halfwayPointIndex].mag();
                 return distA - distB;
             }
             
@@ -520,9 +473,9 @@ export class Tiling {
 
         let anchor = anchors[indexOff];
 
-        anchor.dir = new Vector(
-            anchor.node.vertices[(anchor.halfwayPointIndex + 1) % anchor.node.vertices.length].x - anchor.node.vertices[anchor.halfwayPointIndex].x,
-            anchor.node.vertices[(anchor.halfwayPointIndex + 1) % anchor.node.vertices.length].y - anchor.node.vertices[anchor.halfwayPointIndex].y
+        anchor.dir = Vector.sub(
+            anchor.node.vertices[(anchor.halfwayPointIndex + 1) % anchor.node.vertices.length],
+            anchor.node.vertices[anchor.halfwayPointIndex]
         );
         anchor.dir.normalize();
         anchor.dir.rotate(-Math.PI / 2);
@@ -582,7 +535,7 @@ export class Tiling {
             let uniqueCentroids = deduplicatePoints(centroids);
             let sortedCentroids = sortPointsByAngleAndDistance(uniqueCentroids);
 
-            sortedCentroids = sortedCentroids.filter(centroid => !isWithinTolerance(centroid, {x: 0, y: 0}));
+            sortedCentroids = sortedCentroids.filter(centroid => !isWithinTolerance(centroid, new Vector()));
 
             result = sortedCentroids[index - 1];
         } 
@@ -666,13 +619,9 @@ export class Tiling {
         let originalVertices = this.nodes.map(node => node.vertices).flat();
 
         let uniqueOriginalVertices = [];
-        for (let i = 0; i < originalVertices.length; i++) {
-            let vertex = originalVertices[i];
-
-            if (!uniqueOriginalVertices.some(v => isWithinTolerance(v, vertex))) {
-                uniqueOriginalVertices.push(vertex);
-            }
-        }
+        for (let originalVertex of originalVertices)
+            if (!uniqueOriginalVertices.some(v => isWithinTolerance(v, originalVertex)))
+                uniqueOriginalVertices.push(originalVertex);
 
         let dualNodes = [];
         for (let i = 0; i < uniqueOriginalVertices.length; i++) {
@@ -695,20 +644,6 @@ export class Tiling {
 
             if (neighboringPolygons.length < 3) {
                 continue;
-            }
-
-            const angleBetween = (a, b, c) => {
-                let v1 = {
-                    x: a.x - b.x,
-                    y: a.y - b.y
-                };
-
-                let v2 = {
-                    x: c.x - b.x,
-                    y: c.y - b.y
-                };
-
-                return (Math.atan2(v1.y, v1.x) - Math.atan2(v2.y, v2.x) + Math.PI) % Math.PI;
             }
 
             let neighboringHalfwayPoints = [];
@@ -746,18 +681,11 @@ export class Tiling {
             });
 
             let halfways = [];
-            for (let j = 0; j < vertices.length; j++) {
-                halfways.push({
-                    x: (vertices[j].x + vertices[(j + 1) % vertices.length].x) / 2,
-                    y: (vertices[j].y + vertices[(j + 1) % vertices.length].y) / 2
-                });
-            }
+            for (let j = 0; j < vertices.length; j++)
+                halfways.push(Vector.midpoint(vertices[j], vertices[(j + 1) % vertices.length]));
 
             let dualNode = new DualPolygon({
-                centroid: {
-                    x: centroid.x,
-                    y: centroid.y
-                },
+                centroid: centroid.copy(),
                 vertices: vertices,
                 halfways: halfways
             });
@@ -773,19 +701,15 @@ export class Tiling {
     calculateNeighbors = (depth, neighborhoodType) => {
         if (debugView) debugManager.startTimer("Computing Neighbors");
         
-        // Create a set to track unique neighbor pairs
         const neighborSet = new Set();
         
         if (debugView) debugManager.startTimer("Creating spatial indices");
         const halfwaysSpatialMap = new Map();
         const verticesSpatialMap = new Map();
-        
-        // Initialize all nodes with empty neighbor arrays
+
         for (let i = 0; i < this.nodes.length; i++) {
-            // We'll fill these with findDirectNeighbors later
             this.nodes[i].directNeighbors = [];
             
-            // Build spatial index for halfways
             for (let j = 0; j < this.nodes[i].halfways.length; j++) {
                 const hw = this.nodes[i].halfways[j];
                 const key = getSpatialKey(hw.x, hw.y);
@@ -799,7 +723,6 @@ export class Tiling {
                 });
             }
             
-            // Build spatial index for vertices
             for (let j = 0; j < this.nodes[i].vertices.length; j++) {
                 const v = this.nodes[i].vertices[j];
                 const key = getSpatialKey(v.x, v.y);
@@ -815,8 +738,7 @@ export class Tiling {
         }
         if (debugView) debugManager.endTimer("Creating spatial indices");
         
-        // Helper function to add a direct neighbor relationship
-        const addDirectNeighbor = (type, i, k) => {
+        const addDirectNeighbor = (i, k) => {
             const pairKey = i < k ? `${i}-${k}` : `${k}-${i}`;
             
             if (!neighborSet.has(pairKey)) {
@@ -826,7 +748,6 @@ export class Tiling {
             }
         };
 
-        // Find direct (depth=1) neighbors using spatial indexing
         if (debugView) debugManager.startTimer("Calculating halfways neighbors");
         const processedHalfwayCells = new Set();
         
@@ -844,7 +765,7 @@ export class Tiling {
                     const hw2 = node2.halfways[entry2.halfwayIndex];
                     
                     if (isWithinTolerance(hw1, hw2)) {
-                        addDirectNeighbor('halfways', entry1.nodeIndex, entry2.nodeIndex);
+                        addDirectNeighbor(entry1.nodeIndex, entry2.nodeIndex);
                     }
                 }
             }
@@ -872,7 +793,7 @@ export class Tiling {
                         const hw2 = node2.halfways[entry2.halfwayIndex];
                         
                         if (isWithinTolerance(hw1, hw2)) {
-                            addDirectNeighbor('halfways', entry1.nodeIndex, entry2.nodeIndex);
+                            addDirectNeighbor(entry1.nodeIndex, entry2.nodeIndex);
                         }
                     }
                 }
@@ -880,7 +801,6 @@ export class Tiling {
         }
         if (debugView) debugManager.endTimer("Calculating halfways neighbors");
 
-        // Calculate vertex neighbors only if using Moore neighborhood
         if (neighborhoodType === 'moore') {
             if (debugView) debugManager.startTimer("Calculating vertices neighbors");
             const vertexToNodesMap = new Map();
@@ -952,7 +872,7 @@ export class Tiling {
                             );
                             
                             if (!isSideNeighbors) {
-                                addDirectNeighbor('vertices', node1Index, node2Index);
+                                addDirectNeighbor(node1Index, node2Index);
                             }
                         }
                     }
@@ -961,43 +881,34 @@ export class Tiling {
             if (debugView) debugManager.endTimer("Calculating vertices neighbors");
         }
 
-        // Now perform DFS to get all neighbors up to the specified depth
         if (debugView) debugManager.startTimer("Calculating all neighbors with DFS");
         
         for (let i = 0; i < this.nodes.length; i++) {
             const node = this.nodes[i];
             
-            // Initialize the final neighbors array
             node.neighbors = [];
             
-            // If depth is 1, just copy direct neighbors
             if (depth === 1) {
                 node.neighbors = [...node.directNeighbors];
                 continue;
             }
             
-            // Set to track visited nodes during DFS
             const visited = new Set([node]);
             const allNeighbors = new Set();
             
-            // Queue for BFS (node, currentDepth)
             const queue = [];
             
-            // Add direct neighbors to start BFS
             for (const neighbor of node.directNeighbors) {
                 queue.push({ node: neighbor, depth: 1 });
                 visited.add(neighbor);
                 allNeighbors.add(neighbor);
             }
             
-            // Perform BFS (Breadth-First Search is better here to ensure we get all neighbors at each depth)
             while (queue.length > 0) {
                 const { node: currentNode, depth: currentDepth } = queue.shift();
                 
-                // If we've reached our target depth, don't explore further
                 if (currentDepth >= depth) continue;
                 
-                // For each direct neighbor of the current node
                 for (const nextNode of currentNode.directNeighbors) {
                     if (!visited.has(nextNode)) {
                         visited.add(nextNode);
@@ -1087,7 +998,7 @@ export class Tiling {
         }
 
         let uniqueCentroidsSorted = sortPointsByAngleAndDistance(uniqueCentroids);
-        uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, {x: 0, y: 0}));
+        uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, new Vector()));
         
         ctx.textSize(12 / side);
         ctx.fill(0, 0, 100);
@@ -1293,8 +1204,6 @@ export class Tiling {
             this.calculateNeighbors(rule.range, rule.neighborhood);
         }
 
-        console.log(rule);
-
         return rule;
     }
 
@@ -1302,51 +1211,57 @@ export class Tiling {
         const toBinary = (test) => +(!!test);
         
         for (let i = 0; i < this.nodes.length; i++) {
+            if (this.nodes[i].state != 1)
+                continue;
+
+            for (let j = 0; j < this.nodes[i].neighbors.length; j++)
+                this.nodes[i].neighbors[j].aliveNeighbors++;
+        }
+
+        for (let i = 0; i < this.nodes.length; i++) {
             const node = this.nodes[i];
             const state = node.state;
             
             let nodeRule = this.golRuleType === 'Single' ? this.parsedGolRule : this.rules[node.n];
-            if (state <= 1) {
-                let aliveNeighbors = node.neighbors.filter(neighbor => neighbor.state == 1).length;
-                let aliveRate = aliveNeighbors / node.neighbors.length;
-                
-                const alive = state & 1;
-                
-                let hasBirthNeighbors = false;
-                if (nodeRule.birth.min) {
-                    if (nodeRule.birth.min <= 1 && nodeRule.birth.max <= 1) {
-                        hasBirthNeighbors = toBinary(nodeRule.birth.min <= aliveRate && nodeRule.birth.max >= aliveRate);
-                    } else {
-                        hasBirthNeighbors = toBinary(nodeRule.birth.min <= aliveNeighbors && nodeRule.birth.max >= aliveNeighbors);
-                    }
-                } else {
-                    hasBirthNeighbors = toBinary(nodeRule.birth.includes(aliveNeighbors));
-                }
-
-                let hasSurvivalNeighbors = false;
-                if (nodeRule.survival.min) {
-                    if (nodeRule.survival.min <= 1 && nodeRule.survival.max <= 1) {
-                        hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= aliveRate && nodeRule.survival.max >= aliveRate);
-                    } else {
-                        hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= aliveNeighbors && nodeRule.survival.max >= aliveNeighbors);
-                    }
-                } else {
-                    hasSurvivalNeighbors = toBinary(nodeRule.survival.includes(aliveNeighbors));
-                }
-                
-                const keep = (hasBirthNeighbors & (alive ^ 1)) | (hasSurvivalNeighbors & alive);
-
-                node.nextState = (keep * 1) | ((keep ^ 1) & alive) * 2;
-            } else {
-                node.nextState = state + 1;
-                
-                if (node.nextState > nodeRule.generations)
-                    node.nextState = 0;
+            if (state > 1) {
+                node.nextState = state + 1 > nodeRule.generations ? 0 : state + 1;
+                continue;
             }
+
+            let aliveRate = node.aliveNeighbors / node.neighbors.length;
+            
+            const alive = state & 1;
+            
+            let hasBirthNeighbors = false;
+            if (nodeRule.birth.min) {
+                if (nodeRule.birth.min <= 1 && nodeRule.birth.max <= 1) {
+                    hasBirthNeighbors = toBinary(nodeRule.birth.min <= aliveRate && nodeRule.birth.max >= aliveRate);
+                } else {
+                    hasBirthNeighbors = toBinary(nodeRule.birth.min <= node.aliveNeighbors && nodeRule.birth.max >= node.aliveNeighbors);
+                }
+            } else {
+                hasBirthNeighbors = toBinary(nodeRule.birth.includes(node.aliveNeighbors));
+            }
+
+            let hasSurvivalNeighbors = false;
+            if (nodeRule.survival.min) {
+                if (nodeRule.survival.min <= 1 && nodeRule.survival.max <= 1) {
+                    hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= aliveRate && nodeRule.survival.max >= aliveRate);
+                } else {
+                    hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= node.aliveNeighbors && nodeRule.survival.max >= node.aliveNeighbors);
+                }
+            } else {
+                hasSurvivalNeighbors = toBinary(nodeRule.survival.includes(node.aliveNeighbors));
+            }
+            
+            const keep = (hasBirthNeighbors & (alive ^ 1)) | (hasSurvivalNeighbors & alive);
+
+            node.nextState = (keep * 1) | ((keep ^ 1) & alive) * 2;
         }
 
         for (let i = 0; i < this.nodes.length; i++) {
             this.nodes[i].state = this.nodes[i].nextState;
+            this.nodes[i].aliveNeighbors = 0;
         }
     }
 

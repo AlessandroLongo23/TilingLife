@@ -48,5 +48,35 @@ export const gameOfLifeRules = [
 		name: "Anneal",
 		rule: "B4678/S35678",
 		description: "Also called the twisted majority rule. Symmetric under on-off reversal. Approximates the curve-shortening flow on the boundaries between live and dead cells"
+	},
+	{
+		name: "Bosco's Rule",
+		rule: "R5,C2,S33-57,B34-45",
+		description: ""
+	},
+	{
+		name: "Waffle",
+		rule: "R7,C2,S99-199,B75-170",
+		description: ""
+	},
+	{
+		name: "Majorly",
+		rule: "R7,C2,S112-224,B113-225",
+		description: ""
+	},
+	{
+		name: "Globe",
+		rule: "R8,C2,S163-223,B74-252",
+		description: ""
+	},
+	{
+		name: "Bugsmovie",
+		rule: "R10,C2,S122-211,B123-170",
+		description: ""
+	},
+	{
+		name: "Modern Art",
+		rule: "R10,C255,S1-2,B3",
+		description: ""
 	}
 ]; 

@@ -271,7 +271,7 @@
                     }
                     
                     let uniqueCentroidsSorted = sortPointsByAngleAndDistance(uniqueCentroids);
-                    uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, {x: 0, y: 0}));
+                    uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, new Vector()));
                     
                     for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
                         let centroid = uniqueCentroidsSorted[i];

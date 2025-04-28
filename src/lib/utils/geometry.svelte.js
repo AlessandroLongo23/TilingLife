@@ -1,5 +1,5 @@
 import { tolerance } from '$lib/stores/configuration.js';
-
+import { Vector } from '$lib/classes/Vector.svelte.js';
 export const sortPointsByAngleAndDistance = (points) => {
     return points.sort((a, b) => {
         const angleA = getClockwiseAngle(a);
@@ -30,6 +30,13 @@ export const getClockwiseAngle = (point) => {
 
 export const apothem = (n) => {
     return 0.5 / Math.tan(Math.PI / n);
+}
+
+export const angleBetween = (a, b, c) => {
+    let v1 = new Vector(a.x - b.x, a.y - b.y);
+    let v2 = new Vector(c.x - b.x, c.y - b.y);
+
+    return (v1.heading() - v2.heading() + Math.PI) % Math.PI;
 }
 
 // export const isTriangleOverlappingHexagon = (triangle, existingNodes) => {

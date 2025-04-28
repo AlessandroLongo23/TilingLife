@@ -1,5 +1,5 @@
 import { patch } from '$lib/stores/configuration.js';
-
+import { Vector } from '$lib/classes/Vector.svelte.js';
 export class Cr {
     constructor(crString) {
         this.crString = crString;
@@ -53,10 +53,10 @@ export class Cr {
             let radius = this.side / 2 / Math.sin(beta / 2);
             
             let alpha = (shapeSides - 2) / shapeSides * Math.PI;
-            let center = {
-                x: radius * Math.cos(baseAngle + alpha / 2),
-                y: radius * Math.sin(baseAngle + alpha / 2)
-            };
+            let center = new Vector(
+                radius * Math.cos(baseAngle + alpha / 2),
+                radius * Math.sin(baseAngle + alpha / 2)
+            );
 
             context.fill(context.map(shapeSides, 3, 12, 0, 300), 40, 100, 0.80);
             context.beginShape();

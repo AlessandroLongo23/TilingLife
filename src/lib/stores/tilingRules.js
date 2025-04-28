@@ -8,23 +8,23 @@ export const tilingRules = [
 			{
 				name: "triangular",
 				cr: "3^6",
-				rulestring: "3/m30/r(h2)",
+				rulestring: "3/r60/r(h2)",
 				dualname: "hexagonal",
 			},
 			{
 				name: "square",
 				cr: "4^4",
-				rulestring: "4-4-0,4/r90/t(c2)",
+				rulestring: "4-4-0,4/r90/m(v2)",
 				dualname: "square",
 				alternatives: [
 					"4/m45/r(h1)",
-					"4-4-0,4/r90/t(c2)"
+					"4-4-0,4/r90/m(v2)"
 				]
 			},
 			{
 				name: "hexagonal",
 				cr: "6^3",
-				rulestring: "6/m30/r(h1)",
+				rulestring: "6/r60/r(h1)",
 				dualname: "triangular"
 			}
 		]
@@ -336,7 +336,7 @@ export const tilingRules = [
 			{
 				name: "",
 				cr: "",
-				rulestring: "6-4-3,3-12_r60_r(h10)",
+				rulestring: "6-4-3,3-12/r60/r(h10)",
 			},
 			{
 				name: "",

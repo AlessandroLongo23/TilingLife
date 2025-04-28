@@ -1,4 +1,5 @@
 import { tolerance } from '$lib/stores/configuration.js';
+import { Vector } from '$lib/classes/Vector.svelte.js';
 import { map } from '$lib/utils/math.svelte.js';
 
 export class Polygon {
@@ -7,10 +8,7 @@ export class Polygon {
         this.n = data.n;
         this.angle = data.angle;
         
-        this.neighbors = {
-            side: [],
-            vertex: []
-        };
+        this.neighbors = [];
         this.state = 0;
         this.nextState = 0;
 
@@ -104,10 +102,10 @@ export class Polygon {
         this.vertices = [];
         let radius = 0.5 / Math.sin(Math.PI / this.n);
         for (let i = 0; i < this.n; i++) {
-            this.vertices.push({
-                x: this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle),
-                y: this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle)
-            });
+            this.vertices.push(new Vector(
+                this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle),
+                this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle)
+            ));
 
             if (Math.abs(this.vertices[i].x) < tolerance) {
                 this.vertices[i].x = 0;
@@ -122,10 +120,7 @@ export class Polygon {
     calculateHalfways = () => {
         this.halfways = [];
         for (let i = 0; i < this.n; i++) {
-            this.halfways.push({
-                x: (this.vertices[i].x + this.vertices[(i + 1) % this.n].x) / 2,
-                y: (this.vertices[i].y + this.vertices[(i + 1) % this.n].y) / 2
-            });
+            this.halfways.push(Vector.midpoint(this.vertices[i], this.vertices[(i + 1) % this.n]));
 
             if (Math.abs(this.halfways[i].x) < tolerance) {
                 this.halfways[i].x = 0;
@@ -138,7 +133,6 @@ export class Polygon {
     }
 }
 
-// svelte-ignore perf_avoid_nested_class
 export class RegularPolygon extends Polygon {
     constructor(data) {
         super(data);
@@ -152,17 +146,13 @@ export class RegularPolygon extends Polygon {
 
     clone = () => {
         return new RegularPolygon({
-            centroid: {
-                x: this.centroid.x,
-                y: this.centroid.y
-            },
+            centroid: this.centroid.copy(),
             n: this.n,
             angle: this.angle
         });
     }
 }
 
-// svelte-ignore perf_avoid_nested_class
 export class DualPolygon extends Polygon {
     constructor(data) {
         super({
@@ -187,19 +177,12 @@ export class DualPolygon extends Polygon {
             const curr = i;
             const next = (i === this.vertices.length - 1) ? 0 : i + 1;
             
-            const v1 = {
-                x: this.vertices[prev].x - this.vertices[curr].x,
-                y: this.vertices[prev].y - this.vertices[curr].y
-            };
-            const v2 = {
-                x: this.vertices[next].x - this.vertices[curr].x,
-                y: this.vertices[next].y - this.vertices[curr].y
-            };
+            const v1 = Vector.sub(this.vertices[prev], this.vertices[curr]);
+            const v2 = Vector.sub(this.vertices[next], this.vertices[curr]);
             
-            const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
-            const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
-            
-            const dot = v1.x * v2.x + v1.y * v2.y;
+            const mag1 = v1.mag();
+            const mag2 = v2.mag();
+            const dot = v1.dot(v2);
             
             const angle = Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2)))) * 180 / Math.PI;
             angles.push(Math.round(angle)); 
@@ -237,17 +220,13 @@ export class DualPolygon extends Polygon {
 
     clone = () => {
         return new DualPolygon({
-            centroid: {
-                x: this.centroid.x,
-                y: this.centroid.y
-            },
+            centroid: this.centroid.copy(),
             vertices: [...this.vertices],
             halfways: [...this.halfways]
         });
     }
 }
 
-// svelte-ignore perf_avoid_nested_class
 export class StarPolygon extends Polygon {
     constructor(data) {
         super({
@@ -271,15 +250,15 @@ export class StarPolygon extends Polygon {
         let radius = Math.cos(beta) / Math.cos(gamma);
         let intRadius = Math.tan(gamma) * Math.cos(beta) - Math.sin(beta);
         for (let i = 0; i < this.n; i++) {
-            this.vertices.push({
-                x: this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle + Math.PI),
-                y: this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle + Math.PI)
-            });
+            this.vertices.push(new Vector(
+                this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle + Math.PI),
+                this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle + Math.PI)
+            ));
 
-            this.vertices.push({
-                x: this.centroid.x + intRadius * Math.cos((i + .5) * 2 * Math.PI / this.n + this.angle + Math.PI),
-                y: this.centroid.y + intRadius * Math.sin((i + .5) * 2 * Math.PI / this.n + this.angle + Math.PI)
-            });
+            this.vertices.push(new Vector(
+                this.centroid.x + intRadius * Math.cos((i + .5) * 2 * Math.PI / this.n + this.angle + Math.PI),
+                this.centroid.y + intRadius * Math.sin((i + .5) * 2 * Math.PI / this.n + this.angle + Math.PI)
+            ));
 
             if (Math.abs(this.vertices[i].x) < tolerance) {
                 this.vertices[i].x = 0;
@@ -294,10 +273,7 @@ export class StarPolygon extends Polygon {
     calculateHalfways = () => {
         this.halfways = [];
         for (let i = 0; i < this.vertices.length; i++) {
-            this.halfways.push({
-                x: (this.vertices[i].x + this.vertices[(i + 1) % this.vertices.length].x) / 2,
-                y: (this.vertices[i].y + this.vertices[(i + 1) % this.vertices.length].y) / 2
-            });
+            this.halfways.push(Vector.midpoint(this.vertices[i], this.vertices[(i + 1) % this.vertices.length]));
         }
     }
 
@@ -307,10 +283,7 @@ export class StarPolygon extends Polygon {
 
     clone = () => {
         return new StarPolygon({
-            centroid: {
-                x: this.centroid.x,
-                y: this.centroid.y
-            },
+            centroid: this.centroid.copy(),
             n: this.n,
             angle: this.angle,
             alfa: this.alfa
