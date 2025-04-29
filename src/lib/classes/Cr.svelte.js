@@ -38,7 +38,6 @@ export class CrVertex {
             );
 
             ctx.fill(ctx.map(shapeSides, 3, 12, 0, 300), 40, 100, 0.80);
-            console.log(center, alpha, beta, radius);
             ctx.beginShape();
             for (let angle = 0; angle < 2 * Math.PI; angle += beta) {
                 ctx.vertex(

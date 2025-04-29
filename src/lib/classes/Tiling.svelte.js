@@ -95,6 +95,8 @@ export class Tiling {
         
         if (debugView) debugManager.endTimer("Tiling generation");
         updateDebugStore();
+
+        this.extractCundyRollettNotation();
     }
 
     addCoreNode = () => {
@@ -1322,4 +1324,117 @@ export class Tiling {
         
         return graph;
     }
+
+    extractCundyRollettNotation = () => {
+        let uniqueVertices = [];
+        for (let i = 0; i < this.nodes.length; i++) {
+            for (let j = 0; j < this.nodes[i].vertices.length; j++) {
+                let vertex = this.nodes[i].vertices[j];
+                if (!uniqueVertices.some(v => isWithinTolerance(v, vertex))) {
+                    uniqueVertices.push(vertex);
+                }
+            }
+        }
+
+        let vertexGroups = [];
+        for (let uniqueVertex of uniqueVertices) {
+            let shapesOnVertex = [];
+            for (let node of this.nodes) {
+                for (let vertex of node.vertices) {
+                    if (isWithinTolerance(vertex, uniqueVertex)) {
+                        shapesOnVertex.push(node);
+                        break;
+                    }
+                }
+            }
+
+            let sum = shapesOnVertex.reduce((acc, shape) => acc + Math.PI * (shape.n - 2) / shape.n, 0);
+            if (Math.abs(sum - 2 * Math.PI) > 0.01) continue;
+
+            shapesOnVertex.sort((a, b) => Vector.sub(a.centroid, uniqueVertex).heading() - Vector.sub(b.centroid, uniqueVertex).heading());
+            shapesOnVertex = shapesOnVertex.map(shape => shape.n);
+            shapesOnVertex = shapesOnVertex.cycleToMinimumLexicographicalOrder();
+
+            if (!vertexGroups.some(group => group.shapes.isEqualOrChiral(shapesOnVertex))) {
+                vertexGroups.push({
+                    shapes: shapesOnVertex,
+                    occurrences: 1
+                });
+            } else {
+                vertexGroups.find(group => group.shapes.isEqualOrChiral(shapesOnVertex)).occurrences++;
+            }
+        }
+
+        this.vertexGroups = vertexGroups
+            .map(group => group.shapes.join('.'))
+            .sort((a, b) => a.localeCompare(b));
+
+        vertexGroups = this.vertexGroups.map(group => group.split('.').map(Number)).sort((a, b) => compareArrays(a, b));
+
+        this.crNotation = "";
+        let exponent = 1;
+        for (let i = 0; i < vertexGroups.length; i++) {
+            for (let j = 0; j < vertexGroups[i].length; j++) {
+                if (j < vertexGroups[i].length && vertexGroups[i][j] === vertexGroups[i][j + 1]) {
+                    exponent++;
+                } else {
+                    if (exponent > 1) {
+                        this.crNotation += vertexGroups[i][j] + "^" + exponent + ".";
+                    } else {
+                        this.crNotation += vertexGroups[i][j] + ".";
+                    }
+                    exponent = 1;
+                }
+            }
+            
+            this.crNotation = this.crNotation.slice(0, -1);
+            if (i < vertexGroups.length - 1) {
+                this.crNotation += ";";
+            }
+        }
+    }
+}
+
+Array.prototype.cycleToMinimumLexicographicalOrder = function() {
+    let min = this.slice(0);
+    for (let i = 0; i < this.length; i++) {
+        let rotated = this.slice(i).concat(this.slice(0, i));
+        if (compareArrays(rotated, min) < 0) {
+            min = rotated;
+        }
+    }
+    return min;
+}
+
+function compareArrays(a, b) {
+    if (a.length !== b.length) return a.length - b.length;
+
+    for (let i = 0; i < a.length; i++)
+        if (a[i] !== b[i]) return a[i] - b[i];
+
+    return 0;
+}
+
+Array.prototype.isEqual = function(array) {
+    if (this.length !== array.length) return false;
+    for (let i = 0; i < this.length; i++)
+        if (this[i] !== array[i]) return false;
+    return true;
+}
+
+Array.prototype.isEqualOrChiral = function(array) {
+    if (this.length !== array.length) return false;
+    
+    for (let i = 0; i < this.length; i++) {
+        let rotated = this.slice(i).concat(this.slice(0, i));
+        if (rotated.isEqual(array)) return true;
+    }
+
+    let reversed = this.slice().reverse();
+    for (let i = 0; i < this.length; i++) {
+        let rotated = reversed.slice(i).concat(reversed.slice(0, i));
+        if (rotated.isEqual(array)) return true;
+    }
+
+    return false;
 }

@@ -90,9 +90,6 @@
             p5.colorMode(p5.HSB, 360, 100, 100);
             
             tiling = new Tiling();
-            cr = new Cr($selectedTiling.cr);
-            crCanvases = Array.from({length: cr.vertices.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
-
             try {
                 tiling.parseRule($selectedTiling.rulestring);
                 if ($debugView) {
@@ -103,6 +100,9 @@
                 if ($debugView) {
                     updateDebugStore();
                 }
+
+                cr = new Cr($selectedTiling.cr || tiling.crNotation);
+                crCanvases = Array.from({length: cr.vertices.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
             } catch (e) {
                 console.log(e);
             }
@@ -151,7 +151,7 @@
                         tiling.parseRule($selectedTiling.rulestring);
                         tiling.generateTiling();
                         tiling.setupGameOfLife($ruleType, $golRule, $golRules);
-                        cr = new Cr($selectedTiling.cr);
+                        cr = new Cr($selectedTiling.cr || tiling.crNotation);
 
                         crCanvases = Array.from({length: cr.vertices.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
                     }
