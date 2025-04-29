@@ -43,7 +43,8 @@
 		let shapes = new Set();
 		let seed = $selectedTiling.rulestring.split('/')[0].replaceAll(',', '-').split('-');
 		for (let shape of seed)
-			shapes.add(parseInt(shape));
+			if (shape !== '0')
+				shapes.add(parseInt(shape));
 
 		return Array.from(shapes).sort((a, b) => a - b);
 	});
