@@ -1,5 +1,5 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, side, showConstructionPoints, showInfo, showCR, speed, ruleType, parameter } from '$lib/stores/configuration.js';
+	import { golRule, golRules, selectedTiling, transformSteps, side, showConstructionPoints, showInfo, showCR, speed, ruleType, parameter, activeTab } from '$lib/stores/configuration.js';
 	import { ChevronDown, ChevronLeft, ChevronRight, Maximize2, ChevronsDownUp, ChevronsUpDown } from 'lucide-svelte';
 	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
 	import { tilingRules } from '$lib/stores/tilingRules.js';
@@ -15,10 +15,14 @@
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import TheorySidebar from '$lib/components/TheorySidebar.svelte';
+	import { contentService } from '$lib/services/contentService';
 
 	let { 
 		isSidebarOpen = $bindable(true),
 		sidebarElement = $bindable(''),
+		onSectionSelect = $bindable(() => {}),
+		activeTheorySection = $bindable('')
 	} = $props();
 
 	let expandedGroups = $state({});
@@ -35,7 +39,6 @@
 	
 	const toggleGroup = (groupTitle) => {
 		expandedGroups[groupTitle] = !expandedGroups[groupTitle];
-		// We need to refresh observers after groups expand/collapse
 		setTimeout(setupObservers, 300);
 	};
 
@@ -229,6 +232,24 @@
 			observerNeedsRefresh = true;
 		}
 	});
+
+	// For theory content
+	let theoryActiveSection = $state('');
+	
+	const handleTheorySectionSelect = (e) => {
+		onSectionSelect(e.detail.sectionId);
+	};
+
+	$effect(() => {
+		// Trigger content loading when Theory tab is active
+		if ($activeTab === "Theory") {
+			contentService.loadContent('/theory/tilings-and-automata.md');
+		}
+	});
+
+	$effect(() => {
+		theoryActiveSection = activeTheorySection;
+	});
 </script>
 
 <style>
@@ -304,7 +325,7 @@
 		
 		{#if isSidebarOpen}
 			<div class="flex-1 overflow-hidden">
-				<Tabs tabs={["Tilings", "Game of Life"]}>
+				<Tabs tabs={["Tilings", "Game of Life", "Theory"]}>
 					<div slot="tab-0" class="h-full flex flex-col">
 						<!-- Fixed options section -->
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
@@ -577,6 +598,13 @@
 								</div>
 							</div>
 						{/if}
+					</div>
+					
+					<div slot="tab-2" class="h-full flex flex-col">
+						<TheorySidebar 
+							activeSection={theoryActiveSection}
+							on:sectionSelect={handleTheorySectionSelect}
+						/>
 					</div>
 				</Tabs>
 			</div>

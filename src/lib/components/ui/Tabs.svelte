@@ -25,6 +25,8 @@
 			<slot name='tab-0' />
 		{:else if $activeTab === tabs[1]}
 			<slot name='tab-1' />
+		{:else if $activeTab === tabs[2]}
+			<slot name='tab-2' />
 		{/if}
 	</div>
 </div> 

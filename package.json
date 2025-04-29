@@ -25,6 +25,8 @@
 	"dependencies": {
 		"chart.js": "^4.4.9",
 		"lucide-svelte": "^0.501.0",
+		"markdown-it": "^14.1.0",
+		"markdown-it-anchor": "^9.2.0",
 		"p5": "^1.11.3"
 	}
 }
