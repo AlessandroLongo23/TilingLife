@@ -9,7 +9,7 @@ export let selectedTiling = writable({
 	dualname: 'square'
 });
 export let isDual = writable(false);
-export let transformSteps = writable(0);
+export let transformSteps = writable(5);
 export let side = writable(50);
 export let speed = writable(20);
 export let parameter = writable(45);
@@ -20,7 +20,7 @@ export let screenshotButtonHover = writable(false);
 
 export let showConstructionPoints = writable(false);
 export let showInfo = writable(false);
-export let showCR = writable(true);
+export let showCR = writable(false);
 // export let screenshotSize = writable(600);
 
 export let tolerance = 0.01;

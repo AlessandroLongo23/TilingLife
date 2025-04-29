@@ -1158,6 +1158,7 @@ export class Tiling {
     randomizeGameOfLifeGrid = () => {
         for (let i = 0; i < this.nodes.length; i++) {
             this.nodes[i].state = Math.random() < 0.5 ? 1 : 0;
+            this.nodes[i].aliveNeighbors = 0;
         }
     }
 
@@ -1215,19 +1216,38 @@ export class Tiling {
     updateGameOfLife = () => {
         const toBinary = (test) => +(!!test);
         
+        // Reset aliveNeighbors count for the next iteration
         for (let i = 0; i < this.nodes.length; i++) {
-            if (this.nodes[i].state != 1)
-                continue;
-
-            for (let j = 0; j < this.nodes[i].neighbors.length; j++)
-                this.nodes[i].neighbors[j].aliveNeighbors++;
+            this.nodes[i].aliveNeighbors = 0;
+        }
+        
+        // Count alive neighbors for each node
+        for (let i = 0; i < this.nodes.length; i++) {
+            if (this.nodes[i].state === 1) {
+                for (let j = 0; j < this.nodes[i].neighbors.length; j++) {
+                    this.nodes[i].neighbors[j].aliveNeighbors++;
+                }
+            }
         }
 
+        // Calculate next state for each node
         for (let i = 0; i < this.nodes.length; i++) {
             const node = this.nodes[i];
             const state = node.state;
             
+            // Verify node has neighbors before calculating rules
+            if (!node.neighbors || node.neighbors.length === 0) {
+                node.nextState = 0; // Default to dead if no neighbors
+                continue;
+            }
+            
             let nodeRule = this.golRuleType === 'Single' ? this.parsedGolRule : this.rules[node.n];
+            if (!nodeRule) {
+                console.error(`No rule found for node with n=${node.n}`);
+                node.nextState = 0;
+                continue;
+            }
+            
             if (state > 1) {
                 node.nextState = state + 1 > nodeRule.generations ? 0 : state + 1;
                 continue;
@@ -1238,7 +1258,7 @@ export class Tiling {
             const alive = state & 1;
             
             let hasBirthNeighbors = false;
-            if (nodeRule.birth.min) {
+            if (nodeRule.birth.min !== undefined) {
                 if (nodeRule.birth.min <= 1 && nodeRule.birth.max <= 1) {
                     hasBirthNeighbors = toBinary(nodeRule.birth.min <= aliveRate && nodeRule.birth.max >= aliveRate);
                 } else {
@@ -1249,7 +1269,7 @@ export class Tiling {
             }
 
             let hasSurvivalNeighbors = false;
-            if (nodeRule.survival.min) {
+            if (nodeRule.survival.min !== undefined) {
                 if (nodeRule.survival.min <= 1 && nodeRule.survival.max <= 1) {
                     hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= aliveRate && nodeRule.survival.max >= aliveRate);
                 } else {
@@ -1264,9 +1284,9 @@ export class Tiling {
             node.nextState = (keep * 1) | ((keep ^ 1) & alive) * 2;
         }
 
+        // Apply next states
         for (let i = 0; i < this.nodes.length; i++) {
             this.nodes[i].state = this.nodes[i].nextState;
-            this.nodes[i].aliveNeighbors = 0;
         }
     }
 

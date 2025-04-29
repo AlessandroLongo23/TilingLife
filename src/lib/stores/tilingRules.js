@@ -1,4 +1,3 @@
-// Tiling patterns (GomJau-Hogg notation)
 export const tilingRules = [
 	{
 		title: "1-Uniform (Regular)",

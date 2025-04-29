@@ -12,6 +12,7 @@
         width = 600,
         height = 600,
         showGameOfLife,
+        showExtra = true
     } = $props();
 
     let frameMod = $derived(60 / $speed);
@@ -381,70 +382,72 @@
 <div class="relative h-full w-full">
     <div bind:this={canvasContainer}></div>
     
-    {#if !showGameOfLife}
-        <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
-            <button 
-                class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
-                onclick={captureScreenshot}
-                onmouseenter={() => { $screenshotButtonHover = true; }}
-                onmouseleave={() => { $screenshotButtonHover = false; }}
-            >
-                <ls.Camera />
-                Screenshot
-            </button>
-            
-            <button 
-                class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
-                onclick={() => {
-                    $debugView = !$debugView;
-                    if ($debugView) {
-                        debugManager.reset();
-                        setTimeout(() => {
-                            tiling.generateTiling();
-                            updateDebugStore();
-                        }, 0);
-                    }
-                }}
-            >
-                <ls.Bug />
-                {$debugView ? 'Disable Debug' : 'Enable Debug'}
-            </button>
+    {#if showExtra}
+        {#if !showGameOfLife}
+            <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
+                <button 
+                    class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
+                    onclick={captureScreenshot}
+                    onmouseenter={() => { $screenshotButtonHover = true; }}
+                    onmouseleave={() => { $screenshotButtonHover = false; }}
+                >
+                    <ls.Camera />
+                    Screenshot
+                </button>
+                
+                <button 
+                    class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
+                    onclick={() => {
+                        $debugView = !$debugView;
+                        if ($debugView) {
+                            debugManager.reset();
+                            setTimeout(() => {
+                                tiling.generateTiling();
+                                updateDebugStore();
+                            }, 0);
+                        }
+                    }}
+                >
+                    <ls.Bug />
+                    {$debugView ? 'Disable Debug' : 'Enable Debug'}
+                </button>
 
-            <button 
-                class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
-                onclick={() => {
-                    tiling.exportGraph();
-                }}
-            >
-                <ls.Workflow />
-                Export Graph
-            </button>
-        </div>
-    {:else}
-        <div class="absolute top-4 right-4 flex flex-col gap-4 z-10">
-            <button 
-                class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
-                onclick={() => resetGameOfLife = true}
-            >
-                <ls.RefreshCw size={18} />
-                Randomize
-            </button>
-            
-            <div class="w-72">
-                <LiveChart bind:alivePercentage={alivePercentage} bind:iterationCount={iterationCount}/>
+                <button 
+                    class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
+                    onclick={() => {
+                        tiling.exportGraph();
+                    }}
+                >
+                    <ls.Workflow />
+                    Export Graph
+                </button>
             </div>
-        </div>
-    {/if}
-    
-    {#if $debugView}
-        <div class="absolute bottom-4 right-4 w-96 z-20">
-            <ls.PieChart />
-            {#if $debugStore.timingData.phases.length === 0}
-                <div class="mt-2 p-3 bg-amber-500/80 text-white text-sm rounded-lg">
-                    No timing data available. Try changing the rulestring or layers to generate data.
+        {:else}
+            <div class="absolute top-4 right-4 flex flex-col gap-4 z-10">
+                <button 
+                    class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                    onclick={() => resetGameOfLife = true}
+                >
+                    <ls.RefreshCw size={18} />
+                    Randomize
+                </button>
+                
+                <div class="w-72">
+                    <LiveChart bind:alivePercentage={alivePercentage} bind:iterationCount={iterationCount}/>
                 </div>
-            {/if}
-        </div>
+            </div>
+        {/if}
+        
+        {#if $debugView}
+            <div class="absolute bottom-4 right-4 w-96 z-20">
+                <ls.PieChart />
+                {#if $debugStore.timingData.phases.length === 0}
+                    <div class="mt-2 p-3 bg-amber-500/80 text-white text-sm rounded-lg">
+                        No timing data available. Try changing the rulestring or layers to generate data.
+                    </div>
+                {/if}
+            </div>
+        {/if}
     {/if}
 </div>
 
@@ -455,11 +458,13 @@
     </div>
 {/if}
 
-<div class="flex flex-col gap-3">
-    {#if showInfo}
-        <LiveChart 
-            bind:alivePercentage={alivePercentage}
-            bind:iterationCount={iterationCount}
-        />
-    {/if}
-</div>
+{#if showExtra}
+    <div class="flex flex-col gap-3">
+        {#if showInfo}
+            <LiveChart 
+                bind:alivePercentage={alivePercentage}
+                bind:iterationCount={iterationCount}
+            />
+        {/if}
+    </div>
+{/if}
