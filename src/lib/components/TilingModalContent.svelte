@@ -14,25 +14,31 @@
         showFilters = !showFilters;
     };
     
-    let searchTerm = $state('');
     let selectedTypes = $state([]);
     let selectedPolygons = $state([]);
+    let selectedVertexTypes = $state([]);
     let showDual = $state(false);
+    let polygonFilterMode = $state('exact');
+    let vertexTypeFilterMode = $state('exact');
     
     $effect(() => {
         const currentFilters = $tilingFilters;
-        searchTerm = currentFilters.searchTerm;
         selectedTypes = currentFilters.selectedTypes;
         selectedPolygons = currentFilters.selectedPolygons;
+        selectedVertexTypes = currentFilters.selectedVertexTypes || [];
         showDual = currentFilters.showDual;
+        polygonFilterMode = currentFilters.polygonFilterMode || 'exact';
+        vertexTypeFilterMode = currentFilters.vertexTypeFilterMode || 'exact';
     });
     
     $effect(() => {
         $tilingFilters = {
-            searchTerm,
             selectedTypes,
             selectedPolygons,
-            showDual
+            selectedVertexTypes,
+            showDual,
+            polygonFilterMode,
+            vertexTypeFilterMode
         };
     });
     
@@ -64,8 +70,22 @@
             }
         }
         
-        // TODO: match/contains toggle
-        return !sides.some(side => !polygonSides.includes(side)) && !polygonSides.some(side => !sides.includes(side));
+        if (polygonFilterMode === 'exact') {
+            return !sides.some(side => !polygonSides.includes(side)) && !polygonSides.some(side => !sides.includes(side));
+        } else {
+            return !sides.some(side => !polygonSides.includes(side));
+        }
+    };
+    
+    const containsVertexType = (tiling, vertexTypes) => {
+        if (!tiling.cr) 
+            return false;
+        
+        if (vertexTypeFilterMode === 'exact') {
+            return !vertexTypes.some(vt => !tiling.cr.includes(vt)) && !tiling.cr.split(';').some(group => !vertexTypes.some(vt => group.includes(vt)));
+        } else {
+            return !vertexTypes.some(vt => !tiling.cr.includes(vt));
+        }
     };
     
     let filteredTilings = $derived.by(() => {
@@ -83,12 +103,7 @@
                     return;
                 }
                 
-                if (
-                    searchTerm && 
-                    !rule.rulestring.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                    !rule.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                    !rule.dualname.toLowerCase().includes(searchTerm.toLowerCase())
-                ) {
+                if (selectedVertexTypes.length > 0 && !containsVertexType(rule, selectedVertexTypes)) {
                     return;
                 }
                 
@@ -113,50 +128,62 @@
     });
     
     let activeFiltersCount = $derived(
-        searchTerm.length > 0 || selectedTypes.length > 0 || selectedPolygons.length > 0 || showDual ? 
-        (searchTerm.length > 0 ? 1 : 0) + selectedTypes.length + selectedPolygons.length + (showDual ? 1 : 0) : 
-        0
+        selectedTypes.length + selectedPolygons.length + selectedVertexTypes.length + (showDual ? 1 : 0)
     );
 </script>
 
 <style>
     .modal-container {
         position: relative;
-        height: 70vh;
+        height: 80vh;
         overflow: hidden;
+        display: flex;
     }
     
     .filters-hidden {
-        transform: translateY(-100%);
+        transform: translateX(-100%);
         opacity: 0;
         pointer-events: none;
+        width: 0;
+        margin-right: 0;
     }
     
     .filters-visible {
-        transform: translateY(0);
+        transform: translateX(0);
         opacity: 1;
+        width: 20rem;
+        margin-right: 1rem;
+    }
+    
+    .filter-sidebar {
+        height: 100%;
+        transition: all 0.3s ease;
+        overflow-y: auto;
+        flex-shrink: 0;
+        background-color: rgba(24, 24, 27, 0.95);
+        /* border-radius: 0.5rem; */
     }
     
     .catalog-container {
         height: 100%;
         overflow-y: auto;
-        padding-top: var(--filters-height, 0px);
-        transition: padding-top 0.3s ease;
+        flex-grow: 1;
+        transition: margin-left 0.3s ease;
     }
     
     .with-filters {
-        --filters-height: 320px;
+        margin-left: 0;
     }
     
     .without-filters {
-        --filters-height: 0px;
+        margin-left: 0;
     }
 </style>
 
 <Modal 
     bind:isOpen={$tilingModalOpen}
     title="Tiling Rules List"
-    maxWidth="max-w-6xl"
+    maxWidth="max-w-7xl"
 >
     <svelte:fragment slot="header">
         <button 
@@ -175,16 +202,18 @@
     </svelte:fragment>
     
     <div class="modal-container">
-        <div class="absolute top-0 left-0 right-0 z-10 {showFilters ? 'filters-visible' : 'filters-hidden'}">
+        <div class="filter-sidebar {showFilters ? 'filters-visible' : 'filters-hidden'}">
             <TilingFilterBar 
-                bind:searchTerm
                 bind:selectedTypes
                 bind:selectedPolygons
                 bind:showDual
+                bind:selectedVertexTypes
+                bind:polygonFilterMode
+                bind:vertexTypeFilterMode
             />
         </div>
         
-        <div class="catalog-container {showFilters ? 'with-filters' : 'without-filters'}">
+        <div class="catalog-container p-4 {showFilters ? 'with-filters' : 'without-filters'}">
             {#if filteredTilings.length === 0}
                 <div class="py-8 text-center text-zinc-400">
                     <Grid size={48} class="mx-auto mb-4 opacity-40" />
@@ -192,9 +221,9 @@
                     <button 
                         class="mt-2 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-md border border-zinc-700/50 transition-all"
                         onclick={() => {
-                            searchTerm = '';
                             selectedTypes = [];
                             selectedPolygons = [];
+                            selectedVertexTypes = [];
                             showDual = false;
                         }}
                     >
@@ -202,11 +231,11 @@
                     </button>
                 </div>
             {:else}
-                <div class="mb-4 pt-4">
+                <div class="mb-4">
                     <p class="text-sm text-zinc-400">{filteredTilings.length} tilings found</p>
                 </div>
                 
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pb-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pb-4">
                     {#each filteredTilings as tiling}
                         <div class="animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <TilingCard 

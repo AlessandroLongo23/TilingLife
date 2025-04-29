@@ -126,7 +126,7 @@ export const tilingRules = [
 			},
 			{
 				name: "",
-				cr: "3.12.12;3.4.3.12",
+				cr: "3.12^2;3.4.3.12",
 				rulestring: "12-0,3,3-0,0,4/r90/r(h1)",
 			},
 			{
@@ -510,7 +510,6 @@ export const tilingRules = [
 			}
 		]
 	},
-	// 6-6-0,6,3-0,0,3,3/r60/m(v6)
 	{
 		title: "4-Uniform",
 		id: "4U",
@@ -525,11 +524,6 @@ export const tilingRules = [
 				name: "",
 				cr: "",
 				rulestring: "6-6-0,6,3-0,0,3,3/r60/m(c1)"
-			},
-			{
-				name: "",
-				cr: "",
-				rulestring: ""
 			}
 		]
 	},

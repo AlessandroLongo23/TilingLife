@@ -101,7 +101,7 @@
                 </div>
             {/if}
             
-            <div class="p-4">
+            <div class="">
                 <slot />
             </div>
         </div>

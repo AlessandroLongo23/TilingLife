@@ -6,5 +6,8 @@ export const tilingFilters = writable({
     searchTerm: '',
     selectedTypes: [],
     selectedPolygons: [],
-    showDual: false
+    selectedVertexTypes: [],
+    showDual: false,
+    polygonFilterMode: 'exact',
+    vertexTypeFilterMode: 'exact'
 }); 

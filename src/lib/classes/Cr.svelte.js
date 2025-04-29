@@ -1,31 +1,34 @@
 import { patch } from '$lib/stores/configuration.js';
 import { Vector } from '$lib/classes/Vector.svelte.js';
 
-export class CrVertex {
+export class VertexGroup {
     constructor(shapes, molteplicity) {
         this.shapes = shapes;
         this.molteplicity = molteplicity;
         this.side = 25;
     }
 
-    draw(ctx) {
+    draw(ctx, displayText, scale = 1) {
         let baseAngle = 0;
 
         ctx.push();
         ctx.translate(-ctx.width / 2 + patch.padding, -ctx.height / 2 + patch.padding);
         ctx.noStroke();
-        ctx.textAlign(ctx.LEFT, ctx.TOP);
-        ctx.textSize(16);
-        ctx.fill(0, 0, 100);
-        ctx.text(this.shapes.join('.'), 0, 0);
-        if (this.molteplicity > 1) {
-            ctx.fill(0, 0, 15);
-            ctx.ellipse(ctx.width - 36, 7, 24);
+        if (displayText) {
+            ctx.textAlign(ctx.LEFT, ctx.TOP);
+            ctx.textSize(16);
             ctx.fill(0, 0, 100);
-            ctx.text(this.molteplicity, ctx.width - 40, 0);
+            ctx.text(this.shapes.join('.'), 0, 0);
+            if (this.molteplicity > 1) {
+                ctx.fill(0, 0, 15);
+                ctx.ellipse(ctx.width - 36, 7, 24);
+                ctx.fill(0, 0, 100);
+                ctx.text(this.molteplicity, ctx.width - 40, 0);
+            }
         }
         ctx.pop();
 
+        ctx.scale(scale);
         ctx.stroke(0, 0, 0);
         for (let shapeSides of this.shapes) {
             let beta = 2 * Math.PI / shapeSides;
@@ -50,12 +53,30 @@ export class CrVertex {
             baseAngle += alpha;
         }
     }
+
+    getCompactNotation() {
+        let compactNotation = "";
+        let exponent = 1;
+        for (let j = 0; j < this.shapes.length; j++) {
+            if (j < this.shapes.length && this.shapes[j] === this.shapes[j + 1]) {
+                exponent++;
+            } else {
+                if (exponent > 1) {
+                    compactNotation += this.shapes[j] + "^" + exponent + ".";
+                } else {
+                    compactNotation += this.shapes[j] + ".";
+                }
+                exponent = 1;
+            }
+        }
+        return compactNotation.slice(0, -1);
+    }
 }
 
 export class Cr {
     constructor(crString) {
         this.crString = crString;
-        this.vertices = this.parseCr(crString);
+        this.vertexGroups = this.parseCr(crString);
     }
 
     parseCr(crString) {
@@ -74,7 +95,7 @@ export class Cr {
             pieces = [crString];
         }
 
-        let vertices = [];
+        let vertexGroups = [];
         for (let i = 0; i < pieces.length; i++) {
             let base = pieces[i];
             let exponent = 1;
@@ -100,26 +121,58 @@ export class Cr {
                 }
 
                 if (Math.abs(sum - 2 * Math.PI) < 0.01) {
-                    vertices.push(vertex);
+                    vertexGroups.push(vertex);
                     vertex = [];
                     sum = 0;
                 }
             }
         }
 
-        let uniqueVertices = [];
-        for (let vertex of vertices) {
-            if (!uniqueVertices.some(v => v.shapes.every((value, index) => value === vertex[index]))) {
-                uniqueVertices.push(new CrVertex(vertex, 1));
+        let uniqueVertexGroups = [];
+        for (let vertexGroup of vertexGroups) {
+            if (!uniqueVertexGroups.some(v => v.shapes.every((value, index) => value === vertexGroup[index]))) {
+                uniqueVertexGroups.push(new VertexGroup(vertexGroup, 1));
             } else {
-                uniqueVertices.find(v => v.shapes.every((value, index) => value === vertex[index])).molteplicity++;
+                uniqueVertexGroups.find(v => v.shapes.every((value, index) => value === vertexGroup[index])).molteplicity++;
             }
         }
 
-        return uniqueVertices;
+        return uniqueVertexGroups;
     }
 
-    draw(ctx, vertexIndex) {
-        this.vertices[vertexIndex].draw(ctx);
+    getCompactNotation() {
+        let compactNotation = "";
+        for (let i = 0; i < this.vertexGroups.length; i++) {
+            compactNotation += this.vertexGroups[i].getCompactNotation();
+            if (i < this.vertexGroups.length - 1) {
+                compactNotation += ";";
+            }
+        }
+        return compactNotation;
+    }
+
+    draw(ctx, vertexIndex, displayText = true, scale = 1) {
+        this.vertexGroups[vertexIndex].draw(ctx, displayText, scale);
+    }
+
+    save(ctx, vertexIndex) {
+        let scale = 3;
+        const filename = `${this.vertexGroups[vertexIndex].getCompactNotation()}.png`;
+        
+        const canvasCopy = ctx.createGraphics(patch.size.x * scale, patch.size.y * scale);
+        canvasCopy.colorMode(ctx.HSB, 360, 100, 100);
+        
+        canvasCopy.push();
+        canvasCopy.fill(240, 7, 24);
+        canvasCopy.noStroke();
+        canvasCopy.rect(0, 0, canvasCopy.width, canvasCopy.height);
+        canvasCopy.translate(canvasCopy.width / 2, canvasCopy.height / 2);
+        
+        this.draw(canvasCopy, vertexIndex, false, scale);
+        canvasCopy.pop();
+        
+        ctx.saveCanvas(canvasCopy, filename, 'png');
+        
+        canvasCopy.remove();
     }
 }

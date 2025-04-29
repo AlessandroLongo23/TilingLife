@@ -20,6 +20,9 @@ export class Tiling {
         this.golRuleType = 'Single';
         this.rules = {};
         this.rule = {};
+
+        this.vertexGroups = [];
+        this.crNotation = '';
     }
 
     parseRule = (tilingRule) => {

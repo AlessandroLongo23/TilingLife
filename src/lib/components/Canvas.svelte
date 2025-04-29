@@ -102,7 +102,7 @@
                 }
 
                 cr = new Cr($selectedTiling.cr || tiling.crNotation);
-                crCanvases = Array.from({length: cr.vertices.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
+                crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
             } catch (e) {
                 console.log(e);
             }
@@ -153,7 +153,7 @@
                         tiling.setupGameOfLife($ruleType, $golRule, $golRules);
                         cr = new Cr($selectedTiling.cr || tiling.crNotation);
 
-                        crCanvases = Array.from({length: cr.vertices.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
+                        crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
                     }
 
                     tiling.show(p5, $side, $showConstructionPoints);
@@ -199,6 +199,30 @@
                 cr.draw(crCanvases[i], i, p5);
                 p5.image(crCanvases[i], patch.padding + i * (patch.size.x + patch.padding), p5.height - patch.size.y - patch.padding);
                 crCanvases[i].pop();
+            }
+        }
+        
+        p5.mousePressed = (event) => {
+            if (!$showCR) return;
+            
+            if (event && event.target !== p5.canvas) return;
+            
+            for (let i = 0; i < crCanvases.length; i++) {
+                const x = patch.padding + i * (patch.size.x + patch.padding);
+                const y = p5.height - patch.size.y - patch.padding;
+                
+                if (p5.mouseX >= x && p5.mouseX <= x + patch.size.x && 
+                    p5.mouseY >= y && p5.mouseY <= y + patch.size.y) {
+                    cr.save(p5, i);
+                    
+                    notificationMessage = `CR image saved as ${cr.vertexGroups[i].getCompactNotation()}.png`;
+                    showNotification = true;
+                    setTimeout(() => {
+                        showNotification = false;
+                    }, 3000);
+                    
+                    break;
+                }
             }
         }
 
