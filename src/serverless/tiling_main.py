@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 alive_p = 0.2
-iterations = 2000
+iterations = 5
 random_starts = 50 # Number of different starting configurations
 infile = "tiling-graph.json"
 outfile = "output.json"
@@ -96,17 +96,35 @@ def count_neighbors(i):
             count += 1
     return count
 
+logger.info(f"Computing set of rules, with {maxn} neighbors per node")
+rcount = 2 ** (2 * maxn)
+logger.info(f"{rcount} rules to compute")
+
+should_survive = ti.field(dtype=ti.i32, shape=(maxn))
+should_spawn = ti.field(dtype=ti.i32, shape=(maxn))
+
+for i in range(maxn):
+    should_survive[i] = 0
+    should_spawn[i] = 0
+
+should_spawn[3] = 1
+should_survive[2] = 1
+should_survive[3] = 1
+
+
 @ti.kernel
 def apply_rules():
     for i in range(nodes):
         count = count_neighbors(i)
         if current[i] == 1:
-            if count < 2 or count > 3:
-                next[i] = 0
-            else:
+            # Cell is alive
+            if should_survive[count] == 1:
                 next[i] = 1
+            else:
+                next[i] = 0
         else:
-            if count == 3:
+            # Cell is dead
+            if should_spawn[count] == 1:
                 next[i] = 1
             else:
                 next[i] = 0
