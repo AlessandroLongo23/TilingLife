@@ -8,9 +8,9 @@ import math
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-alive_p = 0.5
-iterations = 1000
-random_starts = 5
+alive_p = 0.2
+iterations = 20
+random_starts = 1  # Number of different starting configurations
 infile = "tiling-graph.json"
 outfile = "output.json"
 
@@ -21,16 +21,24 @@ with open(infile, "r") as f:
     data = json.load(f)
     logger.info(f"Loaded {data}")
 
-nodes = int(data["n"])
-logger.info(f"Nodes: {nodes}")
+nodes_per_config = int(data["n"])
+logger.info(f"Nodes per configuration: {nodes_per_config}")
 
-# Build neighbor lists
+# Duplicate nodes for multiple starting configurations
+nodes = nodes_per_config * random_starts
+logger.info(f"Total nodes after duplication: {nodes}")
+
+# Build neighbor lists with appropriate offsets
 nlist = [[] for _ in range(nodes)]
-for edge in data["edges"]:
-    u = edge["source"]
-    v = edge["target"]
-    nlist[u].append(v)
-    nlist[v].append(u)
+for config_idx in range(random_starts):
+    offset = config_idx * nodes_per_config
+    
+    # Add edges with the appropriate offset
+    for edge in data["edges"]:
+        u = edge["source"] + offset
+        v = edge["target"] + offset
+        nlist[u].append(v)
+        nlist[v].append(u)
 
 # Get max neighbor count to set field dimensions
 maxn = max(len(n) for n in nlist)
