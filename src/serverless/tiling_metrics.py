@@ -3,198 +3,221 @@ import numpy as np
 import time
 import logging
 import json
+import math
+import csv
 
-# ─── Logging ────────────────────────────────────────────────────────────────
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
-# ─── Parameters ────────────────────────────────────────────────────────────
-alive_p    = 0.2
-iterations = 1000
-infile     = "tiling-graph.json"
-outfile    = "output.json"
+alive_p        = 0.2
+iterations     = 1000
+random_starts  = 100
+infile         = "tiling-graph.json"
+outfile        = "metrics.csv"          # <── CSV
 
-# ─── Taichi init ───────────────────────────────────────────────────────────
-ti.init(
-    arch=ti.gpu,
-    default_fp=ti.f32,
-    default_ip=ti.i32,
-    random_seed=int(time.time())
-)
+ti.init(arch=ti.gpu,
+        default_fp=ti.f32,
+        default_ip=ti.i32,
+        random_seed=int(time.time()))
 
-# ─── Load graph ────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
+#  graph loading (unchanged)
+# ----------------------------------------------------------------------
 with open(infile, "r") as f:
     data = json.load(f)
-    logger.info(f"Loaded graph: {data}")
 
-nodes = int(data["n"])
-# Build Python neighbor list
+nodes_per_config = int(data["n"])
+nodes            = nodes_per_config * random_starts
+
 nlist = [[] for _ in range(nodes)]
-for edge in data["edges"]:
-    u, v = edge["source"], edge["target"]
-    nlist[u].append(v)
-    nlist[v].append(u)
+for cfg in range(random_starts):
+    off = cfg * nodes_per_config
+    for e in data["edges"]:
+        u = e["source"] + off
+        v = e["target"] + off
+        nlist[u].append(v)
+        nlist[v].append(u)
 
-maxn = max(len(nb) for nb in nlist)
-logger.info(f"Max neighbors per node: {maxn}")
+maxn = max(len(n) for n in nlist)
 
-# ─── Taichi fields ─────────────────────────────────────────────────────────
-neighbors       = ti.field(dtype=ti.i32, shape=(nodes, maxn))
-neighbor_count  = ti.field(dtype=ti.i32, shape=(nodes,))
-current, next_ = ti.field(dtype=ti.i32, shape=(nodes,)), ti.field(dtype=ti.i32, shape=(nodes,))
-all_states      = ti.field(dtype=ti.i32, shape=(iterations+1, nodes))
-alive_counts    = ti.field(dtype=ti.i32, shape=(iterations+1,))
+# ----------------------------------------------------------------------
+#  Taichi fields + kernels  (identical to previous reply)
+# ----------------------------------------------------------------------
+neighbors       = ti.field(ti.i32, shape=(nodes, maxn))
+neighbor_count  = ti.field(ti.i32, shape=(nodes))
+current         = ti.field(ti.i32, shape=(nodes))
+next            = ti.field(ti.i32, shape=(nodes))
 
-# Metric fields
-rho_field = ti.field(dtype=ti.f32, shape=(iterations+1,))
-H_field   = ti.field(dtype=ti.f32, shape=(iterations+1,))
-G_field   = ti.field(dtype=ti.f32, shape=(iterations+1,))
-D_field   = ti.field(dtype=ti.f32, shape=(iterations+1,))
+all_states      = ti.field(ti.i32, shape=(iterations + 1, nodes))
+alive_counts    = ti.field(ti.i32, shape=(iterations + 1))
 
-# ─── Kernels & funcs ───────────────────────────────────────────────────────
+density              = ti.field(ti.f32, shape=(iterations + 1))
+marginal_entropy     = ti.field(ti.f32, shape=(iterations + 1))
+conditional_entropy  = ti.field(ti.f32, shape=(iterations + 1))
+complexity           = ti.field(ti.f32, shape=(iterations + 1))
+joint_counts         = ti.field(ti.i32, shape=(iterations + 1, 4))
+
+LN2 = 0.6931471805599453
+
+@ti.func
+def log2f(x: ti.f32) -> ti.f32:
+    return ti.log(x) / ti.static(LN2)
+
 @ti.kernel
-def init_neighbors():
+def init_all_neighbors(neigh_np: ti.types.ndarray(), cnt_np: ti.types.ndarray()):
     for i in range(nodes):
-        neighbor_count[i] = 0
-        for j in range(maxn):
+        neighbor_count[i] = cnt_np[i]
+        for j in range(cnt_np[i]):
+            neighbors[i, j] = neigh_np[i, j]
+        for j in range(cnt_np[i], maxn):
             neighbors[i, j] = -1
 
 @ti.kernel
-def set_neighbor(node: ti.i32, idx: ti.i32, value: ti.i32):
-    neighbors[node, idx] = value
-    neighbor_count[node] = ti.max(neighbor_count[node], idx + 1)
-
-@ti.func
-def safe_log2(x: ti.f32) -> ti.f32:
-    return ti.log(x) / ti.log(2.0)
-
-@ti.kernel
 def init_random():
-    # random start + store state 0
     alive = 0
     for i in range(nodes):
-        current[i] = 1 if ti.random() < alive_p else 0
+        if ti.random() < alive_p:
+            current[i] = 1
+            alive += 1
+        else:
+            current[i] = 0
         all_states[0, i] = current[i]
-        alive += current[i]
     alive_counts[0] = alive
 
-    # metrics at t=0
-    rho       = alive / nodes
-    rho_field[0] = rho
-    # marginal entropy
-    if 0 < rho < 1:
-        H_field[0] = - (rho * safe_log2(rho) + (1 - rho) * safe_log2(1 - rho))
-    else:
-        H_field[0] = 0.0
-    G_field[0] = 0.0
-    D_field[0] = 0.0
-
 @ti.func
-def count_neighbors(i: ti.i32) -> ti.i32:
-    s = 0
+def count_neighbors(i):
+    c = 0
     for j in range(neighbor_count[i]):
         nb = neighbors[i, j]
         if nb >= 0 and current[nb] == 1:
-            s += 1
-    return s
+            c += 1
+    return c
+
+should_survive = ti.field(ti.i32, shape=(maxn))
+should_spawn   = ti.field(ti.i32, shape=(maxn))
+rcount         = 2 ** (2 * maxn)
 
 @ti.kernel
 def apply_rules():
     for i in range(nodes):
         c = count_neighbors(i)
         if current[i] == 1:
-            next_[i] = 1 if 2 <= c <= 3 else 0
+            next[i] = 1 if should_survive[c] else 0
         else:
-            next_[i] = 1 if c == 3 else 0
+            next[i] = 1 if should_spawn[c] else 0
 
 @ti.kernel
 def swap_buffers(iteration: ti.i32):
     alive = 0
-    # pair counts: [00, 01, 10, 11]
-    pc0 = ti.i32(0)
-    pc1 = ti.i32(0)
-    pc2 = ti.i32(0)
-    pc3 = ti.i32(0)
-
     for i in range(nodes):
-        current[i] = next_[i]
+        current[i]       = next[i]
         all_states[iteration, i] = current[i]
-        alive += current[i]
+        if current[i] == 1:
+            alive += 1
+    alive_counts[iteration] = alive
 
-        # accumulate (s, x) pairs over edges
+@ti.kernel
+def calculate_density(iteration: ti.i32):
+    density[iteration] = alive_counts[iteration] / nodes
+
+@ti.kernel
+def compute_metrics(iteration: ti.i32):
+    for k in ti.static(range(4)):
+        joint_counts[iteration, k] = 0
+    for i in range(nodes):
+        s = current[i]
         for j in range(neighbor_count[i]):
             nb = neighbors[i, j]
             if nb >= 0:
-                idx = current[i] * 2 + current[nb]
-                if   idx == 0: pc0 += 1
-                elif idx == 1: pc1 += 1
-                elif idx == 2: pc2 += 1
-                else:           pc3 += 1
+                u   = current[nb]
+                ti.atomic_add(joint_counts[iteration, s*2+u], 1)
 
-    alive_counts[iteration] = alive
+    c00 = ti.cast(joint_counts[iteration, 0], ti.f32)
+    c01 = ti.cast(joint_counts[iteration, 1], ti.f32)
+    c10 = ti.cast(joint_counts[iteration, 2], ti.f32)
+    c11 = ti.cast(joint_counts[iteration, 3], ti.f32)
+    tot = c00 + c01 + c10 + c11
 
-    # ρ
-    rho = alive / nodes
-    rho_field[iteration] = rho
+    ρ   = density[iteration]
+    H   = 0.0
+    eps = 1e-6
+    if ρ > eps and ρ < 1.0 - eps:
+        H = -(ρ*log2f(ρ) + (1-ρ)*log2f(1-ρ))
+    marginal_entropy[iteration] = H
 
-    # H
-    H = 0.0
-    if 0 < rho < 1:
-        H = - (rho * safe_log2(rho) + (1 - rho) * safe_log2(1 - rho))
-    H_field[iteration] = H
-
-    # G & D
-    total = pc0 + pc1 + pc2 + pc3
-    if total > 0:
-        P0, P1, P2, P3 = pc0/total, pc1/total, pc2/total, pc3/total
-        Px0, Px1     = P0+P2,          P1+P3
+    if tot > 0:
+        p00, p01, p10, p11 = c00/tot, c01/tot, c10/tot, c11/tot
+        Pu0, Pu1 = p00+p10, p01+p11
         G = 0.0
-        if P0 > 0: G -= P0*safe_log2(P0/Px0)
-        if P2 > 0: G -= P2*safe_log2(P2/Px0)
-        if P1 > 0: G -= P1*safe_log2(P1/Px1)
-        if P3 > 0: G -= P3*safe_log2(P3/Px1)
-        G_field[iteration] = G
-        D_field[iteration] = H - G
+        if p00 > 0 and Pu0 > 0: G += -p00*log2f(p00/Pu0)
+        if p10 > 0 and Pu0 > 0: G += -p10*log2f(p10/Pu0)
+        if p01 > 0 and Pu1 > 0: G += -p01*log2f(p01/Pu1)
+        if p11 > 0 and Pu1 > 0: G += -p11*log2f(p11/Pu1)
+        conditional_entropy[iteration] = G
+        complexity[iteration]          = H - G
     else:
-        G_field[iteration] = 0.0
-        D_field[iteration] = 0.0
+        conditional_entropy[iteration] = 0.0
+        complexity[iteration]          = 0.0
 
-# ─── Setup & run ───────────────────────────────────────────────────────────
-init_neighbors()
-for i in range(nodes):
-    for j, nb in enumerate(nlist[i]):
-        set_neighbor(i, j, nb)
+# ----------------------------------------------------------------------
+def set_rule_from_i(i: int):
+    for j in range(9):
+        should_spawn[j]   = (i >> j)       & 1
+        should_survive[j] = (i >> (j + 9)) & 1
 
-init_random()
-for it in range(1, iterations+1):
-    apply_rules()
-    swap_buffers(it)
-    logger.info(
-        f"Iter {it}: alive={alive_counts[it]}, "
-        f"ρ={rho_field[it]:.3f}, H={H_field[it]:.3f}, "
-        f"G={G_field[it]:.3f}, D={D_field[it]:.3f}"
-    )
+def rule_index_to_string(i: int) -> str:
+    birth   = ''.join(str(n) for n in range(9) if (i >> n) & 1)
+    survive = ''.join(str(n) for n in range(9) if (i >> (n + 9)) & 1)
+    return f"B{birth}/S{survive}"
 
-# ─── Extract & save ────────────────────────────────────────────────────────
-states    = all_states.to_numpy()
-alive_out = alive_counts.to_numpy()
-rho_out   = rho_field.to_numpy()
-H_out     = H_field.to_numpy()
-G_out     = G_field.to_numpy()
-D_out     = D_field.to_numpy()
+# ----------------------------------------------------------------------
+#  copy neighbour table to GPU once
+# ----------------------------------------------------------------------
+nb_np   = np.full((nodes, maxn), -1, dtype=np.int32)
+cnt_np  = np.zeros(nodes, dtype=np.int32)
+for i, nbrs in enumerate(nlist):
+    cnt_np[i]   = len(nbrs)
+    nb_np[i, :len(nbrs)] = nbrs
 
-output = {
-    "states":       states.tolist(),
-    "alive_counts": alive_out.tolist(),
-    "rho":          rho_out.tolist(),
-    "H":            H_out.tolist(),
-    "G":            G_out.tolist(),
-    "D":            D_out.tolist(),
-}
+init_all_neighbors(nb_np, cnt_np)
 
-with open(outfile, "w") as f:
-    json.dump(output, f, indent=2)
-    logger.info(f"Results saved to {outfile}")
+# ----------------------------------------------------------------------
+#  CSV output
+# ----------------------------------------------------------------------
+with open(outfile, "w", newline="") as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(["rule", "rulestr", "iter", "rho", "H", "G", "D"])   # header
+
+    rcount = 10
+
+    for rule_i in range(rcount):
+        set_rule_from_i(rule_i)
+        rulestr = rule_index_to_string(rule_i)
+        logger.info(f"Running rule {rulestr}")
+
+        init_random()
+        calculate_density(0)
+        compute_metrics(0)
+
+        for it in range(1, iterations + 1):
+            apply_rules()
+            swap_buffers(it)
+            calculate_density(it)
+            compute_metrics(it)
+
+        # ─── write this rule's whole time‑series to the CSV ───
+        rho_np = density.to_numpy()
+        H_np   = marginal_entropy.to_numpy()
+        G_np   = conditional_entropy.to_numpy()
+        D_np   = complexity.to_numpy()
+
+        for it in range(iterations + 1):
+            writer.writerow([rule_i, rulestr, it,
+                             f"{rho_np[it]:.6f}",
+                             f"{H_np[it]:.6f}",
+                             f"{G_np[it]:.6f}",
+                             f"{D_np[it]:.6f}"])
+        csvfile.flush()      # ensure data is on disk
+
+logger.info(f"CSV written to {outfile}")
