@@ -3,7 +3,7 @@ import argparse
 import sys
 
 def create_grid_graph(width=3, height=3):
-    """Create a grid graph where each cell is connected to its neighbors."""
+    """Create a grid graph where each cell is connected to its 8 neighbors."""
     n = width * height
     edges = []
     
@@ -11,15 +11,24 @@ def create_grid_graph(width=3, height=3):
         row_i = i // width
         col_i = i % width
         
-        # Check right neighbor
-        if col_i < width - 1:
-            j = i + 1
-            edges.append({"source": i, "target": j, "type": "side"})
-        
-        # Check bottom neighbor
-        if row_i < height - 1:
-            j = i + width
-            edges.append({"source": i, "target": j, "type": "side"})
+        # Check all 8 neighbors (horizontally, vertically, and diagonally)
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                # Skip the cell itself
+                if dr == 0 and dc == 0:
+                    continue
+                
+                new_row = row_i + dr
+                new_col = col_i + dc
+                
+                # Check if neighbor is within grid boundaries
+                if 0 <= new_row < height and 0 <= new_col < width:
+                    j = new_row * width + new_col
+                    
+                    # To avoid duplicate edges, only add edge if i < j
+                    if i < j:
+                        edge_type = "side" if dr == 0 or dc == 0 else "diagonal"
+                        edges.append({"source": i, "target": j, "type": edge_type})
     
     return {
         "n": n,
