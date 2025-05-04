@@ -65,7 +65,7 @@
                 
                 <div in:fly={{ y: 10, x: 0, duration: 500, delay: 600 }} class="mt-8">
                     <a 
-                        href="/practice"
+                        href="/play"
                         class="w-full inline-flex items-center justify-center h-10 px-6 text-sm font-medium bg-green-700 hover:bg-green-800 active:bg-green-900 text-white rounded-md transition-all duration-200 ease-in-out"
                     >
                         Start Exploring

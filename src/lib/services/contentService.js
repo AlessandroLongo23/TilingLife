@@ -16,8 +16,6 @@ class ContentService {
 			this.isLoading = true;
 			this.error = null;
 			
-			console.log(`Loading content from ${path}`);
-			
 			const response = await fetch(path);
 			
 			if (!response.ok) {
@@ -30,19 +28,11 @@ class ContentService {
 				throw new Error('Loaded content is empty');
 			}
 			
-			console.log(`Content loaded: ${markdownContent.length} characters`);
-			
 			const flatToc = extractTableOfContents(markdownContent);
-			console.log(`TOC extracted: ${flatToc.length} items`);
-			
 			this.sections = structureTableOfContents(flatToc);
-			console.log(`Sections structured: ${this.sections.length} sections`);
-			
 			this.content = renderMarkdown(markdownContent);
-			
 			this.isLoading = false;
 			this.isInitialized = true;
-			console.log('Content loading complete');
 		} catch (error) {
 			console.error('Error loading content:', error);
 			this.error = error.message;

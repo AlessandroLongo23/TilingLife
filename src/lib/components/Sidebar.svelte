@@ -504,6 +504,7 @@
 															name={tiling.name}
 															cr={tiling.cr}
 															rulestring={tiling.rulestring}
+															golRules={tiling.golRules}
 															onClick={loadTiling}
 														/>
 
@@ -513,6 +514,7 @@
 																name={tiling.dualname}
 																cr={tiling.cr}
 																rulestring={tiling.rulestring.concat('*')}
+																golRules={tiling.golRules}
 																onClick={loadTiling}
 															/>
 														{/if}
@@ -584,15 +586,43 @@
 						{#if $ruleType === 'Single'}
 							<div class="flex-1 overflow-y-auto p-3">
 								<div class="flex flex-col gap-3">
+									{#if !$selectedTiling.rulestring.includes('*') && $selectedTiling.golRules?.standard?.length > 0}
+										<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Custom rules</h3>
+										<div class="grid grid-cols-2 gap-2">
+											{#each $selectedTiling.golRules.standard as gameRule}
+												<GolRuleCard 
+													name={gameRule.name}
+													rule={gameRule.rule}
+													description={gameRule.description}
+													onClick={loadGolRule}
+												/>
+											{/each}
+										</div>
+									{/if}
+
+									{#if $selectedTiling.rulestring.includes('*') && $selectedTiling.golRules?.dual?.length > 0}
+										<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Custom rules</h3>
+										<div class="grid grid-cols-2 gap-2">
+											{#each $selectedTiling.golRules.dual as gameRule}
+												<GolRuleCard
+													name={gameRule.name}
+													rule={gameRule.rule}
+													description={gameRule.description}
+													onClick={loadGolRule}
+												/>
+											{/each}
+										</div>
+									{/if}
+
 									<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Game of Life Rules</h3>
 									<div class="grid grid-cols-2 gap-2">
 										{#each gameOfLifeRules as gameRule}
-										<GolRuleCard 
-											name={gameRule.name}
-											rule={gameRule.rule}
-											description={gameRule.description}
-											onClick={loadGolRule}
-										/>
+											<GolRuleCard 
+												name={gameRule.name}
+												rule={gameRule.rule}
+												description={gameRule.description}
+												onClick={loadGolRule}
+											/>
 										{/each}
 									</div>
 								</div>

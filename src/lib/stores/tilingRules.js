@@ -61,7 +61,22 @@ export const tilingRules = [
 				name: "Truncated square",
 				cr: "4.8^2",
 				rulestring: "8-4/m90/r(h4)",
-				dualname: "tetrakis square"
+				dualname: "tetrakis square",
+				golRules: {
+					standard: [],
+					dual: [
+						{
+							name: "",
+							rule: "B48/S234",
+							description: "",
+						},
+						{
+							name: "",
+							rule: "B1/S1/G50",
+							description: "",
+						}
+					]
+				}
 			},
 			{
 				name: "Snub square",
@@ -527,6 +542,31 @@ export const tilingRules = [
 		]
 	},
 	{
+		title: "5-Uniform",
+		id: "5U",
+		dual: true,
+		rules: [
+			{
+				id: '235',
+				name: "",
+				cr: "",
+				rulestring: "6-3,6-3,3-0,3-0,3-0,3-0,0,0,0,3,3-0,0,0,0,0,6/r120/r(h5)"
+			},
+			{
+				id: '246',
+				name: "",
+				cr: "",
+				rulestring: "3-0,3-0,6-0,0,3-0,0,3-0,0,0,3/r60/r(h2)"
+			},
+			{
+				id: '297',
+				name: "",
+				cr: "",
+				rulestring: "6-3-3,3-0,3,3-0,3,3,3-0,0,4,4,4-0,0,3/r60/m(c8)"
+			},
+		]
+	},
+	{
 		title: "6-Uniform",
 		id: "6U",
 		dual: true,
@@ -535,6 +575,12 @@ export const tilingRules = [
 				name: "",
 				cr: "",
 				rulestring: "6-6-0,6,6-0,3,3,3,3,0,0,0,0,0,0,0,0,0,0,3/r60/m(v3)",
+			},
+			{
+				id: '372',
+				name: "",
+				cr: "",
+				rulestring: "6-3-6-4,3-3,0,4-0,3,6-0,0,0,3/m30/m(h1)"
 			}
 		]
 	},

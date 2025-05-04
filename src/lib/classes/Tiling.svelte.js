@@ -99,6 +99,8 @@ export class Tiling {
         if (debugView) debugManager.endTimer("Tiling generation");
         updateDebugStore();
 
+        console.log("# of nodes: " + this.nodes.length);
+
         this.extractCundyRollettNotation();
     }
 

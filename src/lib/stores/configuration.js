@@ -6,7 +6,11 @@ export let selectedTiling = writable({
 	name: 'square',
 	rulestring: '4/m45/r(h1)',
 	cr: '4^4',
-	dualname: 'square'
+	dualname: 'square',
+	golRules: {
+		standard: [],
+		dual: []
+	}
 });
 export let isDual = writable(false);
 export let transformSteps = writable(5);

@@ -1,5 +1,5 @@
 <script>
-	let { name, cr, rulestring, groupId, onClick } = $props();
+	let { name, cr, rulestring, groupId, onClick, golRules } = $props();
 
 	let isDual = $derived(rulestring.includes('*'));
 
@@ -25,6 +25,7 @@
 		name,
 		cr,
 		rulestring,
+		golRules
 	})}
 >
 	<div class="flex flex-col gap-2">
