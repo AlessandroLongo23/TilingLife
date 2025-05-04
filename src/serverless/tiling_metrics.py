@@ -4,6 +4,7 @@ import time
 import logging
 import json
 import csv
+import sys
 import math
 from tqdm import tqdm
 
@@ -15,8 +16,12 @@ alive_p    = 0.2
 steps      = 1000                # number of Life iterations
 starts     = 100                 # how many disconnected copies of the graph
 
-infile  = "tiling-graph.json"
-outfile = "metrics.csv"
+# ──────────────────────  parameters  ─────────────────────────────────
+
+# Read infline from arguments
+
+infile  = sys.argv[1] if len(sys.argv) > 1 else "tiling-graph.json"
+outfile = sys.argv[2] if len(sys.argv) > 2 else "metrics.csv"
 
 ti.init(arch=ti.gpu,
         default_fp=ti.f32,
@@ -40,6 +45,7 @@ for c in range(starts):
         nlist[v].append(u)
 
 maxn = max(len(nb) for nb in nlist)
+logger.info(f"Loaded {nodes} nodes with {maxn} max neighbors")
 
 # ─────────────────────  Taichi fields  ────────────────────────────────
 neighbors      = ti.field(ti.i32, shape=(nodes, maxn))
