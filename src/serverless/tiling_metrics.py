@@ -5,7 +5,6 @@ import logging
 import json
 import csv
 import sys
-import math
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -163,13 +162,13 @@ def compute_metrics():
 
 # ───────────────────  host-side helpers  ──────────────────────────────
 def set_rule(idx: int):
-    for n in range(9):
+    for n in range(17):  # Support 0 to 16 neighbors
         should_spawn[n]   = (idx >> n) & 1
-        should_survive[n] = (idx >> (n + 9)) & 1
+        should_survive[n] = (idx >> (n + 17)) & 1  # Offset increased to 17
 
 def rulestr(idx: int) -> str:
-    b = ''.join(str(n) for n in range(9) if (idx >> n) & 1)
-    s = ''.join(str(n) for n in range(9) if (idx >> (n + 9)) & 1)
+    b = ''.join(str(n) for n in range(17) if (idx >> n) & 1)
+    s = ''.join(str(n) for n in range(17) if (idx >> (n + 17)) & 1)  # Offset increased to 17
     return f"B{b}/S{s}"
 
 # ───────────────────  upload neighbours once  ─────────────────────────
@@ -181,13 +180,43 @@ for i, nbrs in enumerate(nlist):
 init_neighbors(nb_np, cnt_np)
 
 # ────────────────────────  main loop  ────────────────────────────────
-rule_space = 2 ** (2 * maxn)
+
+def generate_all_rule_indices(max_neighbors: int) -> list:
+    """
+    Generate rule indices for all possible combinations of birth (B) and survival (S) rules
+    where each rule can include any subset of neighbors from 0 to max_neighbors.
+    
+    Parameters:
+    - max_neighbors: Maximum number of neighbors to consider (0 to max_neighbors)
+    
+    Returns:
+    - List of rule indices compatible with set_rule() and rulestr()
+    """
+    rule_indices = []
+    
+    # Generate all possible birth rule combinations
+    for b in range(2**(max_neighbors+1)):
+        # Generate all possible survival rule combinations
+        for s in range(2**(max_neighbors+1)):
+            # Encode as a rule index
+            rule_idx = b | (s << 17)
+            rule_indices.append(rule_idx)
+            
+    return rule_indices
+
+logger.info(f"Max neighbors: {maxn}")
+maxn = min(maxn, 8)
+logger.info(f"Max neighbors (clamped): {maxn}")
+
+rules = generate_all_rule_indices(maxn)
+
+logger.info(f"Found {len(rules)} rules")
 
 with open(outfile, "w", newline="") as fp:
     writer = csv.writer(fp)
     writer.writerow(["rule", "rulestr", "rho", "H", "G", "D"])
 
-    for r in tqdm(range(rule_space), desc="Rules", unit="rule"):
+    for r in tqdm(rules, desc="Rules", unit="rule"):
         set_rule(r)
         random_fill()
 
