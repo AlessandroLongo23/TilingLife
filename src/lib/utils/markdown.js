@@ -1,6 +1,75 @@
 import MarkdownIt from 'markdown-it';
 import anchor from 'markdown-it-anchor';
 
+function protectMath(markdown) {
+	const placeholders = [];
+	
+	let processed = markdown.replace(/\$(.+?)\$/g, (match) => {
+		const placeholder = `MATH_PLACEHOLDER_${placeholders.length}`;
+		placeholders.push(match);
+		return placeholder;
+	});
+	
+	processed = processed.replace(/\$\$(.+?)\$\$/gs, (match) => {
+		const placeholder = `DISPLAY_MATH_PLACEHOLDER_${placeholders.length}`;
+		placeholders.push(match);
+		return placeholder;
+	});
+	
+	return { processed, placeholders };
+}
+
+function restoreMath(html, placeholders) {
+	let result = html;
+	
+	result = result.replace(/MATH_PLACEHOLDER_(\d+)/g, (_, index) => {
+		return placeholders[parseInt(index)];
+	});
+	
+	result = result.replace(/DISPLAY_MATH_PLACEHOLDER_(\d+)/g, (_, index) => {
+		return placeholders[parseInt(index)];
+	});
+	
+	return result;
+}
+
+function tableClassPlugin(md) {
+	const originalTable = md.renderer.rules.table_open || function(tokens, idx, options, env, self) {
+		return self.renderToken(tokens, idx, options);
+	};
+	
+	md.renderer.rules.table_open = function(tokens, idx, options, env, self) {
+		if (env.classMarker && env.classMarker.next === idx) {
+			tokens[idx].attrJoin('class', env.classMarker.className);
+			delete env.classMarker;
+		}
+		return originalTable(tokens, idx, options, env, self);
+	};
+	
+	md.core.ruler.after('block', 'table_class_marker', function(state) {
+		const tokens = state.tokens;
+		
+		for (let i = 0; i < tokens.length - 1; i++) {
+			if (tokens[i].type === 'paragraph_open' && 
+				tokens[i+1].type === 'inline' && 
+				tokens[i+1].content.match(/^\{\.([a-zA-Z0-9-]+)\}$/)) {
+				
+				const className = tokens[i+1].content.match(/^\{\.([a-zA-Z0-9-]+)\}$/)[1];
+				
+				state.env.classMarker = {
+					next: i + 3,
+					className: className
+				};
+				
+				tokens.splice(i, 3);
+				i--;
+			}
+		}
+		
+		return true;
+	});
+}
+
 const md = new MarkdownIt({
 	html: true,
 	linkify: true,
@@ -12,8 +81,14 @@ md.use(anchor, {
 	slugify: s => s.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '')
 });
 
+md.use(tableClassPlugin);
+
 export function renderMarkdown(markdownContent) {
-	return md.render(markdownContent);
+	const { processed, placeholders } = protectMath(markdownContent);
+	
+	const html = md.render(processed);
+	
+	return restoreMath(html, placeholders);
 }
 
 export function extractTableOfContents(markdownContent) {
@@ -47,19 +122,41 @@ export function extractTableOfContents(markdownContent) {
 export function structureTableOfContents(flatToc) {
 	const sections = [];
 	let currentSection = null;
+	let currentH1Section = null;
 	
 	for (const item of flatToc) {
-		if (item.level === 2) {
+		if (item.level === 1) {
+			// Create a new top-level section for h1
+			currentH1Section = {
+				id: item.id,
+				title: item.title,
+				subsections: [],
+				level: 1
+			};
+			sections.push(currentH1Section);
+			currentSection = null; // Reset current h2 section
+		} else if (item.level === 2) {
+			// Create a new section for h2
 			currentSection = {
 				id: item.id,
 				title: item.title,
-				subsections: []
+				subsections: [],
+				level: 2,
+				parent: currentH1Section ? currentH1Section.id : null
 			};
-			sections.push(currentSection);
+			
+			// Add to parent h1 or to main sections array
+			if (currentH1Section) {
+				currentH1Section.subsections.push(currentSection);
+			} else {
+				sections.push(currentSection);
+			}
 		} else if (item.level === 3 && currentSection) {
+			// Add h3 to the current h2 section
 			currentSection.subsections.push({
 				id: item.id,
-				title: item.title
+				title: item.title,
+				level: 3
 			});
 		}
 	}

@@ -55,9 +55,9 @@ export class Tiling {
                 }
             }
         }
-        if (this.shapeSeed.flat().some(n => !possibleSides.includes(n.n))) {
-            throw new Error('Invalid shape seed');
-        }
+        // if (this.shapeSeed.flat().some(n => !possibleSides.includes(n.n))) {
+        //     throw new Error('Invalid shape seed');
+        // }
 
         this.transforms = [];
         for (let i = 1; i < phases.length; i++) {
@@ -76,9 +76,9 @@ export class Tiling {
                     angle: angle
                 }
 
-                if (!possibleAngles.includes(parseInt(transform.angle))) {
-                    throw new Error('Invalid angle');
-                }
+                // if (!possibleAngles.includes(parseInt(transform.angle))) {
+                //     throw new Error('Invalid angle');
+                // }
             }
             this.transforms.push(transform);
         }
@@ -98,8 +98,6 @@ export class Tiling {
         
         if (debugView) debugManager.endTimer("Tiling generation");
         updateDebugStore();
-
-        console.log("# of nodes: " + this.nodes.length);
 
         this.extractCundyRollettNotation();
     }
@@ -287,11 +285,11 @@ export class Tiling {
                 newNode.centroid.y = origin.y + projection.y - perpendicular.y;
                 
                 const lineAngle = lineVector.heading();
-                newNode.angle = 2 * lineAngle - newNode.angle;
+                newNode.angle = (2 * lineAngle - newNode.angle + 2 * Math.PI) % (2 * Math.PI);
             } else {
                 newNode.centroid.x = origin.x - (newNode.centroid.x - origin.x);
                 newNode.centroid.y = origin.y - (newNode.centroid.y - origin.y);
-                newNode.angle = Math.PI + newNode.angle;
+                newNode.angle = (Math.PI + newNode.angle) % (Math.PI * 2);
             }
 
             newNode.calculateCentroid();
@@ -318,7 +316,7 @@ export class Tiling {
                 let newNode = newLayerNode.clone();
 
                 newNode.centroid.mirror(angleRad);
-                newNode.angle = 2 * angleRad - newNode.angle;
+                newNode.angle = (2 * angleRad - newNode.angle + Math.PI * 2) % (Math.PI * 2);
 
                 newNode.calculateCentroid();
                 newNode.calculateVertices();
@@ -347,7 +345,7 @@ export class Tiling {
 
             newNode.centroid.x = origin.x - (newNode.centroid.x - origin.x);
             newNode.centroid.y = origin.y - (newNode.centroid.y - origin.y);
-            newNode.angle = Math.PI + newNode.angle;
+            newNode.angle = (Math.PI + newNode.angle) % (Math.PI * 2);
 
             newNode.calculateCentroid();
             newNode.calculateVertices();
@@ -392,7 +390,7 @@ export class Tiling {
                 
                 let newNode = newLayerNode.clone();
                 newNode.centroid.set(newPos);
-                newNode.angle = newLayerNode.angle + angle;
+                newNode.angle = (newLayerNode.angle + angle) % (Math.PI * 2);
 
                 newNode.calculateCentroid();
                 newNode.calculateVertices();

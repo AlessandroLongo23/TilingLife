@@ -8,7 +8,7 @@ export class VertexGroup {
         this.side = 25;
     }
 
-    draw(ctx, displayText, scale = 1) {
+    show(ctx, displayText, scale) {
         let baseAngle = 0;
 
         ctx.push();
@@ -151,8 +151,8 @@ export class Cr {
         return compactNotation;
     }
 
-    draw(ctx, vertexIndex, displayText = true, scale = 1) {
-        this.vertexGroups[vertexIndex].draw(ctx, displayText, scale);
+    show(ctx, vertexIndex, displayText = true, scale = 1) {
+        this.vertexGroups[vertexIndex].show(ctx, displayText, scale);
     }
 
     save(ctx, vertexIndex) {
@@ -168,7 +168,7 @@ export class Cr {
         canvasCopy.rect(0, 0, canvasCopy.width, canvasCopy.height);
         canvasCopy.translate(canvasCopy.width / 2, canvasCopy.height / 2);
         
-        this.draw(canvasCopy, vertexIndex, false, scale);
+        this.show(canvasCopy, vertexIndex, false, scale);
         canvasCopy.pop();
         
         ctx.saveCanvas(canvasCopy, filename, 'png');

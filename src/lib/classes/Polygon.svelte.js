@@ -2,6 +2,8 @@ import { tolerance } from '$lib/stores/configuration.js';
 import { Vector } from '$lib/classes/Vector.svelte.js';
 import { map } from '$lib/utils/math.svelte.js';
 
+const PHI = (1 + Math.sqrt(5)) / 2;
+
 export class Polygon {
     constructor(data) {
         this.centroid = data.centroid;
@@ -90,12 +92,11 @@ export class Polygon {
     }
 
     calculateCentroid = () => {
-        if (Math.abs(this.centroid.x) < tolerance) {
+        if (Math.abs(this.centroid.x) < tolerance)
             this.centroid.x = 0;
-        }
-        if (Math.abs(this.centroid.y) < tolerance) {
+
+        if (Math.abs(this.centroid.y) < tolerance)
             this.centroid.y = 0;
-        }
     }
 
     calculateVertices = () => {
@@ -107,13 +108,11 @@ export class Polygon {
                 this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle)
             ));
 
-            if (Math.abs(this.vertices[i].x) < tolerance) {
+            if (Math.abs(this.vertices[i].x) < tolerance)
                 this.vertices[i].x = 0;
-            }
 
-            if (Math.abs(this.vertices[i].y) < tolerance) {
+            if (Math.abs(this.vertices[i].y) < tolerance)
                 this.vertices[i].y = 0;
-            }
         }
     }
 
@@ -122,13 +121,11 @@ export class Polygon {
         for (let i = 0; i < this.n; i++) {
             this.halfways.push(Vector.midpoint(this.vertices[i], this.vertices[(i + 1) % this.n]));
 
-            if (Math.abs(this.halfways[i].x) < tolerance) {
+            if (Math.abs(this.halfways[i].x) < tolerance)
                 this.halfways[i].x = 0;
-            }
 
-            if (Math.abs(this.halfways[i].y) < tolerance) {
+            if (Math.abs(this.halfways[i].y) < tolerance)
                 this.halfways[i].y = 0;
-            }
         }
     }
 }
@@ -141,7 +138,7 @@ export class RegularPolygon extends Polygon {
     }
 
     calculateHue = () => {
-        this.hue = map(this.vertices.length, 3, 12, 0, 300);
+        this.hue = map(Math.log(this.vertices.length), Math.log(3), Math.log(40), 0, 300);
     }
 
     clone = () => {
@@ -189,33 +186,35 @@ export class DualPolygon extends Polygon {
         }
 
         let minRotation = [...angles]; 
-        let canonicalAngles = [...angles];
         
-        for (let i = 1; i < angles.length; i++) {
-            const rotation = [...angles.slice(i), ...angles.slice(0, i)];
-            
-            let isSmaller = false;
-            for (let j = 0; j < angles.length; j++) {
-                if (rotation[j] < minRotation[j]) {
-                    isSmaller = true;
-                    break;
-                } else if (rotation[j] > minRotation[j]) {
-                    break;
+        for (let j = 0; j < 2; j++) {
+            for (let i = 0; i < angles.length; i++) {
+                const rotation = [...angles.slice(i), ...angles.slice(0, i)];
+                
+                let isSmaller = false;
+                for (let j = 0; j < angles.length; j++) {
+                    if (rotation[j] < minRotation[j]) {
+                        isSmaller = true;
+                        break;
+                    } else if (rotation[j] > minRotation[j]) {
+                        break;
+                    }
                 }
+                
+                if (isSmaller)
+                    minRotation = [...rotation];
             }
-            
-            if (isSmaller) {
-                minRotation = rotation;
-                canonicalAngles = rotation;
-            }
+
+            angles = angles.reverse();
         }
         
         let hash = 0;
-        for (let i = 0; i < canonicalAngles.length; i++) {
-            hash = (hash * 31 + canonicalAngles[i]) % (300 * Math.sqrt(2));
-        }
+        let a = 37;
+        let b = 200;
+        for (let i = 0; i < minRotation.length; i++)
+            hash = (hash * a + minRotation[i]) % (b * PHI);
         
-        return hash % 300;
+        return hash % b;
     }
 
     clone = () => {
@@ -260,13 +259,11 @@ export class StarPolygon extends Polygon {
                 this.centroid.y + intRadius * Math.sin((i + .5) * 2 * Math.PI / this.n + this.angle + Math.PI)
             ));
 
-            if (Math.abs(this.vertices[i].x) < tolerance) {
+            if (Math.abs(this.vertices[i].x) < tolerance)
                 this.vertices[i].x = 0;
-            }
 
-            if (Math.abs(this.vertices[i].y) < tolerance) {
+            if (Math.abs(this.vertices[i].y) < tolerance)
                 this.vertices[i].y = 0;
-            }
         }
     }
 

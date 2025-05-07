@@ -9,6 +9,31 @@
 	
 	const dispatch = createEventDispatcher();
 	
+	// Function to set CSS variable for column count on tables
+	function setTableColumnCounts() {
+		if (!containerElement) return;
+		
+		const tables = containerElement.querySelectorAll('.markdown-content table');
+		tables.forEach(table => {
+			const headerRow = table.querySelector('tr');
+			if (headerRow) {
+				const columnCount = headerRow.children.length;
+				table.style.setProperty('--col-count', columnCount.toString());
+			}
+		});
+	}
+	
+	// Initialize MathJax on content changes
+	$effect(() => {
+		if (content && typeof window !== 'undefined' && window.MathJax) {
+			// Allow content to be rendered first, then process math
+			setTimeout(() => {
+				window.MathJax.typeset();
+				setTableColumnCounts();
+			}, 100);
+		}
+	});
+	
 	$effect(() => {
 		if (targetSection && containerElement) {
 			scrollToSection(targetSection);
@@ -31,7 +56,7 @@
 		if (!containerElement) return;
 		
 		const scrollPosition = containerElement.scrollTop;
-		const headings = containerElement.querySelectorAll('h2, h3');
+		const headings = containerElement.querySelectorAll('h1, h2, h3');
 		
 		for (let i = headings.length - 1; i >= 0; i--) {
 			const heading = headings[i];
@@ -50,6 +75,11 @@
 		if (containerElement) {
 			setTimeout(() => {
 				handleScroll({ target: containerElement });
+				// Initial MathJax typesetting
+				if (typeof window !== 'undefined' && window.MathJax) {
+					window.MathJax.typeset();
+				}
+				setTableColumnCounts();
 			}, 100);
 		}
 	});
@@ -75,19 +105,20 @@
 
 <style>
 	:global(.markdown-content h1) {
-		@apply text-3xl font-bold text-white mb-8;
+		@apply text-4xl font-bold text-white mb-10 mt-24 pb-4 border-b border-green-400/80;
+		scroll-margin-top: 1rem;
 	}
 	
 	:global(.markdown-content h2) {
-		@apply text-2xl font-semibold text-white mb-4 mt-12 scroll-mt-20;
+		@apply text-2xl font-semibold text-white mb-4 mt-16 scroll-mt-20;
 	}
 	
 	:global(.markdown-content h3) {
-		@apply text-xl font-medium text-white mb-3 mt-8 ml-4 border-l-2 border-zinc-700/50 pl-4 scroll-mt-16;
+		@apply text-xl font-medium text-white mb-3 mt-8 scroll-mt-16;
 	}
 	
 	:global(.markdown-content p) {
-		@apply text-zinc-300 mb-6;
+		@apply text-zinc-400 mb-6;
 	}
 	
 	:global(.markdown-content ul) {
@@ -131,7 +162,8 @@
 	}
 	
 	:global(.markdown-content table) {
-		@apply w-full border-collapse mb-6;
+		@apply w-full border-collapse mb-6 bg-zinc-800/20;
+		table-layout: fixed; /* Uses fixed table layout for better control */
 	}
 	
 	:global(.markdown-content th) {
@@ -139,6 +171,60 @@
 	}
 	
 	:global(.markdown-content td) {
-		@apply p-2 border border-zinc-700/50 text-zinc-300;
+		@apply p-2 border border-zinc-700/50 text-zinc-300 text-center align-middle;
+		width: calc(100% / var(--col-count, 10)); /* Distributes columns evenly */
+	}
+	
+	:global(.markdown-content tr:nth-child(odd)) {
+		@apply bg-zinc-800/30;
+	}
+	
+	:global(.markdown-content tr:nth-child(even)) {
+		@apply bg-zinc-800/10;
+	}
+	
+	/* Table images styling for flexible sizing and distribution */
+	:global(.markdown-content table img) {
+		@apply object-contain mx-auto block;
+		width: 100%;
+		height: auto;
+		max-width: 100%;
+	}
+	
+	/* Specific styling for tables with custom classes */
+	:global(.markdown-content table.cols-3 td) {
+		width: 33.333%;
+	}
+	
+	:global(.markdown-content table.cols-3 img) {
+		max-width: 120px; /* Larger max-width for tables with fewer columns */
+		margin: 0 auto;
+	}
+	
+	:global(.markdown-content table.cols-4 td) {
+		width: 25%;
+	}
+	
+	:global(.markdown-content table.cols-4 img) {
+		max-width: 100px;
+		margin: 0 auto;
+	}
+	
+	:global(.markdown-content table.cols-10 td) {
+		width: 10%;
+	}
+	
+	:global(.markdown-content table.cols-10 img) {
+		max-width: 60px;
+		margin: 0 auto;
+	}
+	
+	/* MathJax styling */
+	:global(.markdown-content .MathJax) {
+		@apply text-zinc-200;
+	}
+
+	:global(.markdown-content mjx-container) {
+		@apply overflow-x-auto overflow-y-hidden my-6;
 	}
 </style> 

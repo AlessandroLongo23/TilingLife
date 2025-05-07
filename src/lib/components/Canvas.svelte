@@ -164,9 +164,8 @@
                     tiling.showNeighbors(p5, $side, $showConstructionPoints);
                     p5.pop();
 
-                    if ($showCR) {
+                    if ($showCR)
                         p5.drawCr();
-                    }
 
                     if (takeScreenshot) {
                         p5.takeScreenshot();
@@ -174,7 +173,7 @@
                     }
                 }
             } catch (e) {
-                console.log(e);
+                console.error(e);
             }
             
             prevWidth = width;
@@ -194,13 +193,17 @@
                 crCanvases[i].colorMode(p5.HSB, 360, 100, 100);
                 crCanvases[i].fill(240, 7, 24);
                 crCanvases[i].noStroke();
-                crCanvases[i].rect(0, 0, crCanvases[i].width, crCanvases[i].height, patch.borderRadius);
-                crCanvases[i].translate(crCanvases[i].width / 2, crCanvases[i].height / 2);
+                crCanvases[i].rect(0, 0, patch.size.x, patch.size.y, patch.borderRadius);
+                crCanvases[i].translate(patch.size.x / 2, patch.size.y / 2);
 
-                cr.draw(crCanvases[i], i, p5);
+                cr.show(crCanvases[i], i);
                 p5.image(crCanvases[i], patch.padding + i * (patch.size.x + patch.padding), p5.height - patch.size.y - patch.padding);
                 crCanvases[i].pop();
             }
+
+            let a = p5.createGraphics(100, 100);
+            a.background(240, 7, 24);
+            p5.image(a, -100, -100);
         }
         
         p5.mousePressed = (event) => {

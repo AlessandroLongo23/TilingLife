@@ -1,28 +1,46 @@
-# Tilings and Cellular Automata
+# Tilings
 
-## Tilings
+## Classification
 
 A tiling is a covering of the plane using one or more geometric shapes, called tiles, with no overlaps and no gaps. In mathematics, tilings are studied in various contexts and have applications in crystallography, material science, and art.
+
+### The 15 valid vertex shapes
+
+When trying to analyze tilings in a rigorous way, the first thing we need to consider is how many ways there are to build vertices, i.e. what are the different combinations of regular polygons that, when wrapped around a point, cover exactly 360°.
+
+Turns out that there are only 21 ways to do that:
+
+{.cols-10}
+| # | | | | | | | | | | |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| $3$ | ![3.7.42](../theory/images/vertexTypes/3.7.42.png) | ![3.8.24](../theory/images/vertexTypes/3.8.24.png) | ![3.9.18](../theory/images/vertexTypes/3.9.18.png) | ![3.10.15](../theory/images/vertexTypes/3.10.15.png) | ![3.12^2](../theory/images/vertexTypes/3.12^2.png) | ![4.5.20](../theory/images/vertexTypes/4.5.20.png) | ![4.6.12](../theory/images/vertexTypes/4.6.12.png) | ![4.8^2](../theory/images/vertexTypes/4.8^2.png) | ![5^2.10](../theory/images/vertexTypes/5^2.10.png) | ![6^3](../theory/images/vertexTypes/6^3.png) |
+| | $\color{red}{3.7.42}$ | $\color{red}{3.8.24}$ | $\color{red}{3.9.18}$ | $\color{red}{3.10.15}$ | $\color{green}{3.12^2}$ | $\color{red}{4.5.20}$ | $\color{green}{4.6.12}$ | $\color{green}{4.8^2}$ | $\color{red}{5^2.10}$ | $\color{green}{6^3}$ |
+| $4$ | ![3.4.3.12](../theory/images/vertexTypes/3.4.3.12.png) | ![3.4.6.4](../theory/images/vertexTypes/3.4.6.4.png) | ![3.4^2.6](../theory/images/vertexTypes/3.4^2.6.png) | ![3^2.4.12](../theory/images/vertexTypes/3^2.4.12.png) | ![3^2.6^2](../theory/images/vertexTypes/3^2.6^2.png) | ![3.6.3.6](../theory/images/vertexTypes/3.6.3.6.png) | ![4^4](../theory/images/vertexTypes/4^4.png) | | | |
+| | $\color{green}{3.4.3.12}$ | $\color{green}{3.4.6.4}$ | $\color{green}{3.4^2.6}$ | $\color{green}{3^2.4.12}$ | $\color{green}{3^2.6^2}$ | $\color{green}{3.6.3.6}$ | $\color{green}{4^4}$ | | | |
+| $5$ | ![3^2.4.3.4](../theory/images/vertexTypes/3^2.4.3.4.png) | ![3^3.4^2](../theory/images/vertexTypes/3^3.4^2.png) | ![3^4.6](../theory/images/vertexTypes/3^4.6.png) | | | | | | | |
+| | $\color{green}{3^2.4.3.4}$ | $\color{green}{3^3.4^2}$ | $\color{green}{3^4.6}$ | | | | | | | |
+| $6$ | ![3^6](../theory/images/vertexTypes/3^6.png) | | | | | | | | | |
+| | $\color{green}{3^6}$ | | | | | | | | | |
+
+Of which only 15 can generate valid tilings (in green).
 
 ### Regular Tilings
 
 Regular tilings are composed of regular polygons arranged in a way that every vertex looks the same. There are only three regular tilings of the plane: triangular, square, and hexagonal.
 
-![Regular Tilings](/theory/images/regular-tilings.svg)
+| ![3^6](../tilings/1Ur/3_r60_r(h2).png) | ![4^4](../tilings/1Ur/4-4-0,4_r90_m(v2).png) | ![6^3](../tilings/1Ur/6_r60_r(h1).png) |
+| :---: | :---: | :---: |
+| $3^6$ | $4^4$ | $6^3$ |
 
 ### Semi-Regular Tilings
 
-Semi-regular tilings use two or more regular polygons, with the same arrangement of polygons at each vertex. There are eight semi-regular tilings, including the trihexagonal tiling and the truncated square tiling.
+Semi-regular tilings use two or more regular polygons, with the same arrangement of polygons at each vertex. There are eight semi-regular tilings (also known as Archimedean tilings):
 
-![Semi-Regular Tilings](/theory/images/semi-regular-tilings.png)
-
-### Demi-Regular Tilings
-
-Demi-regular tilings are edge-to-edge tilings by regular polygons with the property that all vertices are of the same "local type".
-
-![Demi-Regular Tilings](/theory/images/demi-regular-tilings.png)
-
-## Categorization of Tilings
+| ![3^4.6](../tilings/1Usr/6-3-3_r60_r(h5).png) | ![3.3.3.3.6](../tilings/1Usr/4-3_m90_r(h2).png) | ![3.3.3.4](../tilings/1Usr/4-3-3,0,0,0,4_r90_r(h2).png) | ![3.12.12](../tilings/1Usr/6-4-3_m30_r(c2).png) | 
+| :---: | :---: | :---: | :---: |
+| $3^4.6$ (Snub trihexagonal)| $3^3.4^2$ (Elongated triangular) | $3^2.4.3.4$ (Snub square) | $3.4.6.4$ (Rhombitrihexagonal) |
+| ![(3.6)^2](../tilings/1Usr/6-3-6_m30_r(v4).png) | ![3.12^2](../tilings/1Usr/12-3_m30_r(h3).png) | ![4.6.12](../tilings/1Usr/12-6,4_m30_r(c2).png) | ![4.8^2](../tilings/1Usr/8-4_m90_r(h4).png) | 
+| $(3.6)^2$ (Trihexagonal) | $3.12^2$ (Truncated hexagonal) | $4.6.12$ (Truncated trihexagonal) | $4.8^2$ (Truncated square) |
 
 Tilings can be categorized based on various properties:
 
@@ -50,9 +68,11 @@ The rule strings define the base shape, orientation, and transformations to gene
 
 We apply transformations like rotations, translations, and reflections to create complex patterns from simple base shapes. The number of transformation steps determines the complexity of the resulting pattern.
 
-## Conway's Game of Life
+# Conway's Game of Life
 
 The Game of Life is a cellular automaton devised by mathematician John Conway in 1970. It's a zero-player game where evolution is determined by the initial state.
+
+## Original Definition
 
 ### Rules
 
@@ -85,18 +105,9 @@ Larger Than Life rules extend the neighborhood beyond the immediate 8 cells, all
 
 Our implementation allows cellular automata to run on various tiling patterns beyond the traditional square grid, including triangular, hexagonal, and more complex tilings.
 
-## Connections to Mathematics and Science
+# Our study
 
-The combination of tilings and cellular automata connects to various fields:
+## Idea
 
-### Computational Theory
 
-The Game of Life is Turing complete, meaning it can simulate any computer algorithm, despite its simple rules.
 
-### Crystallography
-
-Tilings have connections to crystal structures in materials science, helping us understand how atoms arrange in crystals.
-
-### Complexity Theory
-
-Complex patterns emerging from simple rules demonstrate principles of emergence and complexity theory found throughout nature. 

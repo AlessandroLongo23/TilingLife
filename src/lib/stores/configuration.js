@@ -4,7 +4,7 @@ export let golRule = writable('B3/S23'); // Conway's Game of Life with 6 generat
 export let golRules = writable({});
 export let selectedTiling = writable({
 	name: 'square',
-	rulestring: '4/m45/r(h1)',
+	rulestring: '4-4-0,4/r90/m(v2)',
 	cr: '4^4',
 	dualname: 'square',
 	golRules: {

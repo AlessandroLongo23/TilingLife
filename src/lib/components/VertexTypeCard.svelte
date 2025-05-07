@@ -30,7 +30,7 @@
         </div>
 
         <img 
-            src="/vertexTypes/{id}.png" 
+            src="theory/images/vertexTypes/{id}.png" 
             alt="Vertex type {name}" 
             class="w-full h-full object-contain transition-all {isSelected ? 'scale-105' : 'grayscale group-hover:opacity-90 group-hover:grayscale-0 group-hover:scale-105'}"
         />

@@ -16,6 +16,14 @@
 			const initialState = {};
 			sections.forEach(section => {
 				initialState[section.id] = true;
+				
+				if (section.subsections) {
+					section.subsections.forEach(subsection => {
+						if (subsection.id) {
+							initialState[subsection.id] = true;
+						}
+					});
+				}
 			});
 			expandedSections = initialState;
 		}
@@ -34,6 +42,10 @@
 	
 	function hasSubsections(section) {
 		return section.subsections && section.subsections.length > 0;
+	}
+	
+	function isH1(section) {
+		return section.level === 1;
 	}
 </script>
 
@@ -56,10 +68,12 @@
 		{:else}
 			<div class="theory-toc">
 				{#each sections as section}
-					<div class="mb-3">
+					<div class="mb-4">
+						<!-- H1 Section -->
 						<div class="flex items-center">
 							<button 
-								class="text-left flex-1 py-1.5 px-2 rounded text-sm font-medium 
+								class="text-left flex-1 py-1.5 px-2 rounded text-sm
+									{isH1(section) ? 'font-bold' : 'font-medium'} 
 									{activeSection === section.id ? 'text-green-400' : 'text-zinc-400 hover:text-white'}"
 								onclick={() => scrollToSection(section.id)}
 							>
@@ -81,16 +95,50 @@
 							{/if}
 						</div>
 						
+						<!-- H2 Sections inside H1 -->
 						{#if hasSubsections(section) && expandedSections[section.id]}
 							<div class="ml-3 border-l border-zinc-700/50 pl-2 mt-1" transition:slide={{ duration: 150 }}>
 								{#each section.subsections as subsection}
-									<button 
-										class="text-left w-full py-1 px-2 rounded text-xs 
-											{activeSection === subsection.id ? 'text-green-400' : 'text-zinc-400 hover:text-white'}"
-										onclick={() => scrollToSection(subsection.id)}
-									>
-										{subsection.title}
-									</button>
+									<div class="my-2">
+										<div class="flex items-center">
+											<button 
+												class="text-left flex-1 py-1 px-2 rounded text-xs font-medium 
+													{activeSection === subsection.id ? 'text-green-400' : 'text-zinc-400 hover:text-white'}"
+												onclick={() => scrollToSection(subsection.id)}
+											>
+												{subsection.title}
+											</button>
+											
+											{#if hasSubsections(subsection)}
+												<button 
+													class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100"
+													onclick={(e) => toggleSection(subsection.id, e)}
+													aria-label={expandedSections[subsection.id] ? "Collapse section" : "Expand section"}
+													title={expandedSections[subsection.id] ? "Collapse section" : "Expand section"}
+												>
+													<ChevronDown 
+														size={12} 
+														class="transition-transform duration-200 {expandedSections[subsection.id] ? 'rotate-180' : ''}"
+													/>
+												</button>
+											{/if}
+										</div>
+										
+										<!-- H3 Sections inside H2 -->
+										{#if hasSubsections(subsection) && expandedSections[subsection.id]}
+											<div class="ml-3 border-l border-zinc-700/50 pl-2 mt-1" transition:slide={{ duration: 150 }}>
+												{#each subsection.subsections as subsubsection}
+													<button 
+														class="text-left w-full py-1 px-2 rounded text-xs 
+															{activeSection === subsubsection.id ? 'text-green-400' : 'text-zinc-400 hover:text-white'}"
+														onclick={() => scrollToSection(subsubsection.id)}
+													>
+														{subsubsection.title}
+													</button>
+												{/each}
+											</div>
+										{/if}
+									</div>
 								{/each}
 							</div>
 						{/if}
