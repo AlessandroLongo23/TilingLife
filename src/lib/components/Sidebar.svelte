@@ -362,9 +362,9 @@
 									id="side"
 									label="Side Length"
 									bind:value={$side}
-									min={1}
-									max={100}
-									step={1}
+									min={10}
+									max={150}
+									step={5}
 									unit="px"
 								/>
 

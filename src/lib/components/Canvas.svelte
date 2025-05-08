@@ -1,6 +1,9 @@
 <script>
     import { ruleType, parameter, selectedTiling, showCR, debugView, side, transformSteps, patch, golRule, golRules, showConstructionPoints, showInfo, speed, screenshotButtonHover } from '$lib/stores/configuration.js';
     import { debugManager, debugStore, updateDebugStore } from '$lib/stores/debug.js';
+    import { isWithinTolerance } from '$lib/utils/math.svelte';
+    import { sortPointsByAngleAndDistance } from '$lib/utils/geometry.svelte';
+    import { Vector } from '$lib/classes/Vector.svelte.js';
     import * as ls from 'lucide-svelte';
     import { Tiling } from '$lib/classes/Tiling.svelte.js';
     import { Cr } from '$lib/classes/Cr.svelte.js';
@@ -259,11 +262,10 @@
         p5.takeScreenshot = () => {
             const filename = `${$selectedTiling.rulestring}.png`;
             
-            const screenshotCanvas = p5.createGraphics(600, 600);
-            
+            let screenshotCanvas = p5.createGraphics(600, 600);
+
             screenshotCanvas.colorMode(p5.HSB, 360, 100, 100);
             
-            screenshotCanvas.push();
             screenshotCanvas.translate(0, 600);
             screenshotCanvas.scale(1, -1);
             
@@ -273,8 +275,23 @@
             
             screenshotCanvas.stroke(0);
             screenshotCanvas.strokeWeight(2 / $side);
-            
+
+            let maxX = 0;
+            let maxY = 0;
+            let minX = 0;
+            let minY = 0;
+            for (let i = 0; i < tiling.nodes.length; i++) {
+                for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
+                    let vertex = tiling.nodes[i].vertices[j];
+                    if (vertex.x > maxX) maxX = vertex.x;
+                    if (vertex.y > maxY) maxY = vertex.y;
+                    if (vertex.x < minX) minX = vertex.x;
+                    if (vertex.y < minY) minY = vertex.y;
+                }
+            }
+
             screenshotCanvas.scale($side);
+            screenshotCanvas.translate(-(maxX + minX) / 2, -(maxY + minY) / 2);
             
             for (let i = 0; i < tiling.nodes.length; i++) {
                 screenshotCanvas.push();
@@ -359,10 +376,8 @@
                 }
             }
             
-            screenshotCanvas.pop();
-            
             p5.saveCanvas(screenshotCanvas, filename, 'png');
-            
+
             screenshotCanvas.remove();
             
             notificationMessage = `Screenshot saved as ${filename}`;

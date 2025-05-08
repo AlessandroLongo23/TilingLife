@@ -209,8 +209,8 @@ export class DualPolygon extends Polygon {
         }
         
         let hash = 0;
-        let a = 37;
-        let b = 200;
+        let a = 31;
+        let b = 300;
         for (let i = 0; i < minRotation.length; i++)
             hash = (hash * a + minRotation[i]) % (b * PHI);
         

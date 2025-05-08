@@ -10,7 +10,6 @@ When trying to analyze tilings in a rigorous way, the first thing we need to con
 
 Turns out that there are only 21 ways to do that:
 
-{.cols-10}
 | # | | | | | | | | | | |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | $3$ | ![3.7.42](../theory/images/vertexTypes/3.7.42.png) | ![3.8.24](../theory/images/vertexTypes/3.8.24.png) | ![3.9.18](../theory/images/vertexTypes/3.9.18.png) | ![3.10.15](../theory/images/vertexTypes/3.10.15.png) | ![3.12^2](../theory/images/vertexTypes/3.12^2.png) | ![4.5.20](../theory/images/vertexTypes/4.5.20.png) | ![4.6.12](../theory/images/vertexTypes/4.6.12.png) | ![4.8^2](../theory/images/vertexTypes/4.8^2.png) | ![5^2.10](../theory/images/vertexTypes/5^2.10.png) | ![6^3](../theory/images/vertexTypes/6^3.png) |
@@ -36,10 +35,10 @@ Regular tilings are composed of regular polygons arranged in a way that every ve
 
 Semi-regular tilings use two or more regular polygons, with the same arrangement of polygons at each vertex. There are eight semi-regular tilings (also known as Archimedean tilings):
 
-| ![3^4.6](../tilings/1Usr/6-3-3_r60_r(h5).png) | ![3.3.3.3.6](../tilings/1Usr/4-3_m90_r(h2).png) | ![3.3.3.4](../tilings/1Usr/4-3-3,0,0,0,4_r90_r(h2).png) | ![3.12.12](../tilings/1Usr/6-4-3_m30_r(c2).png) | 
+| ![3^4.6](../tilings/1Usr/6-3-3_r60_r(h5).png) | ![3.3.3.3.6](../tilings/1Usr/4-3_m90_r(h2).png) | ![3.3.3.4](../tilings/1Usr/4-3-3,0,0,0,4_r90_r(h2).png) | ![3.12.12](../tilings/1Usr/6-4-3_m30_r(c2).png) |
 | :---: | :---: | :---: | :---: |
 | $3^4.6$ (Snub trihexagonal)| $3^3.4^2$ (Elongated triangular) | $3^2.4.3.4$ (Snub square) | $3.4.6.4$ (Rhombitrihexagonal) |
-| ![(3.6)^2](../tilings/1Usr/6-3-6_m30_r(v4).png) | ![3.12^2](../tilings/1Usr/12-3_m30_r(h3).png) | ![4.6.12](../tilings/1Usr/12-6,4_m30_r(c2).png) | ![4.8^2](../tilings/1Usr/8-4_m90_r(h4).png) | 
+| ![(3.6)^2](../tilings/1Usr/6-3-6_m30_r(v4).png) | ![3.12^2](../tilings/1Usr/12-3_m30_r(h3).png) | ![4.6.12](../tilings/1Usr/12-6,4_m30_r(c2).png) | ![4.8^2](../tilings/1Usr/8-4_m90_r(h4).png) |
 | $(3.6)^2$ (Trihexagonal) | $3.12^2$ (Truncated hexagonal) | $4.6.12$ (Truncated trihexagonal) | $4.8^2$ (Truncated square) |
 
 Tilings can be categorized based on various properties:
@@ -77,6 +76,7 @@ The Game of Life is a cellular automaton devised by mathematician John Conway in
 ### Rules
 
 The classic Game of Life follows the B3/S23 rule:
+
 - A dead cell with exactly 3 live neighbors becomes alive (Birth).
 - A live cell with 2 or 3 live neighbors survives (Survival).
 - In all other cases, cells die or remain dead.
@@ -84,6 +84,7 @@ The classic Game of Life follows the B3/S23 rule:
 ### Patterns
 
 Various patterns can emerge:
+
 - Still lifes: Patterns that don't change
 - Oscillators: Patterns that repeat after a fixed number of generations
 - Spaceships: Patterns that translate across the grid
@@ -108,6 +109,3 @@ Our implementation allows cellular automata to run on various tiling patterns be
 # Our study
 
 ## Idea
-
-
-
