@@ -1,5 +1,5 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, zoom, showConstructionPoints, showInfo, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections } from '$lib/stores/configuration.js';
+	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections } from '$lib/stores/configuration.js';
 	import { ChevronDown, ChevronLeft, ChevronRight, Maximize2, ChevronsDownUp, ChevronsUpDown } from 'lucide-svelte';
 	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
 	import { tilingRules } from '$lib/stores/tilingRules.js';
@@ -381,10 +381,10 @@
 									/>
 									
 									<Checkbox 
-										id="showInfo"
-										label="Show Info"
+										id="showPolygonPoints"
+										label="Show Polygon Points"
 										position="right"
-										bind:checked={$showInfo}
+										bind:checked={$showPolygonPoints}
 									/>
 
 									<Checkbox 
@@ -582,7 +582,7 @@
 									id="speed"
 									label="Simulation Speed"
 									bind:value={$speed}
-									min={1}
+									min={0}
 									max={300}
 									step={1}
 									unit="iterations/s"

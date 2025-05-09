@@ -18,14 +18,14 @@
 
 - [x] add R&C notation to all tilings and fix visualization
 - [x] add R&C filtering and sorting in the catalogue
-- [ ] add zoom and movement with the mouse instead of the slider
+- [x] add zoom and movement with the mouse instead of the slider
 - [ ] add R&C for face types (dual polygons)
 - [ ] add predefined palettes in the colorPad
 - [ ] add more trasnformations and visualizations (truncation, fractalization, circle packing)
 
 ## UI
 
-- [ ] remove unnecessary buttons and checkboxes (or move them to dev visualization)
+- [x] remove unnecessary buttons and checkboxes (or move them to dev visualization)
 
 ## Bugs
 

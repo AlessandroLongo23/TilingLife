@@ -16,12 +16,12 @@ export class Vector {
         return new Vector((v1.x + v2.x) / 2, (v1.y + v2.y) / 2);
     }
 
-    static sub(v1, v2) {
-        return new Vector(v1.x - v2.x, v1.y - v2.y);
-    }
-
     copy() {
         return new Vector(this.x, this.y);
+    }
+
+    static add(v1, v2) {
+        return new Vector(v1.x + v2.x, v1.y + v2.y);
     }
     
     add(other) {
@@ -29,6 +29,10 @@ export class Vector {
         this.y += other.y;
 
         return this.copy();
+    }
+
+    static sub(v1, v2) {
+        return new Vector(v1.x - v2.x, v1.y - v2.y);
     }
     
     sub(other) {
@@ -38,9 +42,37 @@ export class Vector {
         return this.copy();
     }
 
-    set(other) {
-        this.x = other.x;
-        this.y = other.y;
+    static mult(v1, v2) {
+        return new Vector(v1.x * v2.x, v1.y * v2.y);
+    }
+
+    mult(other) {
+        this.x *= other.x;
+        this.y *= other.y;
+
+        return this.copy();
+    }
+
+    static scale(v, scalar) {
+        return new Vector(v.x * scalar, v.y * scalar);
+    }
+
+    scale(scalar) {
+        this.x *= scalar;
+        this.y *= scalar;
+
+        return this.copy();
+    }
+
+    set(x, y = null) {
+        if (typeof x === 'object') {
+            const other = x;
+            this.x = other.x;
+            this.y = other.y;
+        } else {
+            this.x = x;
+            this.y = y;
+        }
 
         return this.copy();
     }
@@ -84,13 +116,6 @@ export class Vector {
         let newY = this.x * Math.sin(angle) + this.y * Math.cos(angle);
         this.x = newX;
         this.y = newY;
-
-        return this.copy();
-    }
-
-    scale(scalar) {
-        this.x *= scalar;
-        this.y *= scalar;
 
         return this.copy();
     }

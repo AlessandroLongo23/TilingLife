@@ -1,4 +1,4 @@
-import { tolerance, parameter, debugView, transformSteps, offsets, screenshotButtonHover, lineWidth, showDualConnections } from '$lib/stores/configuration.js';
+import { tolerance, parameter, debugView, transformSteps, offsets, screenshotButtonHover, lineWidth, showDualConnections, controls } from '$lib/stores/configuration.js';
 import { sortPointsByAngleAndDistance, getClockwiseAngle } from '$lib/utils/geometry.svelte';
 import { RegularPolygon, StarPolygon, DualPolygon} from '$lib/classes/Polygon.svelte';
 import { debugManager, updateDebugStore } from '$lib/stores/debug.js';
@@ -807,6 +807,9 @@ export class Tiling {
         }
         if (debugView) debugManager.endTimer("Calculating halfways neighbors");
 
+        for (let node of this.nodes)
+            node.dualNeighbors = [...node.directNeighbors];
+
         if (neighborhoodType === 'moore') {
             if (debugView) debugManager.startTimer("Calculating vertices neighbors");
             const vertexToNodesMap = new Map();
@@ -839,7 +842,6 @@ export class Tiling {
                         if (canonicalKey) break;
                     }
                     
-                    // If no existing vertex was found, use this one as canonical
                     if (!canonicalKey) {
                         canonicalKey = key;
                         
@@ -920,7 +922,6 @@ export class Tiling {
                         visited.add(nextNode);
                         allNeighbors.add(nextNode);
                         
-                        // Add to the queue for further exploration
                         queue.push({
                             node: nextNode,
                             depth: currentDepth + 1
@@ -929,11 +930,9 @@ export class Tiling {
                 }
             }
             
-            // Assign all discovered neighbors
             node.neighbors = Array.from(allNeighbors);
         }
         
-        // Clean up temporary directNeighbors arrays
         for (let i = 0; i < this.nodes.length; i++) {
             delete this.nodes[i].directNeighbors;
         }
@@ -987,63 +986,44 @@ export class Tiling {
         return uniqueNodes;
     }
 
-    drawInfo = (ctx, zoom) => {
-        ctx.push();
-        ctx.translate(0, ctx.height);
+    drawConstructionPoints = (ctx) => {
         ctx.scale(1, -1);
-        ctx.translate(ctx.width / 2, ctx.height / 2);
-        ctx.scale(zoom);
-        
-        // Drawing the standard info labels
-        let uniqueCentroids = [];
+        ctx.textSize(12 / get(controls).zoom);
+        ctx.fill(0, 0, 100);
+        ctx.strokeWeight(2 / get(controls).zoom);
+        ctx.stroke(0, 0, 0, 0.5);
 
-        for (let i = 0; i < this.anchorNodes.length; i++) {
-            let centroid = this.anchorNodes[i].centroid;
-            if (!uniqueCentroids.some(c => isWithinTolerance(c, centroid))) {
-                uniqueCentroids.push(centroid);
-            }
-        }
+        let uniqueCentroids = [];
+        for (let anchorNode of this.anchorNodes)
+            if (!uniqueCentroids.some(c => isWithinTolerance(c, anchorNode.centroid)))
+                uniqueCentroids.push(anchorNode.centroid);
 
         let uniqueCentroidsSorted = sortPointsByAngleAndDistance(uniqueCentroids);
         uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, new Vector()));
-        
-        ctx.textSize(12 / zoom);
-        ctx.fill(0, 0, 100);
-        
         for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
             let centroid = uniqueCentroidsSorted[i];
             ctx.text('c' + (i + 1), centroid.x, -centroid.y);
         }
 
         let uniqueHalfways = [];
-        for (let i = 0; i < this.anchorNodes.length; i++) {
-            for (let j = 0; j < this.anchorNodes[i].halfways.length; j++) {
-                let halfway = this.anchorNodes[i].halfways[j];
-                if (!uniqueHalfways.some(h => isWithinTolerance(h, halfway))) {
+        for (let anchorNode of this.anchorNodes)
+            for (let halfway of anchorNode.halfways)
+                if (!uniqueHalfways.some(h => isWithinTolerance(h, halfway)))
                     uniqueHalfways.push(halfway);
-                }
-            }
-        }
 
         let uniqueHalfwaysSorted = sortPointsByAngleAndDistance(uniqueHalfways);
-
         for (let i = 0; i < uniqueHalfwaysSorted.length; i++) {
             let halfway = uniqueHalfwaysSorted[i];
             ctx.text('h' + (i + 1), halfway.x, -halfway.y);
         }
 
         let uniqueVertices = [];
-        for (let i = 0; i < this.anchorNodes.length; i++) {
-            for (let j = 0; j < this.anchorNodes[i].vertices.length; j++) {
-                let vertex = this.anchorNodes[i].vertices[j];
-                if (!uniqueVertices.some(v => isWithinTolerance(v, vertex))) {
+        for (let anchorNode of this.anchorNodes)
+            for (let vertex of anchorNode.vertices)
+                if (!uniqueVertices.some(v => isWithinTolerance(v, vertex)))
                     uniqueVertices.push(vertex);
-                }
-            }
-        }
 
         let uniqueVerticesSorted = sortPointsByAngleAndDistance(uniqueVertices); 
-
         for (let i = 0; i < uniqueVerticesSorted.length; i++) {
             let vertex = uniqueVerticesSorted[i];
             ctx.text('v' + (i + 1), vertex.x, -vertex.y);
@@ -1051,38 +1031,29 @@ export class Tiling {
         
         const showDualConnectionsValue = get(showDualConnections);
         if (showDualConnectionsValue)
-            this.drawDualConnections(ctx, zoom, true);
-
-        ctx.pop();
+            this.drawDualConnections(ctx, true);
     }
 
-    show = (ctx, zoom, showConstructionPoints) => {
-        ctx.push();
-        ctx.translate(ctx.width / 2, ctx.height / 2);
-        ctx.scale(zoom);
-        
+    show = (ctx, showPolygonPoints) => {
         const lineWidthValue = get(lineWidth);
         if (lineWidthValue > 1) {
-            ctx.strokeWeight(lineWidthValue / zoom);
+            ctx.strokeWeight(lineWidthValue / get(controls).zoom);
             ctx.stroke(0, 0, 0);
         } else if (lineWidthValue === 0) {
             ctx.noStroke();
         } else {
-            ctx.strokeWeight(1 / zoom);
-            ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
+            ctx.strokeWeight(1 / get(controls).zoom);
+            ctx.stroke(0, 0, 0, lineWidthValue);
         }
         
-        // Draw all polygons
         for (let i = 0; i < this.nodes.length; i++) {
-            this.nodes[i].show(ctx, zoom, showConstructionPoints);
+            this.nodes[i].show(ctx, showPolygonPoints);
         }
         
         const showDualConnectionsValue = get(showDualConnections);
         if (showDualConnectionsValue)
-            this.drawDualConnections(ctx, zoom);
+            this.drawDualConnections(ctx);
         
-        ctx.pop();
-
         screenshotButtonHover.subscribe(hover => {
             if (hover) {
                 ctx.push();
@@ -1113,69 +1084,44 @@ export class Tiling {
         });
     }
 
-    drawDualConnections = (ctx, zoom, flipY = false) => {
-        this.calculateNeighbors(1, 'vonNeumann');
-
-        ctx.push();
-        ctx.strokeWeight(1 / zoom);
+    drawDualConnections = (ctx, flipY = false) => {
+        ctx.strokeWeight(1 / get(controls).zoom);
         ctx.stroke(0, 0, 0, 0.10);
         
-        const drawnConnections = new Set();
-        
-        for (let i = 0; i < this.nodes.length; i++) {
-            const node = this.nodes[i];
-            const neighbors = node.neighbors;
-            
-            if (!neighbors) continue;
-            
-            for (let j = 0; j < neighbors.length; j++) {
-                const neighbor = neighbors[j];
-                
-                const connectionKey = [node.centroid, neighbor.centroid].sort((a, b) => 
-                    a.x === b.x ? a.y - b.y : a.x - b.x
-                ).map(p => `${p.x},${p.y}`).join('|');
-                
-                if (!drawnConnections.has(connectionKey)) {
-                    ctx.line(
-                        node.centroid.x, 
-                        flipY ? -node.centroid.y : node.centroid.y, 
-                        neighbor.centroid.x, 
-                        flipY ? -neighbor.centroid.y : neighbor.centroid.y
-                    );
-                    drawnConnections.add(connectionKey);
-                }
+        for (let node of this.nodes) {        
+            for (let neighbor of node.dualNeighbors) {
+                ctx.line(
+                    node.centroid.x, 
+                    flipY ? -node.centroid.y : node.centroid.y, 
+                    neighbor.centroid.x, 
+                    flipY ? -neighbor.centroid.y : neighbor.centroid.y
+                );
             }
         }
-        
-        ctx.pop();
     }
 
-    showNeighbors = (ctx, zoom, showConstructionPoints) => {
-        ctx.push();
-        ctx.translate(ctx.width / 2, ctx.height / 2);
-        ctx.scale(zoom);
-        
+    showNeighbors = (ctx, showPolygonPoints) => {
         const lineWidthValue = get(lineWidth);
         if (lineWidthValue > 1) {
-            ctx.strokeWeight(lineWidthValue / zoom);
+            ctx.strokeWeight(lineWidthValue / get(controls).zoom);
             ctx.stroke(0, 0, 0);
         } else if (lineWidthValue === 0) {
             ctx.noStroke();
         } else {
-            ctx.strokeWeight(1 / zoom);
+            ctx.strokeWeight(1 / get(controls).zoom);
             ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
         }
         
-        const mouseWorldX = (ctx.mouseX - ctx.width / 2) / zoom;
-        const mouseWorldY = (-ctx.mouseY + ctx.height / 2) / zoom;
+        const mouseWorldX = (ctx.mouseX - ctx.width / 2) / get(controls).zoom;
+        const mouseWorldY = (-ctx.mouseY + ctx.height / 2) / get(controls).zoom;
         const mousePoint = { x: mouseWorldX, y: mouseWorldY };
         
         for (let node of this.nodes) {
             if (node.containsPoint(mousePoint)) {
-                node.show(ctx, zoom, showConstructionPoints, ctx.color(0, 0, 100));
+                node.show(ctx, showPolygonPoints, ctx.color(0, 0, 100));
 
                 for (let neighbor of node.neighbors) {
-                    neighbor.show(ctx, zoom, showConstructionPoints, ctx.color(240, 100, 100, 0.5));
+                    neighbor.show(ctx, showPolygonPoints, ctx.color(240, 100, 100, 0.5));
                     // ctx.line(
                     //     node.centroid.x,
                     //     node.centroid.y,
@@ -1202,9 +1148,7 @@ export class Tiling {
         
         const showDualConnectionsValue = get(showDualConnections);
         if (showDualConnectionsValue)
-            this.drawDualConnections(ctx, zoom);
-        
-        ctx.pop();
+            this.drawDualConnections(ctx);
     }
 
     setupGameOfLife = (ruleType, golRule, golRules) => {
@@ -1231,7 +1175,9 @@ export class Tiling {
     randomizeGameOfLifeGrid = () => {
         for (let i = 0; i < this.nodes.length; i++) {
             this.nodes[i].state = Math.random() < 0.5 ? 1 : 0;
+            this.nodes[i].nextState = 0;
             this.nodes[i].aliveNeighbors = 0;
+            this.nodes[i].behavior = 'decreasing';
         }
     }
 
@@ -1287,20 +1233,15 @@ export class Tiling {
     }
 
     updateGameOfLife = () => {
-        const toBinary = (test) => +(!!test);
-        
-        // Reset aliveNeighbors count for the next iteration
-        for (let i = 0; i < this.nodes.length; i++) {
+        for (let i = 0; i < this.nodes.length; i++)
             this.nodes[i].aliveNeighbors = 0;
-        }
         
-        // Count alive neighbors for each node
         for (let i = 0; i < this.nodes.length; i++) {
-            if (this.nodes[i].state === 1) {
-                for (let j = 0; j < this.nodes[i].neighbors.length; j++) {
-                    this.nodes[i].neighbors[j].aliveNeighbors++;
-                }
-            }
+            if (this.nodes[i].state !== 1)
+                continue;
+
+            for (let j = 0; j < this.nodes[i].neighbors.length; j++) 
+                this.nodes[i].neighbors[j].aliveNeighbors++;
         }
 
         for (let i = 0; i < this.nodes.length; i++) {
@@ -1325,50 +1266,74 @@ export class Tiling {
             }
 
             let aliveRate = node.aliveNeighbors / node.neighbors.length;
-            
-            const alive = state & 1;
-            
-            let hasBirthNeighbors = false;
-            if (nodeRule.birth.min !== undefined) {
-                if (nodeRule.birth.min <= 1 && nodeRule.birth.max <= 1) {
-                    hasBirthNeighbors = toBinary(nodeRule.birth.min <= aliveRate && nodeRule.birth.max >= aliveRate);
+                                
+            if (state === 1) {
+                let hasSurvivalNeighbors = false;
+                if (nodeRule.survival.min !== undefined) {
+                    if (nodeRule.survival.min <= 1 && nodeRule.survival.max <= 1) {
+                        hasSurvivalNeighbors = nodeRule.survival.min <= aliveRate && nodeRule.survival.max >= aliveRate;
+                    } else {
+                        hasSurvivalNeighbors = nodeRule.survival.min <= node.aliveNeighbors && nodeRule.survival.max >= node.aliveNeighbors;
+                        node.behavior = 'increasing';
+                    }
                 } else {
-                    hasBirthNeighbors = toBinary(nodeRule.birth.min <= node.aliveNeighbors && nodeRule.birth.max >= node.aliveNeighbors);
+                    hasSurvivalNeighbors = nodeRule.survival.includes(node.aliveNeighbors);
+                    node.behavior = 'increasing';
                 }
-            } else {
-                hasBirthNeighbors = toBinary(nodeRule.birth.includes(node.aliveNeighbors));
+
+                if (hasSurvivalNeighbors) {
+                    node.nextState = 1;
+                } else {
+                    node.nextState = 0;
+                    node.behavior = 'decreasing';
+                }
             }
 
-            let hasSurvivalNeighbors = false;
-            if (nodeRule.survival.min !== undefined) {
-                if (nodeRule.survival.min <= 1 && nodeRule.survival.max <= 1) {
-                    hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= aliveRate && nodeRule.survival.max >= aliveRate);
+            else if (state === 0) {
+                let hasBirthNeighbors = false;
+                if (nodeRule.birth.min !== undefined) {
+                    if (nodeRule.birth.min <= 1 && nodeRule.birth.max <= 1) {
+                        hasBirthNeighbors = nodeRule.birth.min <= aliveRate && nodeRule.birth.max >= aliveRate;
+                    } else {
+                        hasBirthNeighbors = nodeRule.birth.min <= node.aliveNeighbors && nodeRule.birth.max >= node.aliveNeighbors;
+                        if (hasBirthNeighbors) {
+                            node.behavior = 'increasing';
+                        } else {
+                            if (
+                                node.aliveNeighbors == nodeRule.birth.min - 1 ||
+                                node.aliveNeighbors == nodeRule.birth.max + 1
+                            ) {
+                                node.behavior = 'chaotic';
+                            } else {
+                                node.behavior = 'increasing';
+                            }
+                        }
+                    }
                 } else {
-                    hasSurvivalNeighbors = toBinary(nodeRule.survival.min <= node.aliveNeighbors && nodeRule.survival.max >= node.aliveNeighbors);
+                    hasBirthNeighbors = nodeRule.birth.includes(node.aliveNeighbors);
+                    if (hasBirthNeighbors) {
+                        node.behavior = 'increasing';
+                    } else {
+                        let edge = nodeRule.birth.includes(node.aliveNeighbors + 1) || nodeRule.birth.includes(node.aliveNeighbors - 1);
+                        node.behavior = edge ? 'chaotic' : 'decreasing';
+                    }
                 }
-            } else {
-                hasSurvivalNeighbors = toBinary(nodeRule.survival.includes(node.aliveNeighbors));
-            }
-            
-            const keep = (hasBirthNeighbors & (alive ^ 1)) | (hasSurvivalNeighbors & alive);
 
-            node.nextState = (keep * 1) | ((keep ^ 1) & alive) * 2;
+                if (hasBirthNeighbors) {
+                    node.nextState = 1;
+                } else {
+                    node.nextState = 0;
+                }
+            }
         }
 
-        for (let i = 0; i < this.nodes.length; i++) {
+        for (let i = 0; i < this.nodes.length; i++)
             this.nodes[i].state = this.nodes[i].nextState;
-        }
     }
 
-    drawGameOfLife = (ctx, zoom) => {
-        ctx.push();
-        ctx.translate(ctx.width / 2, ctx.height / 2);
-        ctx.scale(zoom);
-        
+    drawGameOfLife = (ctx) => {
         for (let i = 0; i < this.nodes.length; i++)
-            this.nodes[i].showGameOfLife(ctx, zoom, this.golRuleType, this.parsedGolRule, this.rules);
-        
-        ctx.pop();
+            this.nodes[i].showGameOfLife(ctx, this.golRuleType, this.parsedGolRule, this.rules);
     }
 
     exportGraph = () => {

@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { Vector } from '$lib/classes/Vector.svelte';
 
 export let golRule = writable('B3/S23'); // Conway's Game of Life with 6 generations
 export let golRules = writable({});
@@ -14,7 +15,13 @@ export let selectedTiling = writable({
 });
 export let isDual = writable(false);
 export let transformSteps = writable(5);
-export let zoom = writable(50);
+export let controls = writable({
+	zoom: 50,
+	targetZoom: 50,
+	offset: new Vector(0, 0),
+	targetOffset: new Vector(0, 0),
+	dampening: 0.2
+});
 export let speed = writable(20);
 export let parameter = writable(45);
 export let lineWidth = writable(1);
@@ -24,9 +31,11 @@ export let activeTab = writable('Tilings');
 export let debugView = writable(false);
 export let screenshotButtonHover = writable(false);
 
+export let showPolygonPoints = writable(false);
 export let showConstructionPoints = writable(false);
-export let showInfo = writable(false);
+export let showChart = writable(false);
 export let showCR = writable(false);
+export let liveChartMode = writable('count');
 // export let screenshotSize = writable(600);
 
 export const tolerance = 0.01;

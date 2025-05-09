@@ -1,4 +1,4 @@
-import { tolerance, lineWidth, colorParams } from '$lib/stores/configuration.js';
+import { tolerance, lineWidth, colorParams, liveChartMode, controls } from '$lib/stores/configuration.js';
 import { Vector } from '$lib/classes/Vector.svelte.js';
 import { map } from '$lib/utils/math.svelte.js';
 import { get } from 'svelte/store';
@@ -24,10 +24,10 @@ export class Polygon {
         let inside = false;
         
         for (let i = 0, j = this.vertices.length - 1; i < this.vertices.length; j = i++) {
-            const xi = this.vertices[i].x;
-            const yi = this.vertices[i].y;
-            const xj = this.vertices[j].x;
-            const yj = this.vertices[j].y;
+            const xi = this.vertices[i].x + get(controls).offset.x / get(controls).zoom;
+            const yi = this.vertices[i].y - get(controls).offset.y / get(controls).zoom;
+            const xj = this.vertices[j].x + get(controls).offset.x / get(controls).zoom;
+            const yj = this.vertices[j].y - get(controls).offset.y / get(controls).zoom;
             
             const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
             
@@ -38,7 +38,7 @@ export class Polygon {
         return inside;
     }
 
-    show = (ctx, zoom, showConstructionPoints, customColor = null) => {
+    show = (ctx, showPolygonPoints, customColor = null) => {
         if (this.centroid.x < -ctx.width / 2 - 10 || this.centroid.y < -ctx.height / 2 - 10 || this.centroid.x > ctx.width / 2 + 10 || this.centroid.y > ctx.height / 2 + 10)
             return;
 
@@ -48,12 +48,12 @@ export class Polygon {
         
         const lineWidthValue = get(lineWidth);
         if (lineWidthValue > 1) {
-            ctx.strokeWeight(lineWidthValue / zoom);
+            ctx.strokeWeight(lineWidthValue / get(controls).zoom);
             ctx.stroke(0, 0, 0);
         } else if (lineWidthValue === 0) {
             ctx.noStroke();
         } else {
-            ctx.strokeWeight(1 / zoom);
+            ctx.strokeWeight(1 / get(controls).zoom);
             ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
         }
         
@@ -64,46 +64,56 @@ export class Polygon {
         }
         ctx.endShape(ctx.CLOSE);
         
-        if (showConstructionPoints) {
+        if (showPolygonPoints) {
             ctx.fill(0, 100, 100);
-            ctx.ellipse(this.centroid.x, this.centroid.y, 5 / zoom);
+            ctx.ellipse(this.centroid.x, this.centroid.y, 5 / get(controls).zoom);
             
             ctx.fill(120, 100, 100);
             for (let i = 0; i < this.halfways.length; i++) {
-                ctx.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / zoom);
+                ctx.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / get(controls).zoom);
             }
             
             ctx.fill(240, 100, 100);
             for (let i = 0; i < this.vertices.length; i++) {
-                ctx.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / zoom);
+                ctx.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / get(controls).zoom);
             }
         }
         ctx.pop();
     }
 
-    showGameOfLife = (ctx, zoom, ruleType, parsedGolRule, rules) => {
+    showGameOfLife = (ctx, ruleType, parsedGolRule, rules) => {
         ctx.push();
         
         const lineWidthValue = get(lineWidth);
         if (lineWidthValue > 1) {
-            ctx.strokeWeight(lineWidthValue / zoom);
+            ctx.strokeWeight(lineWidthValue / get(controls).zoom);
             ctx.stroke(0, 0, 0);
         } else if (lineWidthValue === 0) {
             ctx.noStroke();
         } else {
-            ctx.strokeWeight(1 / zoom);
+            ctx.strokeWeight(1 / get(controls).zoom);
             ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
         }
         
-        if (this.state === 0) {
-            ctx.fill(0, 0, 100);
-        } else if (this.state === 1) {
-            ctx.fill(0, 0, 0);
+        if (get(liveChartMode) === 'count') {
+            if (this.state === 0) {
+                ctx.fill(0, 0, 100);
+            } else if (this.state === 1) {
+                ctx.fill(0, 0, 0);
+            } else {
+                const maxGenerations = ruleType === 'Single' ? parsedGolRule.generations : rules[this.n].generations;
+                const progress = (this.state - 1) / (maxGenerations - 1);
+                const brightness = progress * 100;
+                ctx.fill(0, 0, brightness);
+            }
         } else {
-            const maxGenerations = ruleType === 'Single' ? parsedGolRule.generations : rules[this.n].generations;
-            const progress = (this.state - 1) / (maxGenerations - 1);
-            const brightness = progress * 100;
-            ctx.fill(0, 0, brightness);
+            if (this.behavior === 'decreasing') {
+                ctx.fill(0, 0, 100);
+            } else if (this.behavior === 'increasing') {
+                ctx.fill(0, 0, 0);
+            } else {
+                ctx.fill(345, 50, 100);
+            }
         }
 
         ctx.beginShape();

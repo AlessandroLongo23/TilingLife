@@ -1,5 +1,5 @@
 <script>
-    import { ruleType, parameter, selectedTiling, showCR, debugView, zoom, transformSteps, patch, golRule, golRules, showConstructionPoints, showInfo, speed, screenshotButtonHover } from '$lib/stores/configuration.js';
+    import { ruleType, parameter, selectedTiling, showCR, debugView, controls, transformSteps, patch, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover } from '$lib/stores/configuration.js';
     import { debugManager, debugStore, updateDebugStore } from '$lib/stores/debug.js';
     import { sortPointsByAngleAndDistance } from '$lib/utils/geometry.svelte';
     import { isWithinTolerance } from '$lib/utils/math.svelte';
@@ -19,12 +19,14 @@
         showExtra = true
     } = $props();
 
+    let grab = $state(false);
     let frameMod = $derived(60 / $speed);
     let takeScreenshot = $state(false);
     let showNotification = $state(false);
     let notificationMessage = $state('');
     let alivePercentage = $state(0);
     let iterationCount = $state(0);
+    let behaviorData = $state({ increasing: 0, chaotic: 0, decreasing: 0 });
     
     let canvasElement = $state(null);
 
@@ -94,6 +96,9 @@
             canvasElement = p5;
             p5.colorMode(p5.HSB, 360, 100, 100);
             
+            $controls.targetZoom = $controls.zoom;
+            $controls.targetOffset = $controls.offset.copy();
+            
             tiling = new Tiling();
             try {
                 tiling.parseRule($selectedTiling.rulestring);
@@ -114,8 +119,13 @@
         }
 
         p5.draw = () => {
+            $controls.zoom += ($controls.targetZoom - $controls.zoom) * $controls.dampening;
+            $controls.offset.add(Vector.sub($controls.targetOffset, $controls.offset).scale($controls.dampening));
+            
             p5.push();
-            p5.translate(0, p5.height);
+            p5.translate(p5.width / 2, p5.height / 2);
+            p5.translate($controls.offset.x, $controls.offset.y);
+            p5.scale($controls.zoom);
             p5.scale(1, -1);
             p5.background(240, 7, 16);
 
@@ -135,17 +145,43 @@
                         if (p5.frameCount % Math.round(frameMod) == 0) {
                             tiling.updateGameOfLife();
                             alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
+                            
+                            // Update behavior data
+                            const totalNodes = tiling.nodes.length;
+                            const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
+                            const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
+                            const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
+                            
+                            behaviorData = {
+                                increasing: (increasingNodes / totalNodes) * 100,
+                                chaotic: (chaoticNodes / totalNodes) * 100,
+                                decreasing: (decreasingNodes / totalNodes) * 100
+                            };
+                            
                             iterationCount++;
                         }
                     } else {
                         for (let s = 0; s < Math.round(1 / frameMod); s++) {
                             tiling.updateGameOfLife();
                             alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
+                            
+                            // Update behavior data
+                            const totalNodes = tiling.nodes.length;
+                            const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
+                            const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
+                            const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
+                            
+                            behaviorData = {
+                                increasing: (increasingNodes / totalNodes) * 100,
+                                chaotic: (chaoticNodes / totalNodes) * 100,
+                                decreasing: (decreasingNodes / totalNodes) * 100
+                            };
+                            
                             iterationCount++;
                         }
                     }
 
-                    tiling.drawGameOfLife(p5, $zoom);
+                    tiling.drawGameOfLife(p5);
                     p5.pop();
                 } else {
                     if (
@@ -161,11 +197,12 @@
                         crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
                     }
 
-                    tiling.show(p5, $zoom, $showConstructionPoints);
-                    if ($showInfo) {
-                        tiling.drawInfo(p5, $zoom);
-                    }
-                    tiling.showNeighbors(p5, $zoom, $showConstructionPoints);
+                    tiling.show(p5, $showPolygonPoints);
+
+                    if ($showConstructionPoints)
+                        tiling.drawConstructionPoints(p5);
+                    
+                    // tiling.showNeighbors(p5, $showPolygonPoints);
                     p5.pop();
 
                     if ($showCR)
@@ -178,6 +215,12 @@
                 }
             } catch (e) {
                 console.error(e);
+            }
+
+            if (grab) {
+                const mouse = new Vector(p5.mouseX, p5.mouseY);
+                const prevMouse = new Vector(p5.pmouseX, p5.pmouseY);
+                $controls.targetOffset.add(Vector.sub(mouse, prevMouse));
             }
             
             prevWidth = width;
@@ -211,9 +254,26 @@
         }
         
         p5.mousePressed = (event) => {
-            if (!$showCR) return;
-            
             if (event && event.target !== p5.canvas) return;
+
+            if (event.button === 1) {
+                const mouse = new Vector(p5.mouseX - p5.width/2, p5.mouseY - p5.height/2);
+                const worldPoint = Vector.sub(mouse, $controls.targetOffset).scale(1 / $controls.targetZoom);
+                $controls.targetOffset.set(Vector.sub(new Vector(0, 0), Vector.scale(worldPoint, $controls.targetZoom)));
+                return;
+            }
+
+            if (event.button === 2) {
+                event.preventDefault();
+                event.stopPropagation();
+                $controls.targetOffset.set(new Vector(0, 0));
+                $controls.targetZoom = 50;
+                return;
+            }
+
+            grab = true;
+
+            if (!$showCR) return;
             
             for (let i = 0; i < crCanvases.length; i++) {
                 const x = patch.padding + i * (patch.size.x + patch.padding);
@@ -232,6 +292,10 @@
                     break;
                 }
             }
+        }
+
+        p5.mouseReleased = () => {
+            grab = false;
         }
 
         p5.isSameRule = (prev, current) => {
@@ -263,15 +327,22 @@
         p5.mouseWheel = (event) => {
             if (event && event.target !== p5.canvas) return;
 
+            const mouse = new Vector(p5.mouseX - p5.width / 2, p5.mouseY - p5.height / 2);
+            const world = Vector.sub(mouse, $controls.targetOffset).scale(1 / $controls.targetZoom);
+            
             if (event.deltaY > 0) {
-                $zoom /= 1.10;
-            } else {
-                $zoom *= 1.10;
+                $controls.targetZoom /= 1.10;
+                $controls.targetZoom = Math.max($controls.targetZoom, 10);
+            } else if (event.deltaY < 0) {
+                $controls.targetZoom *= 1.10;
+                $controls.targetZoom = Math.min($controls.targetZoom, 150);
             }
-
-            $zoom = Math.max(10, Math.min($zoom, 150));
+            
+            const newScreen = Vector.add(Vector.scale(world, $controls.targetZoom), $controls.targetOffset);
+            
+            $controls.targetOffset.add(Vector.sub(mouse, newScreen));
         }
-        
+
         p5.takeScreenshot = () => {
             const filename = `${$selectedTiling.rulestring}.png`;
             
@@ -282,12 +353,13 @@
             screenshotCanvas.translate(0, 600);
             screenshotCanvas.scale(1, -1);
             
+            
             screenshotCanvas.background(240, 7, 16);
             
             screenshotCanvas.translate(300, 300);
             
             screenshotCanvas.stroke(0);
-            screenshotCanvas.strokeWeight(2 / $zoom);
+            screenshotCanvas.strokeWeight(2 / $controls.zoom);
 
             let maxX = 0;
             let maxY = 0;
@@ -303,7 +375,7 @@
                 }
             }
 
-            screenshotCanvas.scale($zoom);
+            screenshotCanvas.scale($controls.zoom);
             screenshotCanvas.translate(-(maxX + minX) / 2, -(maxY + minY) / 2);
             
             for (let i = 0; i < tiling.nodes.length; i++) {
@@ -318,8 +390,8 @@
                 screenshotCanvas.pop();
             }
             
-            if ($showInfo) {
-                const drawInfoOnScreenshot = () => {
+            if ($showConstructionPoints) {
+                const drawConstructionPointsOnScreenshot = () => {
                     let uniqueCentroids = [];
                     for (let i = 0; i < tiling.anchorNodes.length; i++) {
                         let centroid = tiling.anchorNodes[i].centroid;
@@ -369,22 +441,22 @@
                     }
                 };
                 
-                drawInfoOnScreenshot();
+                drawConstructionPointsOnScreenshot();
             }
             
-            if ($showConstructionPoints) {
+            if ($showPolygonPoints) {
                 for (let i = 0; i < tiling.nodes.length; i++) {
                     screenshotCanvas.fill(0, 40, 100);
-                    screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5 / $zoom);
+                    screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5 / $controls.zoom);
                     
                     screenshotCanvas.fill(120, 40, 100);
                     for (let j = 0; j < tiling.nodes[i].halfways.length; j++) {
-                        screenshotCanvas.ellipse(tiling.nodes[i].halfways[j].x, tiling.nodes[i].halfways[j].y, 5 / $zoom);
+                        screenshotCanvas.ellipse(tiling.nodes[i].halfways[j].x, tiling.nodes[i].halfways[j].y, 5 / $controls.zoom);
                     }
                     
                     screenshotCanvas.fill(240, 40, 100);
                     for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
-                        screenshotCanvas.ellipse(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y, 5 / $zoom);
+                        screenshotCanvas.ellipse(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y, 5 / $controls.zoom);
                     }
                 }
             }
@@ -399,7 +471,7 @@
                 showNotification = false;
             }, 3000);
         }
-	};
+    };
 
     let canvasContainer = $state();
     let p5;
@@ -411,7 +483,7 @@
 </script>
 
 <div class="relative h-full w-full">
-    <div class="cursor-pointer" bind:this={canvasContainer}></div>
+    <div class="cursor-pointer" bind:this={canvasContainer} oncontextmenu={(e) => e.preventDefault()}></div>
     
     {#if showExtra}
         {#if !showGameOfLife}
@@ -468,7 +540,11 @@
                 </button>
                 
                 <div class="w-72">
-                    <LiveChart bind:alivePercentage={alivePercentage} bind:iterationCount={iterationCount}/>
+                    <LiveChart 
+                        bind:alivePercentage={alivePercentage} 
+                        bind:iterationCount={iterationCount} 
+                        bind:behaviorData={behaviorData}
+                    />
                 </div>
             </div>
         {/if}
@@ -495,10 +571,11 @@
 
 {#if showExtra}
     <div class="flex flex-col gap-3">
-        {#if showInfo}
+        {#if showChart}
             <LiveChart 
                 bind:alivePercentage={alivePercentage}
                 bind:iterationCount={iterationCount}
+                bind:behaviorData={behaviorData}
             />
         {/if}
     </div>
