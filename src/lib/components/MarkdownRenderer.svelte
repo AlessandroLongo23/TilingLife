@@ -1,6 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { createEventDispatcher } from 'svelte';
+	import katex from 'katex';
+	import 'katex/dist/katex.min.css';
 	
 	let { content = '', targetSection = '' } = $props();
 	
@@ -24,11 +26,57 @@
 	}
 	
 	// Initialize MathJax on content changes
+	// $effect(() => {
+	// 	if (content && typeof window !== 'undefined' && window.MathJax) {
+	// 		// Allow content to be rendered first, then process math
+	// 		setTimeout(() => {
+	// 			window.MathJax.typeset();
+	// 			setTableColumnCounts();
+	// 		}, 100);
+	// 	}
+	// });
+	
+	// Process LaTeX with KaTeX
 	$effect(() => {
-		if (content && typeof window !== 'undefined' && window.MathJax) {
-			// Allow content to be rendered first, then process math
+		if (content && containerElement) {
+			// Allow content to be rendered first, then process LaTeX
 			setTimeout(() => {
-				window.MathJax.typeset();
+				// Find all inline math expressions ($...$) and block math expressions ($$...$$)
+				const container = containerElement.querySelector('#content-container');
+				if (!container) return;
+				
+				// Process inline math expressions
+				const inlineMathElements = container.querySelectorAll('p, li, th, td');
+				inlineMathElements.forEach(el => {
+					const text = el.innerHTML;
+					// Look for $...$ but not $$...$$
+					const regex = /\$([^\$]+)\$/g;
+					
+					if (regex.test(text)) {
+						el.innerHTML = text.replace(regex, (match, latex) => {
+							try {
+								return katex.renderToString(latex, { displayMode: false });
+							} catch (e) {
+								console.error('KaTeX error:', e);
+								return match;
+							}
+						});
+					}
+				});
+				
+				// Process block math expressions
+				const blockRegex = /\$\$([\s\S]+?)\$\$/g;
+				const blockMatches = [...container.innerHTML.matchAll(blockRegex)];
+				
+				blockMatches.forEach(match => {
+					try {
+						const rendered = katex.renderToString(match[1], { displayMode: true });
+						container.innerHTML = container.innerHTML.replace(match[0], rendered);
+					} catch (e) {
+						console.error('KaTeX block error:', e);
+					}
+				});
+				
 				setTableColumnCounts();
 			}, 100);
 		}
@@ -73,14 +121,14 @@
 	
 	onMount(() => {
 		if (containerElement) {
-			setTimeout(() => {
-				handleScroll({ target: containerElement });
-				// Initial MathJax typesetting
-				if (typeof window !== 'undefined' && window.MathJax) {
-					window.MathJax.typeset();
-				}
-				setTableColumnCounts();
-			}, 100);
+			// setTimeout(() => {
+			// 	handleScroll({ target: containerElement });
+			// 	// Initial MathJax typesetting
+			// 	if (typeof window !== 'undefined' && window.MathJax) {
+			// 		window.MathJax.typeset();
+			// 	}
+			// 	setTableColumnCounts();
+			// }, 100);
 		}
 	});
 </script>
@@ -219,12 +267,27 @@
 		margin: 0 auto;
 	}
 	
-	/* MathJax styling */
-	:global(.markdown-content .MathJax) {
+	/* MathJax styling (commented) */
+	/* :global(.markdown-content .MathJax) {
 		@apply text-zinc-200;
 	}
 
 	:global(.markdown-content mjx-container) {
 		@apply overflow-x-auto overflow-y-hidden my-6;
+	} */
+	
+	/* KaTeX styling */
+	:global(.markdown-content .katex) {
+		@apply text-zinc-200;
+		font-size: 1.1em;
+	}
+	
+	:global(.markdown-content .katex-display) {
+		@apply overflow-x-auto overflow-y-hidden my-6 px-2;
+	}
+	
+	:global(.markdown-content .katex-display > .katex) {
+		@apply text-zinc-100;
+		font-size: 1.21em;
 	}
 </style> 

@@ -1,4 +1,4 @@
-import { possibleSides, possibleAngles, tolerance, parameter, debugView, transformSteps, offsets, screenshotButtonHover } from '$lib/stores/configuration.js';
+import { tolerance, parameter, debugView, transformSteps, offsets, screenshotButtonHover, lineWidth, showDualConnections } from '$lib/stores/configuration.js';
 import { sortPointsByAngleAndDistance, getClockwiseAngle } from '$lib/utils/geometry.svelte';
 import { RegularPolygon, StarPolygon, DualPolygon} from '$lib/classes/Polygon.svelte';
 import { debugManager, updateDebugStore } from '$lib/stores/debug.js';
@@ -6,6 +6,7 @@ import { apothem, angleBetween } from '$lib/utils/geometry.svelte';
 import { getSpatialKey } from '$lib/utils/optimizing.svelte';
 import { isWithinTolerance } from '$lib/utils/math.svelte';
 import { Vector } from '$lib/classes/Vector.svelte.js';
+import { get } from 'svelte/store';
 
 export class Tiling {
     constructor() {
@@ -986,13 +987,14 @@ export class Tiling {
         return uniqueNodes;
     }
 
-    drawInfo = (ctx, side) => {
+    drawInfo = (ctx, zoom) => {
         ctx.push();
         ctx.translate(0, ctx.height);
         ctx.scale(1, -1);
         ctx.translate(ctx.width / 2, ctx.height / 2);
-        ctx.scale(side);
+        ctx.scale(zoom);
         
+        // Drawing the standard info labels
         let uniqueCentroids = [];
 
         for (let i = 0; i < this.anchorNodes.length; i++) {
@@ -1005,7 +1007,7 @@ export class Tiling {
         let uniqueCentroidsSorted = sortPointsByAngleAndDistance(uniqueCentroids);
         uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, new Vector()));
         
-        ctx.textSize(12 / side);
+        ctx.textSize(12 / zoom);
         ctx.fill(0, 0, 100);
         
         for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
@@ -1046,19 +1048,39 @@ export class Tiling {
             let vertex = uniqueVerticesSorted[i];
             ctx.text('v' + (i + 1), vertex.x, -vertex.y);
         }
+        
+        const showDualConnectionsValue = get(showDualConnections);
+        if (showDualConnectionsValue)
+            this.drawDualConnections(ctx, zoom, true);
 
         ctx.pop();
     }
 
-    show = (ctx, side, showConstructionPoints) => {
+    show = (ctx, zoom, showConstructionPoints) => {
         ctx.push();
         ctx.translate(ctx.width / 2, ctx.height / 2);
-        ctx.scale(side);
-        ctx.strokeWeight(2 / side);
-        ctx.stroke(0);
-        for (let i = 0; i < this.nodes.length; i++) {
-            this.nodes[i].show(ctx, side, showConstructionPoints);
+        ctx.scale(zoom);
+        
+        const lineWidthValue = get(lineWidth);
+        if (lineWidthValue > 1) {
+            ctx.strokeWeight(lineWidthValue / zoom);
+            ctx.stroke(0, 0, 0);
+        } else if (lineWidthValue === 0) {
+            ctx.noStroke();
+        } else {
+            ctx.strokeWeight(1 / zoom);
+            ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
         }
+        
+        // Draw all polygons
+        for (let i = 0; i < this.nodes.length; i++) {
+            this.nodes[i].show(ctx, zoom, showConstructionPoints);
+        }
+        
+        const showDualConnectionsValue = get(showDualConnections);
+        if (showDualConnectionsValue)
+            this.drawDualConnections(ctx, zoom);
+        
         ctx.pop();
 
         screenshotButtonHover.subscribe(hover => {
@@ -1091,23 +1113,69 @@ export class Tiling {
         });
     }
 
-    showNeighbors = (ctx, side, showConstructionPoints) => {
+    drawDualConnections = (ctx, zoom, flipY = false) => {
+        this.calculateNeighbors(1, 'vonNeumann');
+
+        ctx.push();
+        ctx.strokeWeight(1 / zoom);
+        ctx.stroke(0, 0, 0, 0.10);
+        
+        const drawnConnections = new Set();
+        
+        for (let i = 0; i < this.nodes.length; i++) {
+            const node = this.nodes[i];
+            const neighbors = node.neighbors;
+            
+            if (!neighbors) continue;
+            
+            for (let j = 0; j < neighbors.length; j++) {
+                const neighbor = neighbors[j];
+                
+                const connectionKey = [node.centroid, neighbor.centroid].sort((a, b) => 
+                    a.x === b.x ? a.y - b.y : a.x - b.x
+                ).map(p => `${p.x},${p.y}`).join('|');
+                
+                if (!drawnConnections.has(connectionKey)) {
+                    ctx.line(
+                        node.centroid.x, 
+                        flipY ? -node.centroid.y : node.centroid.y, 
+                        neighbor.centroid.x, 
+                        flipY ? -neighbor.centroid.y : neighbor.centroid.y
+                    );
+                    drawnConnections.add(connectionKey);
+                }
+            }
+        }
+        
+        ctx.pop();
+    }
+
+    showNeighbors = (ctx, zoom, showConstructionPoints) => {
         ctx.push();
         ctx.translate(ctx.width / 2, ctx.height / 2);
-        ctx.scale(side);
-        ctx.stroke(0);
-        ctx.strokeWeight(1 / side);
+        ctx.scale(zoom);
         
-        const mouseWorldX = (ctx.mouseX - ctx.width / 2) / side;
-        const mouseWorldY = (-ctx.mouseY + ctx.height / 2) / side;
+        const lineWidthValue = get(lineWidth);
+        if (lineWidthValue > 1) {
+            ctx.strokeWeight(lineWidthValue / zoom);
+            ctx.stroke(0, 0, 0);
+        } else if (lineWidthValue === 0) {
+            ctx.noStroke();
+        } else {
+            ctx.strokeWeight(1 / zoom);
+            ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
+        }
+        
+        const mouseWorldX = (ctx.mouseX - ctx.width / 2) / zoom;
+        const mouseWorldY = (-ctx.mouseY + ctx.height / 2) / zoom;
         const mousePoint = { x: mouseWorldX, y: mouseWorldY };
         
         for (let node of this.nodes) {
             if (node.containsPoint(mousePoint)) {
-                node.show(ctx, side, showConstructionPoints, ctx.color(0, 0, 100));
+                node.show(ctx, zoom, showConstructionPoints, ctx.color(0, 0, 100));
 
                 for (let neighbor of node.neighbors) {
-                    neighbor.show(ctx, side, showConstructionPoints, ctx.color(240, 100, 100, 0.5));
+                    neighbor.show(ctx, zoom, showConstructionPoints, ctx.color(240, 100, 100, 0.5));
                     // ctx.line(
                     //     node.centroid.x,
                     //     node.centroid.y,
@@ -1131,6 +1199,11 @@ export class Tiling {
                 );
             }
         }
+        
+        const showDualConnectionsValue = get(showDualConnections);
+        if (showDualConnectionsValue)
+            this.drawDualConnections(ctx, zoom);
+        
         ctx.pop();
     }
 
@@ -1230,14 +1303,12 @@ export class Tiling {
             }
         }
 
-        // Calculate next state for each node
         for (let i = 0; i < this.nodes.length; i++) {
             const node = this.nodes[i];
             const state = node.state;
             
-            // Verify node has neighbors before calculating rules
             if (!node.neighbors || node.neighbors.length === 0) {
-                node.nextState = 0; // Default to dead if no neighbors
+                node.nextState = 0;
                 continue;
             }
             
@@ -1284,19 +1355,19 @@ export class Tiling {
             node.nextState = (keep * 1) | ((keep ^ 1) & alive) * 2;
         }
 
-        // Apply next states
         for (let i = 0; i < this.nodes.length; i++) {
             this.nodes[i].state = this.nodes[i].nextState;
         }
     }
 
-    drawGameOfLife = (ctx, side) => {
+    drawGameOfLife = (ctx, zoom) => {
         ctx.push();
         ctx.translate(ctx.width / 2, ctx.height / 2);
-        ctx.scale(side);
-        for (let i = 0; i < this.nodes.length; i++) {
-            this.nodes[i].showGameOfLife(ctx, side, this.golRuleType, this.parsedGolRule, this.rules);
-        }
+        ctx.scale(zoom);
+        
+        for (let i = 0; i < this.nodes.length; i++)
+            this.nodes[i].showGameOfLife(ctx, zoom, this.golRuleType, this.parsedGolRule, this.rules);
+        
         ctx.pop();
     }
 

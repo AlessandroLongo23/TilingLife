@@ -1,15 +1,16 @@
 <script>
-    import { ruleType, parameter, selectedTiling, showCR, debugView, side, transformSteps, patch, golRule, golRules, showConstructionPoints, showInfo, speed, screenshotButtonHover } from '$lib/stores/configuration.js';
+    import { ruleType, parameter, selectedTiling, showCR, debugView, zoom, transformSteps, patch, golRule, golRules, showConstructionPoints, showInfo, speed, screenshotButtonHover } from '$lib/stores/configuration.js';
     import { debugManager, debugStore, updateDebugStore } from '$lib/stores/debug.js';
-    import { isWithinTolerance } from '$lib/utils/math.svelte';
     import { sortPointsByAngleAndDistance } from '$lib/utils/geometry.svelte';
+    import { isWithinTolerance } from '$lib/utils/math.svelte';
     import { Vector } from '$lib/classes/Vector.svelte.js';
-    import * as ls from 'lucide-svelte';
     import { Tiling } from '$lib/classes/Tiling.svelte.js';
     import { Cr } from '$lib/classes/Cr.svelte.js';
+    import * as ls from 'lucide-svelte';
     import { onMount } from 'svelte';
 
     import LiveChart from '$lib/components/LiveChart.svelte';
+    import ColorPad from '$lib/components/ColorPad.svelte';
 
     let {
         width = 600,
@@ -144,7 +145,7 @@
                         }
                     }
 
-                    tiling.drawGameOfLife(p5, $side);
+                    tiling.drawGameOfLife(p5, $zoom);
                     p5.pop();
                 } else {
                     if (
@@ -160,11 +161,11 @@
                         crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
                     }
 
-                    tiling.show(p5, $side, $showConstructionPoints);
+                    tiling.show(p5, $zoom, $showConstructionPoints);
                     if ($showInfo) {
-                        tiling.drawInfo(p5, $side);
+                        tiling.drawInfo(p5, $zoom);
                     }
-                    tiling.showNeighbors(p5, $side, $showConstructionPoints);
+                    tiling.showNeighbors(p5, $zoom, $showConstructionPoints);
                     p5.pop();
 
                     if ($showCR)
@@ -258,6 +259,18 @@
                 prevHeight = height;
             }
         }
+
+        p5.mouseWheel = (event) => {
+            if (event && event.target !== p5.canvas) return;
+
+            if (event.deltaY > 0) {
+                $zoom /= 1.10;
+            } else {
+                $zoom *= 1.10;
+            }
+
+            $zoom = Math.max(10, Math.min($zoom, 150));
+        }
         
         p5.takeScreenshot = () => {
             const filename = `${$selectedTiling.rulestring}.png`;
@@ -274,7 +287,7 @@
             screenshotCanvas.translate(300, 300);
             
             screenshotCanvas.stroke(0);
-            screenshotCanvas.strokeWeight(2 / $side);
+            screenshotCanvas.strokeWeight(2 / $zoom);
 
             let maxX = 0;
             let maxY = 0;
@@ -290,7 +303,7 @@
                 }
             }
 
-            screenshotCanvas.scale($side);
+            screenshotCanvas.scale($zoom);
             screenshotCanvas.translate(-(maxX + minX) / 2, -(maxY + minY) / 2);
             
             for (let i = 0; i < tiling.nodes.length; i++) {
@@ -362,16 +375,16 @@
             if ($showConstructionPoints) {
                 for (let i = 0; i < tiling.nodes.length; i++) {
                     screenshotCanvas.fill(0, 40, 100);
-                    screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5 / $side);
+                    screenshotCanvas.ellipse(tiling.nodes[i].centroid.x, tiling.nodes[i].centroid.y, 5 / $zoom);
                     
                     screenshotCanvas.fill(120, 40, 100);
                     for (let j = 0; j < tiling.nodes[i].halfways.length; j++) {
-                        screenshotCanvas.ellipse(tiling.nodes[i].halfways[j].x, tiling.nodes[i].halfways[j].y, 5 / $side);
+                        screenshotCanvas.ellipse(tiling.nodes[i].halfways[j].x, tiling.nodes[i].halfways[j].y, 5 / $zoom);
                     }
                     
                     screenshotCanvas.fill(240, 40, 100);
                     for (let j = 0; j < tiling.nodes[i].vertices.length; j++) {
-                        screenshotCanvas.ellipse(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y, 5 / $side);
+                        screenshotCanvas.ellipse(tiling.nodes[i].vertices[j].x, tiling.nodes[i].vertices[j].y, 5 / $zoom);
                     }
                 }
             }
@@ -398,7 +411,7 @@
 </script>
 
 <div class="relative h-full w-full">
-    <div bind:this={canvasContainer}></div>
+    <div class="cursor-pointer" bind:this={canvasContainer}></div>
     
     {#if showExtra}
         {#if !showGameOfLife}
@@ -439,6 +452,10 @@
                     <ls.Workflow />
                     Export Graph
                 </button>
+            </div>
+
+            <div class="absolute bottom-4 right-4 w-96 z-20">
+                <ColorPad />
             </div>
         {:else}
             <div class="absolute top-4 right-4 flex flex-col gap-4 z-10">

@@ -13,13 +13,13 @@ Turns out that there are only 21 ways to do that:
 | # | | | | | | | | | | |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | $3$ | ![3.7.42](../theory/images/vertexTypes/3.7.42.png) | ![3.8.24](../theory/images/vertexTypes/3.8.24.png) | ![3.9.18](../theory/images/vertexTypes/3.9.18.png) | ![3.10.15](../theory/images/vertexTypes/3.10.15.png) | ![3.12^2](../theory/images/vertexTypes/3.12^2.png) | ![4.5.20](../theory/images/vertexTypes/4.5.20.png) | ![4.6.12](../theory/images/vertexTypes/4.6.12.png) | ![4.8^2](../theory/images/vertexTypes/4.8^2.png) | ![5^2.10](../theory/images/vertexTypes/5^2.10.png) | ![6^3](../theory/images/vertexTypes/6^3.png) |
-| | $\color{red}{3.7.42}$ | $\color{red}{3.8.24}$ | $\color{red}{3.9.18}$ | $\color{red}{3.10.15}$ | $\color{green}{3.12^2}$ | $\color{red}{4.5.20}$ | $\color{green}{4.6.12}$ | $\color{green}{4.8^2}$ | $\color{red}{5^2.10}$ | $\color{green}{6^3}$ |
+| | $\textcolor{lightcoral}{3.7.42}$ | $\textcolor{lightcoral}{3.8.24}$ | $\textcolor{lightcoral}{3.9.18}$ | $\textcolor{lightcoral}{3.10.15}$ | $\textcolor{lightgreen}{3.12^2}$ | $\textcolor{lightcoral}{4.5.20}$ | $\textcolor{lightgreen}{4.6.12}$ | $\textcolor{lightgreen}{4.8^2}$ | $\textcolor{lightcoral}{5^2.10}$ | $\textcolor{lightgreen}{6^3}$ |
 | $4$ | ![3.4.3.12](../theory/images/vertexTypes/3.4.3.12.png) | ![3.4.6.4](../theory/images/vertexTypes/3.4.6.4.png) | ![3.4^2.6](../theory/images/vertexTypes/3.4^2.6.png) | ![3^2.4.12](../theory/images/vertexTypes/3^2.4.12.png) | ![3^2.6^2](../theory/images/vertexTypes/3^2.6^2.png) | ![3.6.3.6](../theory/images/vertexTypes/3.6.3.6.png) | ![4^4](../theory/images/vertexTypes/4^4.png) | | | |
-| | $\color{green}{3.4.3.12}$ | $\color{green}{3.4.6.4}$ | $\color{green}{3.4^2.6}$ | $\color{green}{3^2.4.12}$ | $\color{green}{3^2.6^2}$ | $\color{green}{3.6.3.6}$ | $\color{green}{4^4}$ | | | |
+| | $\textcolor{lightgreen}{3.4.3.12}$ | $\textcolor{lightgreen}{3.4.6.4}$ | $\textcolor{lightgreen}{3.4^2.6}$ | $\textcolor{lightgreen}{3^2.4.12}$ | $\textcolor{lightgreen}{3^2.6^2}$ | $\textcolor{lightgreen}{3.6.3.6}$ | $\textcolor{lightgreen}{4^4}$ | | | |
 | $5$ | ![3^2.4.3.4](../theory/images/vertexTypes/3^2.4.3.4.png) | ![3^3.4^2](../theory/images/vertexTypes/3^3.4^2.png) | ![3^4.6](../theory/images/vertexTypes/3^4.6.png) | | | | | | | |
-| | $\color{green}{3^2.4.3.4}$ | $\color{green}{3^3.4^2}$ | $\color{green}{3^4.6}$ | | | | | | | |
+| | $\textcolor{lightgreen}{3^2.4.3.4}$ | $\textcolor{lightgreen}{3^3.4^2}$ | $\textcolor{lightgreen}{3^4.6}$ | | | | | | | |
 | $6$ | ![3^6](../theory/images/vertexTypes/3^6.png) | | | | | | | | | |
-| | $\color{green}{3^6}$ | | | | | | | | | |
+| | $\textcolor{lightgreen}{3^6}$ | | | | | | | | | |
 
 Of which only 15 can generate valid tilings (in green).
 

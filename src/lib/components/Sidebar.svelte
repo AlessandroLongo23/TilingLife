@@ -1,5 +1,5 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, side, showConstructionPoints, showInfo, showCR, speed, ruleType, parameter, activeTab } from '$lib/stores/configuration.js';
+	import { golRule, golRules, selectedTiling, transformSteps, zoom, showConstructionPoints, showInfo, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections } from '$lib/stores/configuration.js';
 	import { ChevronDown, ChevronLeft, ChevronRight, Maximize2, ChevronsDownUp, ChevronsUpDown } from 'lucide-svelte';
 	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
 	import { tilingRules } from '$lib/stores/tilingRules.js';
@@ -349,23 +349,15 @@
 											min={0}
 										/>
 									</div>
-
-									<!-- <Checkbox 
-										id="isDual"
-										label="Dual"
-										position="top"
-										bind:checked={$isDual}
-									/> -->
 								</div>	
 
 								<Slider 
-									id="side"
-									label="Side Length"
-									bind:value={$side}
-									min={10}
-									max={150}
-									step={5}
-									unit="px"
+									id="lineWidth"
+									label="Line Width"
+									bind:value={$lineWidth}
+									min={0}
+									max={3}
+									step={0.25}
 								/>
 
 								{#if isParametrized}
@@ -400,6 +392,13 @@
 										label="Show Cundy & Rollett's Notation"
 										position="right"
 										bind:checked={$showCR}
+									/>
+
+									<Checkbox 
+										id="showDualConnections"
+										label="Show Dual Connections"
+										position="right"
+										bind:checked={$showDualConnections}
 									/>
 								</div>
 							</div>
@@ -569,6 +568,15 @@
 										{/each}
 									</div>
 								{/if}
+
+								<Slider 
+									id="lineWidth"
+									label="Line Width"
+									bind:value={$lineWidth}
+									min={0}
+									max={3}
+									step={0.25}
+								/>
 
 								<Slider
 									id="speed"

@@ -1,5 +1,6 @@
-import { patch } from '$lib/stores/configuration.js';
+import { patch, lineWidth } from '$lib/stores/configuration.js';
 import { Vector } from '$lib/classes/Vector.svelte.js';
+import { get } from 'svelte/store';
 
 export class VertexGroup {
     constructor(shapes, molteplicity) {
@@ -29,7 +30,18 @@ export class VertexGroup {
         ctx.pop();
 
         ctx.scale(scale);
-        ctx.stroke(0, 0, 0);
+        
+        const lineWidthValue = get(lineWidth);
+        if (lineWidthValue > 1) {
+            ctx.strokeWeight(lineWidthValue / scale);
+            ctx.stroke(0, 0, 0);
+        } else if (lineWidthValue === 0) {
+            ctx.noStroke();
+        } else {
+            ctx.strokeWeight(1 / scale);
+            ctx.stroke(0, 0, 0, lineWidthValue);
+        }
+        
         for (let shapeSides of this.shapes) {
             let beta = 2 * Math.PI / shapeSides;
             let radius = this.side / 2 / Math.sin(beta / 2);

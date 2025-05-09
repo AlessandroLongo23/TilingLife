@@ -1,6 +1,7 @@
-import { tolerance } from '$lib/stores/configuration.js';
+import { tolerance, lineWidth, colorParams } from '$lib/stores/configuration.js';
 import { Vector } from '$lib/classes/Vector.svelte.js';
 import { map } from '$lib/utils/math.svelte.js';
+import { get } from 'svelte/store';
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 
@@ -37,12 +38,25 @@ export class Polygon {
         return inside;
     }
 
-    show = (ctx, side, showConstructionPoints, customColor = null) => {
+    show = (ctx, zoom, showConstructionPoints, customColor = null) => {
         if (this.centroid.x < -ctx.width / 2 - 10 || this.centroid.y < -ctx.height / 2 - 10 || this.centroid.x > ctx.width / 2 + 10 || this.centroid.y > ctx.height / 2 + 10)
             return;
 
         ctx.push();
-        ctx.stroke(0, 0, 0);
+
+        this.calculateHue();
+        
+        const lineWidthValue = get(lineWidth);
+        if (lineWidthValue > 1) {
+            ctx.strokeWeight(lineWidthValue / zoom);
+            ctx.stroke(0, 0, 0);
+        } else if (lineWidthValue === 0) {
+            ctx.noStroke();
+        } else {
+            ctx.strokeWeight(1 / zoom);
+            ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
+        }
+        
         ctx.fill(customColor || this.hue, 40, 100, 0.80);
         ctx.beginShape();
         for (let i = 0; i < this.vertices.length; i++) {
@@ -52,25 +66,34 @@ export class Polygon {
         
         if (showConstructionPoints) {
             ctx.fill(0, 100, 100);
-            ctx.ellipse(this.centroid.x, this.centroid.y, 5 / side);
+            ctx.ellipse(this.centroid.x, this.centroid.y, 5 / zoom);
             
             ctx.fill(120, 100, 100);
             for (let i = 0; i < this.halfways.length; i++) {
-                ctx.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / side);
+                ctx.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / zoom);
             }
             
             ctx.fill(240, 100, 100);
             for (let i = 0; i < this.vertices.length; i++) {
-                ctx.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / side);
+                ctx.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / zoom);
             }
         }
         ctx.pop();
     }
 
-    showGameOfLife = (ctx, side, ruleType, parsedGolRule, rules) => {
+    showGameOfLife = (ctx, zoom, ruleType, parsedGolRule, rules) => {
         ctx.push();
-        ctx.strokeWeight(1 / side);
-        ctx.stroke(0, 0, 0);
+        
+        const lineWidthValue = get(lineWidth);
+        if (lineWidthValue > 1) {
+            ctx.strokeWeight(lineWidthValue / zoom);
+            ctx.stroke(0, 0, 0);
+        } else if (lineWidthValue === 0) {
+            ctx.noStroke();
+        } else {
+            ctx.strokeWeight(1 / zoom);
+            ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
+        }
         
         if (this.state === 0) {
             ctx.fill(0, 0, 100);
@@ -207,14 +230,20 @@ export class DualPolygon extends Polygon {
 
             angles = angles.reverse();
         }
+
+        const params = get(colorParams);
+        const a = params.a;
+        const b = params.b;
         
         let hash = 0;
-        let a = 31;
-        let b = 300;
         for (let i = 0; i < minRotation.length; i++)
-            hash = (hash * a + minRotation[i]) % (b * PHI);
+            hash = (hash * PHI + minRotation[i] * Math.sqrt(2)) % 1447;
         
-        return hash % b;
+        const baseHue = hash % 360;
+        const rotatedHue = (baseHue + a) % 360;
+        const displacedHue = rotatedHue + b * Math.sin(rotatedHue * Math.PI / 180);
+        
+        return (displacedHue + 360) % 360;
     }
 
     clone = () => {

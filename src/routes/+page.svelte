@@ -91,12 +91,4 @@
         background-color: #18181b;
         color: #f8fafc;
     }
-    
-    /* a {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    a:hover {
-        box-shadow: 0 4px 12px hsla(128, 91%, 60%, 0.2);
-    } */
 </style>
