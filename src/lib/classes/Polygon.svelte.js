@@ -38,7 +38,7 @@ export class Polygon {
         return inside;
     }
 
-    show = (ctx, showPolygonPoints, customColor = null) => {
+    show = (ctx, showPolygonPoints, customColor = null, opacity = 0.80) => {
         if (this.centroid.x < -ctx.width / 2 - 10 || this.centroid.y < -ctx.height / 2 - 10 || this.centroid.x > ctx.width / 2 + 10 || this.centroid.y > ctx.height / 2 + 10)
             return;
 
@@ -49,15 +49,15 @@ export class Polygon {
         const lineWidthValue = get(lineWidth);
         if (lineWidthValue > 1) {
             ctx.strokeWeight(lineWidthValue / get(controls).zoom);
-            ctx.stroke(0, 0, 0);
+            ctx.stroke(0, 0, 0, opacity);
         } else if (lineWidthValue === 0) {
             ctx.noStroke();
         } else {
             ctx.strokeWeight(1 / get(controls).zoom);
-            ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
+            ctx.stroke(0, 0, 0, lineWidthValue * opacity); // Use lineWidth as opacity
         }
-        
-        ctx.fill(customColor || this.hue, 40, 100, 0.80);
+
+        ctx.fill(customColor || this.hue, 40, 100 / opacity, 0.80 * opacity);
         ctx.beginShape();
         for (let i = 0; i < this.vertices.length; i++) {
             ctx.vertex(this.vertices[i].x, this.vertices[i].y);

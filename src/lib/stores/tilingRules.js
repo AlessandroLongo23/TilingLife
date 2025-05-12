@@ -634,6 +634,12 @@ export const tilingRules = [
 				name: "",
 				cr: "",
 				rulestring: "6-6-0,6,3-0,0,3,3/r60/m(c1)"
+			},
+			{
+				id: 132,
+				name: "",
+				cr: "",
+				rulestring: "4-3-3-0,4-12,3/r90/r(h12)"
 			}
 		]
 	},

@@ -1,17 +1,16 @@
 <script>
-    import { ruleType, parameter, selectedTiling, showCR, debugView, controls, transformSteps, patch, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover } from '$lib/stores/configuration.js';
+    import { ruleType, parameter, selectedTiling, showCR, debugView, controls, transformSteps, patch, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph } from '$lib/stores/configuration.js';
     import { debugManager, debugStore, updateDebugStore } from '$lib/stores/debug.js';
     import { sortPointsByAngleAndDistance } from '$lib/utils/geometry.svelte';
     import { TilingGenerator } from '$lib/classes/TilingGenerator.svelte.js';
     import { isWithinTolerance } from '$lib/utils/math.svelte';
     import { Vector } from '$lib/classes/Vector.svelte.js';
-    import { Tiling } from '$lib/classes/Tiling.svelte.js';
     import { Cr } from '$lib/classes/Cr.svelte.js';
     import * as ls from 'lucide-svelte';
     import { onMount } from 'svelte';
 
     import LiveChart from '$lib/components/LiveChart.svelte';
-    import ColorPad from '$lib/components/ColorPad.svelte';
+    import ColorPad from '$lib/components/ui/ColorPad.svelte';
     import Input from '$lib/components/ui/Input.svelte';
 
     let {
@@ -23,7 +22,6 @@
 
     let grab = $state(false);
     let frameMod = $derived(60 / $speed);
-    let takeScreenshot = $state(false);
     let showNotification = $state(false);
     let notificationMessage = $state('');
     let alivePercentage = $state(0);
@@ -200,20 +198,60 @@
                         crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
                     }
 
-                    tiling.show(p5, $showPolygonPoints);
+                    if ($exportGraphButtonHover) {
+                        tiling.showGraph(p5);
+                    } else {
+                        tiling.show(p5, $showPolygonPoints);
+                    }
 
                     if ($showConstructionPoints)
                         tiling.drawConstructionPoints(p5);
                     
                     // tiling.showNeighbors(p5, $showPolygonPoints);
+
                     p5.pop();
+
+                    if ($screenshotButtonHover) {
+                        p5.push();
+                        let sss = 600;
+                        p5.noStroke();
+                        p5.fill(0, 0, 0, 0.5);
+
+                        p5.rect(0, 0, p5.width / 2 - sss / 2, p5.height);
+                        p5.rect(p5.width / 2 + sss / 2, 0, p5.width / 2 - sss / 2, p5.height);
+                        p5.rect(p5.width / 2 - sss / 2, 0, sss, p5.height / 2 - sss / 2);
+                        p5.rect(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, sss, p5.height / 2 - sss / 2);
+
+                        let len = 50;
+                        p5.stroke(255);
+                        p5.strokeWeight(2);
+
+                        p5.line(p5.width / 2 - sss / 2, p5.height / 2 - sss / 2, p5.width / 2 - sss / 2 + len, p5.height / 2 - sss / 2);
+                        p5.line(p5.width / 2 - sss / 2, p5.height / 2 - sss / 2, p5.width / 2 - sss / 2, p5.height / 2 - sss / 2 + len);
+
+                        p5.line(p5.width / 2 + sss / 2, p5.height / 2 - sss / 2, p5.width / 2 + sss / 2 - len, p5.height / 2 - sss / 2);
+                        p5.line(p5.width / 2 + sss / 2, p5.height / 2 - sss / 2, p5.width / 2 + sss / 2, p5.height / 2 - sss / 2 + len);
+
+                        p5.line(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, p5.width / 2 - sss / 2 + len, p5.height / 2 + sss / 2);
+                        p5.line(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, p5.width / 2 - sss / 2, p5.height / 2 + sss / 2 - len);
+
+                        p5.line(p5.width / 2 + sss / 2, p5.height / 2 + sss / 2, p5.width / 2 + sss / 2 - len, p5.height / 2 + sss / 2);
+                        p5.line(p5.width / 2 + sss / 2, p5.height / 2 + sss / 2, p5.width / 2 + sss / 2, p5.height / 2 + sss / 2 - len);
+
+                        p5.pop();
+                    }
 
                     if ($showCR)
                         p5.drawCr();
 
-                    if (takeScreenshot) {
+                    if ($takeScreenshot) {
                         p5.takeScreenshot();
-                        takeScreenshot = false;
+                        $takeScreenshot = false;
+                    }
+
+                    if ($exportGraph) {
+                        tiling.exportGraph(p5);
+                        $exportGraph = false;
                     }
                 }
             } catch (e) {
@@ -479,10 +517,6 @@
     let canvasContainer = $state();
     let p5;
     let myp5 = $state();
-    
-    const captureScreenshot = () => {
-        takeScreenshot = true;
-    }
 </script>
 
 <div class="relative h-full w-full">
@@ -490,53 +524,13 @@
     
     {#if showExtra}
         {#if !showGameOfLife}
-            <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
-                <button 
-                    class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
-                    onclick={captureScreenshot}
-                    onmouseenter={() => { $screenshotButtonHover = true; }}
-                    onmouseleave={() => { $screenshotButtonHover = false; }}
-                >
-                    <ls.Camera />
-                    Screenshot
-                </button>
-                
-                <button 
-                    class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
-                    onclick={() => {
-                        $debugView = !$debugView;
-                        if ($debugView) {
-                            debugManager.reset();
-                            setTimeout(() => {
-                                // tiling = tilingGenerator.generateWithWFC();
-                                tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
-                                updateDebugStore();
-                            }, 0);
-                        }
-                    }}
-                >
-                    <ls.Bug />
-                    {$debugView ? 'Disable Debug' : 'Enable Debug'}
-                </button>
-
-                <button 
-                    class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors duration-200 flex items-center gap-2"
-                    onclick={() => {
-                        tiling.exportGraph();
-                    }}
-                >
-                    <ls.Workflow />
-                    Export Graph
-                </button>
-            </div>
-
             {#if $selectedTiling.rulestring.includes('*')}
                 <div class="absolute bottom-4 right-4 w-96 z-20">
                     <ColorPad />
                 </div>
             {/if}
 
-            <div class="absolute bottom-16 right-[50%] translate-x-[50%] z-20 w-80">
+            <div class="absolute bottom-8 right-[50%] translate-x-[50%] z-20 w-80">
                 <div class="flex flex-col gap-3 bg-zinc-900/90 rounded-lg p-2 pt-3 justify-center items-center w-full">
                     <label for="tilingRule" class="text-lg text-center font-bold leading-none text-zinc-100">Tiling Rule</label>
 

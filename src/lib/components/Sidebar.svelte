@@ -1,22 +1,23 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections } from '$lib/stores/configuration.js';
-	import { ChevronDown, ChevronLeft, ChevronRight, Maximize2, ChevronsDownUp, ChevronsUpDown } from 'lucide-svelte';
+	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph } from '$lib/stores/configuration.js';
 	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
-	import { tilingRules } from '$lib/stores/tilingRules.js';
+	import { contentService } from '$lib/services/contentService';
 	import { tilingModalOpen } from '$lib/stores/modalState.js';
+	import { tilingRules } from '$lib/stores/tilingRules.js';
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { slide, fade } from 'svelte/transition';
+	import * as ls from 'lucide-svelte';
 
+	import TheorySidebar from '$lib/components/TheorySidebar.svelte';
 	import GolRuleCard from '$lib/components/GolRuleCard.svelte';
 	import TilingCard from '$lib/components/TilingCard.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import ShapeIcon from '$lib/components/ShapeIcon.svelte';
 	import Slider from '$lib/components/ui/Slider.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
-	import TheorySidebar from '$lib/components/TheorySidebar.svelte';
-	import { contentService } from '$lib/services/contentService';
 
 	let { 
 		isSidebarOpen = $bindable(true),
@@ -252,57 +253,6 @@
 	});
 </script>
 
-<style>
-	.sticky-header {
-		position: sticky;
-		top: 0;
-		z-index: 10;
-		transition: all 0.2s ease;
-	}
-	
-	.sticky-header.scrolling {
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-	
-	.group-indicator {
-		padding: 0.25rem 0.5rem;
-		margin-top: 0.5rem;
-		background-color: rgba(39, 39, 42, 0.5);
-		border-radius: 0.25rem;
-		transition: all 0.15s ease;
-		border: 1px solid rgba(63, 63, 70, 0.3);
-	}
-	
-	.tiling-group {
-		scroll-margin-top: 80px;
-	}
-	
-	.tiling-group-button {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.3rem 0.4rem;
-		border-radius: 0.25rem;
-		font-size: 0.875rem;
-		margin-bottom: 0.25rem;
-		transition: background-color 0.15s ease;
-	}
-	
-	.tiling-group-button:hover {
-		background-color: rgba(63, 63, 70, 0.3);
-	}
-	
-	.tiling-count {
-		font-size: 0.7rem;
-		color: rgba(74, 222, 128, 0.9);
-		padding: 0.1rem 0.4rem;
-		border-radius: 1rem;
-		background-color: rgba(74, 222, 128, 0.1);
-		margin-left: 0.5rem;
-	}
-</style>
-
 <div id="sidebar" class="h-full fixed left-0 top-0 transition-all duration-300 flex flex-col shadow-2xl {isSidebarOpen ? 'w-96' : 'w-12'}" bind:this={sidebarElement}>
 	<div class="bg-zinc-800/90 backdrop-blur-sm text-white h-full overflow-hidden flex flex-col border-r border-zinc-700/50">
 		<div class="p-3 flex items-center justify-between border-b border-zinc-700/50 flex-shrink-0 bg-zinc-900/30">
@@ -316,9 +266,9 @@
 				aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
 			>
 				{#if isSidebarOpen}
-					<ChevronLeft size={18} />
+					<ls.ChevronLeft size={18} />
 				{:else}
-					<ChevronRight size={18} />
+					<ls.ChevronRight size={18} />
 				{/if}
 			</button>
 		</div>
@@ -359,8 +309,6 @@
 										step={0.25}
 									/>
 								</div>	
-
-								
 
 								{#if isParametrized}
 									<Slider 
@@ -403,6 +351,40 @@
 										bind:checked={$showDualConnections}
 									/>
 								</div>
+
+								<div class="flex flex-row gap-2">
+									<div
+										role="button"
+										tabindex="0"
+										onmouseenter={() => { $screenshotButtonHover = true; }}
+										onmouseleave={() => { $screenshotButtonHover = false; }}
+										class="w-1/2"
+									>
+										<Button
+											id="screenshotButton"
+											label="Screenshot"
+											classes="w-full"
+											onclick={() => { $takeScreenshot = true; }}
+											icon={ls.Camera}
+										/>
+									</div>
+
+									<div
+										role="button"
+										tabindex="0"
+										onmouseenter={() => { $exportGraphButtonHover = true; }}
+										onmouseleave={() => { $exportGraphButtonHover = false; }}
+										class="w-1/2"
+									>
+										<Button
+											id="exportGraphButton"
+											label="Export Graph"
+											classes="w-full"
+											onclick={() => { $exportGraph = true }}
+											icon={ls.Workflow}
+										/>
+									</div>
+								</div>
 							</div>
 						</div>
 						
@@ -422,7 +404,7 @@
 													aria-label="Collapse all"
 													title="Collapse all"
 												>
-													<ChevronsDownUp size={14} />
+													<ls.ChevronsDownUp size={14} />
 												</button>
 											{:else}
 												<button
@@ -431,7 +413,7 @@
 													aria-label="Expand all"
 													title="Expand all"
 												>
-													<ChevronsUpDown size={14} />
+													<ls.ChevronsUpDown size={14} />
 												</button>
 											{/if}
 
@@ -441,7 +423,7 @@
 												aria-label="View all tilings"
 												title="View all tilings"
 											>
-												<Maximize2 size={14} />
+												<ls.Maximize2 size={14} />
 											</button>
 										</div>
 									</div>
@@ -463,7 +445,7 @@
 													aria-label="Collapse section"
 													title="Collapse section"
 												>
-													<ChevronsDownUp size={12} />
+													<ls.ChevronsDownUp size={12} />
 												</button>
 											{:else}
 												<button 
@@ -472,7 +454,7 @@
 													aria-label="Expand section"
 													title="Expand section"
 												>
-													<ChevronsUpDown size={12} />
+													<ls.ChevronsUpDown size={12} />
 												</button>
 											{/if}
 										</div>
@@ -490,7 +472,7 @@
 												<span>{tilingGroup.title}</span>
 												<div class="flex items-center">
 													<span class="tiling-count">{tilingGroup.rules.length}</span>
-													<ChevronDown 
+													<ls.ChevronDown 
 														size={14} 
 														class="transition-transform duration-200 ml-1 {expandedGroups[tilingGroup.title] ? 'rotate-180' : ''}"
 													/>
@@ -657,3 +639,54 @@
 		{/if}
 	</div>
 </div> 
+
+<style>
+	.sticky-header {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		transition: all 0.2s ease;
+	}
+	
+	.sticky-header.scrolling {
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+	
+	.group-indicator {
+		padding: 0.25rem 0.5rem;
+		margin-top: 0.5rem;
+		background-color: rgba(39, 39, 42, 0.5);
+		border-radius: 0.25rem;
+		transition: all 0.15s ease;
+		border: 1px solid rgba(63, 63, 70, 0.3);
+	}
+	
+	.tiling-group {
+		scroll-margin-top: 80px;
+	}
+	
+	.tiling-group-button {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.3rem 0.4rem;
+		border-radius: 0.25rem;
+		font-size: 0.875rem;
+		margin-bottom: 0.25rem;
+		transition: background-color 0.15s ease;
+	}
+	
+	.tiling-group-button:hover {
+		background-color: rgba(63, 63, 70, 0.3);
+	}
+	
+	.tiling-count {
+		font-size: 0.7rem;
+		color: rgba(74, 222, 128, 0.9);
+		padding: 0.1rem 0.4rem;
+		border-radius: 1rem;
+		background-color: rgba(74, 222, 128, 0.1);
+		margin-left: 0.5rem;
+	}
+</style>

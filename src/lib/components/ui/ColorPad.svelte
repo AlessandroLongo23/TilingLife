@@ -10,7 +10,7 @@
 	let padWidth = $state(120);
 	let padHeight = $state(120);
 	let isDragging = $state(false);
-	let position = $state({ x: 0, y: 0 });
+	let position = $state({ x: 180, y: 0 });
 	let pad;
 
 	$effect(() => {

@@ -29,17 +29,20 @@ export let showDualConnections = writable(false);
 export let ruleType = writable('Single');
 export let activeTab = writable('Tilings');
 export let debugView = writable(false);
-export let screenshotButtonHover = writable(false);
 
 export let showPolygonPoints = writable(false);
 export let showConstructionPoints = writable(false);
 export let showChart = writable(false);
 export let showCR = writable(false);
 export let liveChartMode = writable('count');
-// export let screenshotSize = writable(600);
+
+export let screenshotButtonHover = writable(false);
+export let takeScreenshot = writable(false);
+export let exportGraphButtonHover = writable(false);
+export let exportGraph = writable(false);
 
 export const tolerance = 0.01;
-export const colorParams = writable({ a: 31, b: 300 });
+export const colorParams = writable({ a: 180, b: 0 });
 export let possibleAngles = [30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
 export let possibleSides = [0, 3, 4, 5, 6, 8, 9, 12, 18];
 

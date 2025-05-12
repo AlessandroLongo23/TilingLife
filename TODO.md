@@ -27,6 +27,7 @@
 - [ ] add R&C for face types (dual polygons)
 - [ ] add predefined palettes in the colorPad
 - [ ] add circle packing visualization
+- [ ] move gol simulation controls to the bottom in a video style (pause, play, speed)
 
 ## UI
 
@@ -36,8 +37,10 @@
 
 - [x] fix adjustable angle tilings
 - [ ] fix polygon angles in some tilings
+- [ ] fix missing tiling (with overlapping between polygons)
 - [ ] add missing R&C notations and fix checks on same vertices
 - [ ] fix screenshot delay
+- [ ] fix text size based on zoom
 
 ## Ideas
 

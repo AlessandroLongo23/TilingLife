@@ -1,4 +1,4 @@
-import { screenshotButtonHover, lineWidth, showDualConnections, controls } from '$lib/stores/configuration.js';
+import { lineWidth, showDualConnections, controls } from '$lib/stores/configuration.js';
 import { sortPointsByAngleAndDistance } from '$lib/utils/geometry.svelte';
 import { isWithinTolerance } from '$lib/utils/math.svelte';
 import { Vector } from '$lib/classes/Vector.svelte.js';
@@ -22,7 +22,7 @@ export class Tiling {
         this.crNotation = '';
     }
 
-    show = (ctx, showPolygonPoints) => {
+    show = (ctx, showPolygonPoints, opacity = 1) => {
         const lineWidthValue = get(lineWidth);
         if (lineWidthValue > 1) {
             ctx.strokeWeight(lineWidthValue / get(controls).zoom);
@@ -35,49 +35,51 @@ export class Tiling {
         }
         
         for (let i = 0; i < this.nodes.length; i++) {
-            this.nodes[i].show(ctx, showPolygonPoints);
+            this.nodes[i].show(ctx, showPolygonPoints, null, opacity);
         }
         
         const showDualConnectionsValue = get(showDualConnections);
         if (showDualConnectionsValue)
             this.drawDualConnections(ctx);
+    }
+
+    showGraph = (ctx) => {
+        this.show(ctx, false, 0.5);
+
+        ctx.stroke(0, 0, 100);
+        ctx.fill(240, 7, 8);
+        ctx.strokeWeight(1 / get(controls).zoom);
         
-        screenshotButtonHover.subscribe(hover => {
-            if (hover) {
-                ctx.push();
-                ctx.noStroke();
-                ctx.fill(0, 0, 0, 0.5);
-                ctx.rect(0, 0, ctx.width / 2 - 600 / 2, ctx.height);
-                ctx.rect(ctx.width / 2 + 600 / 2, 0, ctx.width / 2 - 600 / 2, ctx.height);
-                ctx.rect(ctx.width / 2 - 600 / 2, 0, 600, ctx.height / 2 - 600 / 2);
-                ctx.rect(ctx.width / 2 - 600 / 2, ctx.height / 2 + 600 / 2, 600, ctx.height / 2 - 600 / 2);
-
-                let len = 50;
-                ctx.stroke(255);
-                ctx.strokeWeight(2);
-                ctx.line(ctx.width / 2 - 600 / 2, ctx.height / 2 - 600 / 2, ctx.width / 2 - 600 / 2 + len, ctx.height / 2 - 600 / 2);
-                ctx.line(ctx.width / 2 - 600 / 2, ctx.height / 2 - 600 / 2, ctx.width / 2 - 600 / 2, ctx.height / 2 - 600 / 2 + len);
-
-                ctx.line(ctx.width / 2 + 600 / 2, ctx.height / 2 - 600 / 2, ctx.width / 2 + 600 / 2 - len, ctx.height / 2 - 600 / 2);
-                ctx.line(ctx.width / 2 + 600 / 2, ctx.height / 2 - 600 / 2, ctx.width / 2 + 600 / 2, ctx.height / 2 - 600 / 2 + len);
-
-                ctx.line(ctx.width / 2 - 600 / 2, ctx.height / 2 + 600 / 2, ctx.width / 2 - 600 / 2 + len, ctx.height / 2 + 600 / 2);
-                ctx.line(ctx.width / 2 - 600 / 2, ctx.height / 2 + 600 / 2, ctx.width / 2 - 600 / 2, ctx.height / 2 + 600 / 2 - len);
-
-                ctx.line(ctx.width / 2 + 600 / 2, ctx.height / 2 + 600 / 2, ctx.width / 2 + 600 / 2 - len, ctx.height / 2 + 600 / 2);
-                ctx.line(ctx.width / 2 + 600 / 2, ctx.height / 2 + 600 / 2, ctx.width / 2 + 600 / 2, ctx.height / 2 + 600 / 2 - len);
-
-                ctx.pop();
+        for (let node of this.nodes) {
+            for (let neighbor of node.neighbors) {
+                ctx.line(
+                    node.centroid.x,
+                    node.centroid.y,
+                    neighbor.centroid.x,
+                    neighbor.centroid.y
+                );
             }
-        });
+        }
+        
+        for (let node of this.nodes) {
+            ctx.ellipse(
+                node.centroid.x,
+                node.centroid.y,
+                1/5,
+                1/5
+            );
+        }
     }
 
     drawConstructionPoints = (ctx) => {
+        let offset = new Vector(6 / get(controls).zoom, 0 / get(controls).zoom)
+        let pointSize = 6 / get(controls).zoom
+
         ctx.scale(1, -1);
         ctx.textSize(12 / get(controls).zoom);
         ctx.fill(0, 0, 100);
-        ctx.strokeWeight(2 / get(controls).zoom);
-        ctx.stroke(0, 0, 0, 0.5);
+        ctx.strokeWeight(1.5 / get(controls).zoom);
+        ctx.stroke(0, 0, 0);
 
         let uniqueCentroids = [];
         for (let anchorNode of this.anchorNodes)
@@ -88,7 +90,8 @@ export class Tiling {
         uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, new Vector()));
         for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
             let centroid = uniqueCentroidsSorted[i];
-            ctx.text('c' + (i + 1), centroid.x, -centroid.y);
+            ctx.ellipse(centroid.x, -centroid.y, pointSize);
+            ctx.text('c' + (i + 1), centroid.x + offset.x, -centroid.y + offset.y);
         }
 
         let uniqueHalfways = [];
@@ -100,7 +103,8 @@ export class Tiling {
         let uniqueHalfwaysSorted = sortPointsByAngleAndDistance(uniqueHalfways);
         for (let i = 0; i < uniqueHalfwaysSorted.length; i++) {
             let halfway = uniqueHalfwaysSorted[i];
-            ctx.text('h' + (i + 1), halfway.x, -halfway.y);
+            ctx.ellipse(halfway.x, -halfway.y, pointSize);
+            ctx.text('h' + (i + 1), halfway.x + offset.x, -halfway.y + offset.y);
         }
 
         let uniqueVertices = [];
@@ -112,7 +116,8 @@ export class Tiling {
         let uniqueVerticesSorted = sortPointsByAngleAndDistance(uniqueVertices); 
         for (let i = 0; i < uniqueVerticesSorted.length; i++) {
             let vertex = uniqueVerticesSorted[i];
-            ctx.text('v' + (i + 1), vertex.x, -vertex.y);
+            ctx.ellipse(vertex.x, -vertex.y, pointSize);
+            ctx.text('v' + (i + 1), vertex.x + offset.x, -vertex.y + offset.y);
         }
         
         const showDualConnectionsValue = get(showDualConnections);

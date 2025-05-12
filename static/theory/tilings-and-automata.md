@@ -55,6 +55,8 @@ Tilings can be regular, semi-regular, demi-regular, or irregular based on the ty
 
 Periodic tilings repeat in a regular pattern, while aperiodic tilings (like Penrose tilings) do not have translational symmetry.
 
+For now, we only have $k$-uniform periodic tilings available, but in the future we plan on introducing different types and ways to construct them.
+
 ## Generation Method
 
 In this application, we generate tilings using a systematic approach based on mathematical rules:

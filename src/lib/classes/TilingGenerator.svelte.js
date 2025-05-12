@@ -337,7 +337,7 @@ export class TilingGenerator {
 
                 if (debugView) debugManager.startTimer(`Transform ${s+1}.${i+1}`);
 
-                if (s == 0) this.anchorNodes = [...this.tiling.nodes, ...newNodes];
+                if (s == 0) this.tiling.anchorNodes = [...this.tiling.nodes, ...newNodes];
 
                 if (this.transforms[i].type === 'm') {
                     if (this.transforms[i].relativeTo)
@@ -372,7 +372,7 @@ export class TilingGenerator {
             let type = this.transforms[transformationIndex].relativeTo[0];
             let index = this.transforms[transformationIndex].relativeTo.slice(1);
 
-            origin = this.findOrigin(this.anchorNodes, type, index);
+            origin = this.findOrigin(this.tiling.anchorNodes, type, index);
             this.transforms[transformationIndex].anchor = origin;
         }
         
@@ -383,11 +383,11 @@ export class TilingGenerator {
             if (this.transforms[transformationIndex].relativeTo[0] === 'h') {
                 let lineVector = null;
                 
-                for (let i = 0; i < this.anchorNodes.length; i++) {
-                    for (let k = 0; k < this.anchorNodes[i].halfways.length; k++) {
-                        if (isWithinTolerance(this.anchorNodes[i].halfways[k], origin)) {
-                            const v1 = this.anchorNodes[i].vertices[k];
-                            const v2 = this.anchorNodes[i].vertices[(k + 1) % this.anchorNodes[i].n];
+                for (let i = 0; i < this.tiling.anchorNodes.length; i++) {
+                    for (let k = 0; k < this.tiling.anchorNodes[i].halfways.length; k++) {
+                        if (isWithinTolerance(this.tiling.anchorNodes[i].halfways[k], origin)) {
+                            const v1 = this.tiling.anchorNodes[i].vertices[k];
+                            const v2 = this.tiling.anchorNodes[i].vertices[(k + 1) % this.tiling.anchorNodes[i].n];
                             
                             lineVector = Vector.sub(v2, v1).normalize();
                             break;
@@ -457,7 +457,7 @@ export class TilingGenerator {
             let type = this.transforms[transformationIndex].relativeTo[0];
             let index = this.transforms[transformationIndex].relativeTo.slice(1);
 
-            origin = this.findOrigin(this.anchorNodes, type, index);
+            origin = this.findOrigin(this.tiling.anchorNodes, type, index);
             this.transforms[transformationIndex].anchor = origin;
         }
 
@@ -533,7 +533,7 @@ export class TilingGenerator {
             let type = this.transforms[transformationIndex].relativeTo[0];
             let index = this.transforms[transformationIndex].relativeTo.slice(1);
 
-            origin = this.findOrigin(this.anchorNodes, type, index);
+            origin = this.findOrigin(this.tiling.anchorNodes, type, index);
             this.transforms[transformationIndex].anchor = origin;
         }
         

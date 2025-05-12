@@ -12,6 +12,8 @@ export class VertexGroup {
     show(ctx, displayText, scale) {
         let baseAngle = 0;
 
+        console.log()
+
         ctx.push();
         ctx.translate(-ctx.width / 2 + patch.padding, -ctx.height / 2 + patch.padding);
         ctx.noStroke();
