@@ -4,15 +4,19 @@ import anchor from 'markdown-it-anchor';
 function protectMath(markdown) {
 	const placeholders = [];
 	
-	let processed = markdown.replace(/\$(.+?)\$/g, (match) => {
-		const placeholder = `MATH_PLACEHOLDER_${placeholders.length}`;
-		placeholders.push(match);
+	// First process the block math ($$...$$) to avoid interference with inline math
+	let processed = markdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, content) => {
+		const placeholder = `DISPLAY_MATH_PLACEHOLDER_${placeholders.length}`;
+		placeholders.push({ type: 'display', content: content.trim() });
 		return placeholder;
 	});
 	
-	processed = processed.replace(/\$\$(.+?)\$\$/gs, (match) => {
-		const placeholder = `DISPLAY_MATH_PLACEHOLDER_${placeholders.length}`;
-		placeholders.push(match);
+	processed = processed.replace(/\$([^$]+?)\$/g, (match, content) => {
+		if (match.includes('DISPLAY_MATH_PLACEHOLDER')) {
+			return match; // Skip if it's part of a placeholder
+		}
+		const placeholder = `MATH_PLACEHOLDER_${placeholders.length}`;
+		placeholders.push({ type: 'inline', content: content.trim() });
 		return placeholder;
 	});
 	
@@ -22,12 +26,16 @@ function protectMath(markdown) {
 function restoreMath(html, placeholders) {
 	let result = html;
 	
-	result = result.replace(/MATH_PLACEHOLDER_(\d+)/g, (_, index) => {
-		return placeholders[parseInt(index)];
+	// Restore display math first
+	result = result.replace(/DISPLAY_MATH_PLACEHOLDER_(\d+)/g, (_, index) => {
+		const { content } = placeholders[parseInt(index)];
+		return `<div class="katex-display"><span class="katex-equation">${content}</span></div>`;
 	});
 	
-	result = result.replace(/DISPLAY_MATH_PLACEHOLDER_(\d+)/g, (_, index) => {
-		return placeholders[parseInt(index)];
+	// Then restore inline math
+	result = result.replace(/MATH_PLACEHOLDER_(\d+)/g, (_, index) => {
+		const { content } = placeholders[parseInt(index)];
+		return `<span class="katex-inline">${content}</span>`;
 	});
 	
 	return result;

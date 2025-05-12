@@ -41,39 +41,29 @@
 		if (content && containerElement) {
 			// Allow content to be rendered first, then process LaTeX
 			setTimeout(() => {
-				// Find all inline math expressions ($...$) and block math expressions ($$...$$)
 				const container = containerElement.querySelector('#content-container');
 				if (!container) return;
 				
-				// Process inline math expressions
-				const inlineMathElements = container.querySelectorAll('p, li, th, td');
+				// Process inline math elements
+				const inlineMathElements = container.querySelectorAll('.katex-inline');
 				inlineMathElements.forEach(el => {
-					const text = el.innerHTML;
-					// Look for $...$ but not $$...$$
-					const regex = /\$([^\$]+)\$/g;
-					
-					if (regex.test(text)) {
-						el.innerHTML = text.replace(regex, (match, latex) => {
-							try {
-								return katex.renderToString(latex, { displayMode: false });
-							} catch (e) {
-								console.error('KaTeX error:', e);
-								return match;
-							}
-						});
+					try {
+						const latex = el.textContent;
+						el.innerHTML = katex.renderToString(latex, { displayMode: false });
+					} catch (e) {
+						console.error('KaTeX inline error:', e, el.textContent);
 					}
 				});
 				
-				// Process block math expressions
-				const blockRegex = /\$\$([\s\S]+?)\$\$/g;
-				const blockMatches = [...container.innerHTML.matchAll(blockRegex)];
-				
-				blockMatches.forEach(match => {
+				// Process display math elements
+				const displayMathElements = container.querySelectorAll('.katex-display .katex-equation');
+				displayMathElements.forEach(el => {
 					try {
-						const rendered = katex.renderToString(match[1], { displayMode: true });
-						container.innerHTML = container.innerHTML.replace(match[0], rendered);
+						const latex = el.textContent;
+						const rendered = katex.renderToString(latex, { displayMode: true });
+						el.parentElement.innerHTML = rendered;
 					} catch (e) {
-						console.error('KaTeX block error:', e);
+						console.error('KaTeX display error:', e, el.textContent);
 					}
 				});
 				

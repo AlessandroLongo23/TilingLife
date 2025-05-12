@@ -61,7 +61,13 @@ In this application, we generate tilings using a systematic approach based on ma
 
 ### Rule Strings
 
-The rule strings define the base shape, orientation, and transformations to generate a specific tiling pattern. For example, "4/m45/r(h1)" defines a square tiling with a 45-degree rotation.
+The rule strings define the base shape, orientation, and transformations to generate a specific tiling pattern. For example,
+
+$$
+\text{4/m45/r(h1)}
+$$
+
+defines a square tiling with a 45-degree rotation.
 
 ### Transformations
 
@@ -69,43 +75,133 @@ We apply transformations like rotations, translations, and reflections to create
 
 # Conway's Game of Life
 
-The Game of Life is a cellular automaton devised by mathematician John Conway in 1970. It's a zero-player game where evolution is determined by the initial state.
+## Definition
+Conway's Game of Life is a two-dimensional cellular automaton created by John
+Conway in 1970. It's a zero-player game where evolution is determined by the initial state.
+Despite its very simple rules, it exhibits complex and often unpredictable behaviors.
 
-## Original Definition
+In its original version, the Game of Life operates on an infinite grid of
+square cells. Each cell can be in one of two states: dead or alive. At every
+iteration, the state of each cell evolves according to the following rules:
 
-### Rules
+* Any alive cell with fewer than 2 alive neighbors dies (underpopulation).
+* Any alive cell with 2 or 3 alive neighbors survives to the next generation.
+* Any alive cell with more than 3 alive neighbors dies (overpopulation).
+* Any dead cell with exactly 3 alive neighbors becomes alive (reproduction).
 
-The classic Game of Life follows the B3/S23 rule:
+These transition rules are concisely described by the string **B3/S23**, where
+**B3** indicates birth on exactly three neighbors, and **S23** indicates
+survival on two or three neighbors.
 
-- A dead cell with exactly 3 live neighbors becomes alive (Birth).
-- A live cell with 2 or 3 live neighbors survives (Survival).
-- In all other cases, cells die or remain dead.
+![gol](videos/game_of_life.gif)
 
 ### Patterns
 
 Various patterns can emerge:
 
-- Still lifes: Patterns that don't change
-- Oscillators: Patterns that repeat after a fixed number of generations
-- Spaceships: Patterns that translate across the grid
-- Methuselahs: Patterns that evolve for many generations before stabilizing
+* Still lifes: Patterns that don't change
+* Oscillators: Patterns that repeat after a fixed number of generations
+* Spaceships: Patterns that translate across the grid
+* Methuselahs: Patterns that evolve for many generations before stabilizing
 
-## Extensions Implemented
+![still life](videos/still_life.gif)
+![oscillator](videos/oscillators.gif)
+![spaceships](videos/spaceships.gif)
+![methuselahs](videos/methuselahs.gif)
 
-We've implemented several extensions to the classic Game of Life:
+## Extensions
+We also explored some extensions of the Game of Life:
 
 ### Generations
 
-In Generations rules (like "B36/S23/6"), dying cells go through multiple states before disappearing completely, creating colorful patterns that show the history of the simulation.
+In "Generations" variants, cells can pass through intermediate states between
+alive and dead before fully transitioning. Each cell is associated with a small integer
+counter that represents its "age".
+Rules specify both birth thresholds and decay durations,
+producing interesting phenomena that are not possible
+in the binary model.
 
-### Larger Than Life
+![generations1](videos/generations1.gif)
+![generations2](videos/generations2.gif)
+![generations3](videos/generations3.gif)
 
-Larger Than Life rules extend the neighborhood beyond the immediate 8 cells, allowing for more complex interactions and emergent behaviors.
+### Larger than Life
 
-### Non-Square Tilings
+"Larger than Life" generalizes the neighborhood radius beyond the immediate
+adjacent cells. Instead of counting only the eight nearest neighbors, these
+rules consider all cells within a specified radius *r* on the grid, with
+distinct birth and survival intervals defined over that neighborhood.
 
-Our implementation allows cellular automata to run on various tiling patterns beyond the traditional square grid, including triangular, hexagonal, and more complex tilings.
+![LargerThanLife1](videos/LargerThanLife3.gif)
+![LargerThanLife2](videos/LargerThanLife3.gif)
+![LargerThanLife3](videos/LargerThanLife3.gif)
 
-# Our study
 
-## Idea
+### Non-square grids
+
+The underlying grid can be replaced by arbitrary tilings or graphs, allowing
+each cell to have a non-uniform number of neighbors. Examples include hexagonal
+tilings, Penrose tilings, and irregular networks. Despite the change in
+topology, the life-like rules (B/S strings) apply uniformly based on each
+cell's local neighbor count, unlocking new pattern classes and emergent
+structures.
+
+![NonSquare1](videos/NonSquare1.gif)
+![NonSquare2](videos/NonSquare2.gif)
+![NonSquare3](videos/NonSquare3.gif)
+
+In our project we used 
+
+## Searching for interesting rules
+
+In order to find interesting rules for non-square grids and 
+
+### Used metrics
+
+To systematically compare the dynamical regimes generated by different rules,
+we employ two complementary information-theoretic metrics computed on each
+configuration:
+
+* **Density ($\rho$).** The fraction of live cells in the system,
+  $$
+  \rho=\dfrac{1}{N}\sum_i s_i
+  $$
+  where $s_i\in\{0,1\}$ and $N$ is the total
+  number of cells. Density measures the overall activity or fill ratio.
+
+* **Statistical complexity ($D$).** The difference between the marginal entropy
+  of the cell-state distribution,
+  $$
+  H(S)=-\rho\log_2\rho - (1-\rho)\log_2(1-\rho)
+  $$
+  and the average conditional entropy given a neighboring cell,
+
+  $$
+  G=\langle H(S|U)\rangle, \quad H(S|U)=-\sum_{s,u}P(s,u)\log_2\dfrac{P(s,u)}{P(u)}
+  $$
+
+  so that $D=H(S)-G$. Larger $D$ indicates more non-random spatial organization
+  beyond what is expected from density alone.
+
+By plotting rules in the 2D density–complexity plane, we can cluster similar
+behaviors and identify those that produce the richest dynamics, such as
+**B3/S23**.
+
+We tried to use these metrics to search for diff
+
+### Parallel computing
+
+Our implementation uses the Taichi language to exploit GPU parallelism. The
+cellular state array is stored as a field on the GPU, and update rules,
+neighbor counts, and metric calculations are all expressed as Taichi kernels.
+Each kernel launches thousands of threads to process cells or edges in
+parallel, ensuring that even large graphs or high iteration counts complete
+efficiently. Atomic operations accumulate joint probabilities for the
+complexity metric, while in-place buffer swaps implement the Life update with
+minimal synchronization overhead.
+
+### Plots
+Put plots and the interpretation of them
+
+### Future work
+
