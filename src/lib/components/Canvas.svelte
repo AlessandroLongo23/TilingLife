@@ -2,6 +2,7 @@
     import { ruleType, parameter, selectedTiling, showCR, debugView, controls, transformSteps, patch, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover } from '$lib/stores/configuration.js';
     import { debugManager, debugStore, updateDebugStore } from '$lib/stores/debug.js';
     import { sortPointsByAngleAndDistance } from '$lib/utils/geometry.svelte';
+    import { TilingGenerator } from '$lib/classes/TilingGenerator.svelte.js';
     import { isWithinTolerance } from '$lib/utils/math.svelte';
     import { Vector } from '$lib/classes/Vector.svelte.js';
     import { Tiling } from '$lib/classes/Tiling.svelte.js';
@@ -11,6 +12,7 @@
 
     import LiveChart from '$lib/components/LiveChart.svelte';
     import ColorPad from '$lib/components/ColorPad.svelte';
+    import Input from '$lib/components/ui/Input.svelte';
 
     let {
         width = 600,
@@ -40,6 +42,7 @@
     let prevParameter = $state($parameter);
 
     let tiling = $state();
+    let tilingGenerator = $state();
     let cr = $state();
     let crCanvases = $state([]);
 
@@ -99,14 +102,14 @@
             $controls.targetZoom = $controls.zoom;
             $controls.targetOffset = $controls.offset.copy();
             
-            tiling = new Tiling();
+            tilingGenerator = new TilingGenerator();
             try {
-                tiling.parseRule($selectedTiling.rulestring);
                 if ($debugView) {
                     debugManager.reset();
                 }
-                tiling.generateTiling();
-                tiling.setupGameOfLife($ruleType, $golRule, $golRules);
+                // tiling = tilingGenerator.generateWithWFC();
+                tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
+                tilingGenerator.setupGameOfLife($ruleType, $golRule, $golRules);
                 if ($debugView) {
                     updateDebugStore();
                 }
@@ -114,7 +117,7 @@
                 cr = new Cr($selectedTiling.cr || tiling.crNotation);
                 crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
             } catch (e) {
-                console.log(e);
+                console.error(e);
             }
         }
 
@@ -137,7 +140,7 @@
                         ($ruleType == "By Shape" && !p5.isSameRule(prevGolRules, $golRules)) ||
                         resetGameOfLife
                     ) {
-                        tiling.setupGameOfLife($ruleType, $golRule, $golRules);
+                        tilingGenerator.setupGameOfLife($ruleType, $golRule, $golRules);
                         resetGameOfLife = false;
                     }
 
@@ -189,9 +192,9 @@
                         parseInt($transformSteps) != parseInt(prevTransformSteps) ||
                         prevParameter != $parameter
                     ) {
-                        tiling.parseRule($selectedTiling.rulestring);
-                        tiling.generateTiling();
-                        tiling.setupGameOfLife($ruleType, $golRule, $golRules);
+                        // tiling = tilingGenerator.generateWithWFC();
+                        tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
+                        tilingGenerator.setupGameOfLife($ruleType, $golRule, $golRules);
                         cr = new Cr($selectedTiling.cr || tiling.crNotation);
 
                         crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
@@ -505,7 +508,8 @@
                         if ($debugView) {
                             debugManager.reset();
                             setTimeout(() => {
-                                tiling.generateTiling();
+                                // tiling = tilingGenerator.generateWithWFC();
+                                tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
                                 updateDebugStore();
                             }, 0);
                         }
@@ -526,8 +530,23 @@
                 </button>
             </div>
 
-            <div class="absolute bottom-4 right-4 w-96 z-20">
-                <ColorPad />
+            {#if $selectedTiling.rulestring.includes('*')}
+                <div class="absolute bottom-4 right-4 w-96 z-20">
+                    <ColorPad />
+                </div>
+            {/if}
+
+            <div class="absolute bottom-16 right-[50%] translate-x-[50%] z-20 w-80">
+                <div class="flex flex-col gap-3 bg-zinc-900/90 rounded-lg p-2 pt-3 justify-center items-center w-full">
+                    <label for="tilingRule" class="text-lg text-center font-bold leading-none text-zinc-100">Tiling Rule</label>
+
+                    <Input 
+                        id="tilingRule"
+                        align="center"
+                        bind:value={$selectedTiling.rulestring}
+                        placeholder="4/m90/r(h1)"
+                    />
+                </div>
             </div>
         {:else}
             <div class="absolute top-4 right-4 flex flex-col gap-4 z-10">

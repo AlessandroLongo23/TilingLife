@@ -5,5 +5,9 @@ export const map = (value, start1, stop1, start2, stop2) => {
 }
 
 export const isWithinTolerance = (a, b) => {
-    return Math.abs(a.x - b.x) < tolerance && Math.abs(a.y - b.y) < tolerance;
+    if (typeof a === 'number') {
+        return Math.abs(a - b) < tolerance;
+    } else {
+        return Math.abs(a.x - b.x) < tolerance && Math.abs(a.y - b.y) < tolerance;
+    }
 }

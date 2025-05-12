@@ -331,16 +331,16 @@
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
 							<div class="flex flex-col gap-3">
 								<div class="flex flex-row gap-3">
-									<div class="w-2/3">
+									<!-- <div class="w-2/3">
 										<Input 
 											id="tilingRule"
 											label="Tiling Rule"
 											bind:value={$selectedTiling.rulestring}
 											placeholder="4/m90/r(h1)"
 										/>
-									</div>
+									</div> -->
 
-									<div class="w-1/3">
+									<!-- <div class="w-1/3"> -->
 										<Input
 											id="transformSteps"
 											type="number"
@@ -348,17 +348,19 @@
 											bind:value={$transformSteps}
 											min={0}
 										/>
-									</div>
+									<!-- </div> -->
+
+									<Input 
+										id="lineWidth"
+										type="number"
+										label="Line Width"
+										bind:value={$lineWidth}
+										min={0}
+										step={0.25}
+									/>
 								</div>	
 
-								<Slider 
-									id="lineWidth"
-									label="Line Width"
-									bind:value={$lineWidth}
-									min={0}
-									max={3}
-									step={0.25}
-								/>
+								
 
 								{#if isParametrized}
 									<Slider 
@@ -531,13 +533,28 @@
 						<!-- Fixed options section -->
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
 							<div class="flex flex-col gap-3">
-								<h3 class="font-medium text-xs text-white/80 uppercase tracking-wider">Game of Life Simulation</h3>
-								<Toggle
-									id="debug"
-									leftValue="Single"
-									rightValue="By Shape"
-									bind:value={$ruleType}
-								/>
+								<div class="flex flex-row w-full gap-3 items-center">
+									<div class="w-1/2">
+										<Toggle
+											id="debug"
+											label="Rule Type"
+											leftValue="Single"
+											rightValue="By Shape"
+											bind:value={$ruleType}
+										/>
+									</div>
+
+									<div class="w-1/2">
+										<Input 
+											id="lineWidth"
+											type="number"
+											label="Line Width"
+											bind:value={$lineWidth}
+											min={0}
+											step={0.25}
+										/>
+									</div>
+								</div>
 
 								{#if $ruleType === 'Single'}
 									<Input 
@@ -569,21 +586,12 @@
 									</div>
 								{/if}
 
-								<Slider 
-									id="lineWidth"
-									label="Line Width"
-									bind:value={$lineWidth}
-									min={0}
-									max={3}
-									step={0.25}
-								/>
-
 								<Slider
 									id="speed"
 									label="Simulation Speed"
 									bind:value={$speed}
 									min={0}
-									max={300}
+									max={180}
 									step={1}
 									unit="iterations/s"
 								/>

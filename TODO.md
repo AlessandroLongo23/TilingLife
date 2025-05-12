@@ -3,7 +3,12 @@
 ## Big changes
 
 - [ ] generate tilings from the k-uniform-solver output instead of using the GomJau-Hogg notation
-- [ ] add different types of tilings (aperiodic, etc.)
+- [ ] add fractalization operation
+- [ ] add rectification operation
+- [ ] add truncation operation
+- [ ] add islamic tilings
+- [ ] add aperiodic tilings
+- [ ] add procedurally generated aperiodic tilings
 
 ## Algorithm
 
@@ -21,7 +26,7 @@
 - [x] add zoom and movement with the mouse instead of the slider
 - [ ] add R&C for face types (dual polygons)
 - [ ] add predefined palettes in the colorPad
-- [ ] add more trasnformations and visualizations (truncation, fractalization, circle packing)
+- [ ] add circle packing visualization
 
 ## UI
 
@@ -33,3 +38,8 @@
 - [ ] fix polygon angles in some tilings
 - [ ] add missing R&C notations and fix checks on same vertices
 - [ ] fix screenshot delay
+
+## Ideas
+
+- [ ] Tower defense game
+- [ ] Infinity Loop

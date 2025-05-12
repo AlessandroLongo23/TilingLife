@@ -2,13 +2,14 @@
 	let { 
 		id, 
 		type = "text", 
-		label, 
+		label = null, 
 		value = $bindable(''), 
 		placeholder = "", 
 		min, 
 		max, 
 		step = 1, 
 		disabled = false,
+		align,
 		onChangeFunction = () => {}
 	} = $props();
 
@@ -79,13 +80,14 @@
 	}
 </script>
 
-<div class="grid w-full gap-1.5">
+<div class="w-full {align === 'center' ? 'flex flex-col items-center' : 'grid'} gap-1.5">
 	{#if label}
-		<label for={id} class="text-sm font-medium leading-none text-white/80">
+		<label for={id} class="{align === 'center' ? 'text-lg font-bold' : 'text-sm font-medium'}  leading-none text-white/80">
 			{label}
 		</label>
 	{/if}
-	<div class="relative">
+	
+	<div class="relative w-full">
 		<input 
 			id={id}
 			type={type}
@@ -101,7 +103,7 @@
 			max={max}
 			step={step}
 			disabled={disabled}
-			class="flex h-9 w-full rounded-md border border-zinc-700/50 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 ring-offset-zinc-900 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-500/40 focus-visible:border-green-500/70 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+			class="flex {align === 'center' ? 'text-center' : ''} h-9 w-full rounded-md border border-zinc-700/50 bg-zinc-800/90 px-3 py-2 text-sm text-zinc-100 ring-offset-zinc-900 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-500/40 focus-visible:border-green-500/70 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 		/>
 
 		{#if type === 'number'}
