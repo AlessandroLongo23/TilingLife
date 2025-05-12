@@ -230,13 +230,13 @@ export class Tiling {
                 node.nextState = 0;
                 continue;
             }
-            
-            if (state > 1) {
-                node.nextState = state + 1 > nodeRule.generations ? 0 : state + 1;
-                continue;
-            }
 
             let aliveRate = node.aliveNeighbors / node.neighbors.length;
+            
+            if (state > 1) {
+                node.nextState = state + 1 === nodeRule.generations ? 0 : state + 1;
+                continue;
+            }
                                 
             if (state === 1) {
                 let hasSurvivalNeighbors = false;
@@ -255,7 +255,7 @@ export class Tiling {
                 if (hasSurvivalNeighbors) {
                     node.nextState = 1;
                 } else {
-                    node.nextState = 0;
+                    node.nextState = node.state + 1 > nodeRule.generations ? 0 : node.state + 1;
                     node.behavior = 'decreasing';
                 }
             }
@@ -303,6 +303,17 @@ export class Tiling {
     }
 
     drawGameOfLife = (ctx) => {
+        const lineWidthValue = get(lineWidth);
+        if (lineWidthValue > 1) {
+            ctx.strokeWeight(lineWidthValue / get(controls).zoom);
+            ctx.stroke(0, 0, 0);
+        } else if (lineWidthValue === 0) {
+            ctx.noStroke();
+        } else {
+            ctx.strokeWeight(1 / get(controls).zoom);
+            ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
+        }
+
         for (let i = 0; i < this.nodes.length; i++)
             this.nodes[i].showGameOfLife(ctx, this.golRuleType, this.parsedGolRule, this.rules);
     }

@@ -84,17 +84,6 @@ export class Polygon {
     showGameOfLife = (ctx, ruleType, parsedGolRule, rules) => {
         ctx.push();
         
-        const lineWidthValue = get(lineWidth);
-        if (lineWidthValue > 1) {
-            ctx.strokeWeight(lineWidthValue / get(controls).zoom);
-            ctx.stroke(0, 0, 0);
-        } else if (lineWidthValue === 0) {
-            ctx.noStroke();
-        } else {
-            ctx.strokeWeight(1 / get(controls).zoom);
-            ctx.stroke(0, 0, 0, lineWidthValue); // Use lineWidth as opacity
-        }
-        
         if (get(liveChartMode) === 'count') {
             if (this.state === 0) {
                 ctx.fill(0, 0, 100);
