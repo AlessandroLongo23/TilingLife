@@ -215,10 +215,7 @@ export class Tiling {
                 this.nodes[i].neighbors[j].aliveNeighbors++;
         }
 
-        for (let i = 0; i < this.nodes.length; i++) {
-            const node = this.nodes[i];
-            const state = node.state;
-            
+        for (let node of this.nodes) {
             if (!node.neighbors || node.neighbors.length === 0) {
                 node.nextState = 0;
                 continue;
@@ -232,41 +229,14 @@ export class Tiling {
             }
 
             let aliveRate = node.aliveNeighbors / node.neighbors.length;
-            
-            if (state > 1) {
-                node.nextState = state + 1 === nodeRule.generations ? 0 : state + 1;
-                continue;
-            }
-                                
-            if (state === 1) {
-                let hasSurvivalNeighbors = false;
-                if (nodeRule.survival.min !== undefined) {
-                    if (nodeRule.survival.min <= 1 && nodeRule.survival.max <= 1) {
-                        hasSurvivalNeighbors = nodeRule.survival.min <= aliveRate && nodeRule.survival.max >= aliveRate;
-                    } else {
-                        hasSurvivalNeighbors = nodeRule.survival.min <= node.aliveNeighbors && nodeRule.survival.max >= node.aliveNeighbors;
-                        node.behavior = 'increasing';
-                    }
-                } else {
-                    hasSurvivalNeighbors = nodeRule.survival.includes(node.aliveNeighbors);
-                    node.behavior = 'increasing';
-                }
 
-                if (hasSurvivalNeighbors) {
-                    node.nextState = 1;
-                } else {
-                    node.nextState = node.state + 1 > nodeRule.generations ? 0 : node.state + 1;
-                    node.behavior = 'decreasing';
-                }
-            }
-
-            else if (state === 0) {
+            if (node.state === 0) {
                 let hasBirthNeighbors = false;
                 if (nodeRule.birth.min !== undefined) {
                     if (nodeRule.birth.min <= 1 && nodeRule.birth.max <= 1) {
-                        hasBirthNeighbors = nodeRule.birth.min <= aliveRate && nodeRule.birth.max >= aliveRate;
+                        hasBirthNeighbors = aliveRate >= nodeRule.birth.min && aliveRate <= nodeRule.birth.max;
                     } else {
-                        hasBirthNeighbors = nodeRule.birth.min <= node.aliveNeighbors && nodeRule.birth.max >= node.aliveNeighbors;
+                        hasBirthNeighbors = node.aliveNeighbors >= nodeRule.birth.min && node.aliveNeighbors <= nodeRule.birth.max;
                         if (hasBirthNeighbors) {
                             node.behavior = 'increasing';
                         } else {
@@ -295,6 +265,32 @@ export class Tiling {
                 } else {
                     node.nextState = 0;
                 }
+            }
+                                
+            else if (node.state === 1) {
+                let hasSurvivalNeighbors = false;
+                if (nodeRule.survival.min !== undefined) {
+                    if (nodeRule.survival.min <= 1 && nodeRule.survival.max <= 1) {
+                        hasSurvivalNeighbors = aliveRate >= nodeRule.survival.min && aliveRate <= nodeRule.survival.max;
+                    } else {
+                        hasSurvivalNeighbors = node.aliveNeighbors >= nodeRule.survival.min && node.aliveNeighbors <= nodeRule.survival.max;
+                        node.behavior = 'increasing';
+                    }
+                } else {
+                    hasSurvivalNeighbors = nodeRule.survival.includes(node.aliveNeighbors);
+                    node.behavior = 'increasing';
+                }
+
+                if (hasSurvivalNeighbors) {
+                    node.nextState = 1;
+                } else {
+                    node.nextState = node.state + 1 >= nodeRule.generations ? 0 : node.state + 1;
+                    node.behavior = 'decreasing';
+                }
+            }
+
+            else {
+                node.nextState = node.state + 1 === nodeRule.generations ? 0 : node.state + 1;
             }
         }
 

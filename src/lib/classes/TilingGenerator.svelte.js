@@ -1220,16 +1220,20 @@ export class TilingGenerator {
             if (pieces[i].startsWith('B')) {
                 if (pieces[i].slice(1).includes('-')) {
                     let [min, max] = pieces[i].slice(1).split('-').map(Number);
-                    rule.birth.min = min;
-                    rule.birth.max = max;
+                    rule.birth = {
+                        min: min,
+                        max: max
+                    }
                 } else {
                     rule.birth = pieces[i].slice(1).split('').map(Number);
                 }
             } else if (pieces[i].startsWith('S')) {
                 if (pieces[i].slice(1).includes('-')) {
                     let [min, max] = pieces[i].slice(1).split('-').map(Number);
-                    rule.survival.min = min;
-                    rule.survival.max = max;
+                    rule.survival = {
+                        min: min,
+                        max: max
+                    }
                 } else {
                     rule.survival = pieces[i].slice(1).split('').map(Number);
                 }

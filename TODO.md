@@ -28,6 +28,8 @@
 - [ ] add predefined palettes in the colorPad
 - [ ] add circle packing visualization
 - [ ] move gol simulation controls to the bottom in a video style (pause, play, speed)
+- [ ] expand the gol catalogue with dynamic content based on tiling and rule (show oscillators, still life, etc.)
+- [ ] buttons for random tiling and rule selection
 
 ## UI
 
