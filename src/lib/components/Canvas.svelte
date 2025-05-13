@@ -525,7 +525,7 @@
     {#if showExtra}
         {#if !showGameOfLife}
             {#if $selectedTiling.rulestring.includes('*')}
-                <div class="absolute bottom-4 right-4 w-96 z-20">
+                <div class="absolute bottom-4 left-4 z-20">
                     <ColorPad />
                 </div>
             {/if}
