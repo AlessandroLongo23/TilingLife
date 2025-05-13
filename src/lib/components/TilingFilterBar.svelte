@@ -68,14 +68,6 @@
         showDual = !showDual;
     };
     
-    const togglePolygonFilterMode = () => {
-        polygonFilterMode = polygonFilterMode === 'exact' ? 'contains' : 'exact';
-    };
-    
-    const toggleVertexTypeFilterMode = () => {
-        vertexTypeFilterMode = vertexTypeFilterMode === 'exact' ? 'contains' : 'exact';
-    };
-    
     const clearFilters = () => {
         selectedTypes = [];
         selectedPolygons = [];
@@ -89,7 +81,13 @@
 <div class="h-full overflow-y-auto border-r border-zinc-700/50">
     <div class="flex flex-col gap-6 p-4">
         <div class="filter-section">
-            <div class="flex justify-between items-center cursor-pointer p-2 rounded-md hover:bg-zinc-800/80 transition-colors" onclick={() => toggleSection('types')}>
+            <div 
+                role="button"
+                tabindex="0"
+                onkeydown={() => {}}
+                class="flex justify-between items-center cursor-pointer p-2 rounded-md hover:bg-zinc-800/80 transition-colors" 
+                onclick={() => toggleSection('types')}
+            >
                 <h3 class="text-xs uppercase text-zinc-300 font-medium tracking-wider">Class</h3>
                 <button class="p-1.5 bg-zinc-800 rounded-md text-zinc-400 border border-zinc-700/50">
                     {#if typesSectionExpanded}
@@ -203,7 +201,13 @@
         
         <!-- Dual toggle -->
         <div class="filter-section border-t border-zinc-800 pt-4">
-            <div class="flex justify-between items-center cursor-pointer p-2 rounded-md hover:bg-zinc-800/80 transition-colors" onclick={() => toggleSection('dual')}>
+            <div 
+                role="button"
+                tabindex="0"
+                onkeydown={() => {}}
+                class="flex justify-between items-center cursor-pointer p-2 rounded-md hover:bg-zinc-800/80 transition-colors" 
+                onclick={() => toggleSection('dual')}
+            >
                 <h3 class="text-xs uppercase text-zinc-300 font-medium tracking-wider">Dual Tilings</h3>
                 <button class="p-1.5 bg-zinc-800 rounded-md text-zinc-400 border border-zinc-700/50">
                     {#if dualSectionExpanded}

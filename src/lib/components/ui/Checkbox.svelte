@@ -10,7 +10,14 @@
 	} = $props();
 </script>
 
-<div class="flex items-center space-x-3">
+<div 
+	tabindex="0"
+	role="checkbox"
+	aria-checked={checked}
+	class="flex items-center space-x-3 cursor-pointer" 
+	onclick={() => (checked = !checked)}
+	onkeypress={(e) => {}}
+>
 	<div class="relative flex items-center">
 		<input
 			type="checkbox"
@@ -23,8 +30,8 @@
 		<Check class="absolute top-0 left-0 w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
 	</div>
 	<label
-		for={id}
-		class="text-sm font-medium text-white/80 select-none"
+		for={null}
+		class="text-sm font-medium text-white/80 cursor-pointer"
 	>
 		{label}
 	</label>

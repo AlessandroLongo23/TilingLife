@@ -8,7 +8,7 @@
     import TilingCard from '$lib/components/TilingCard.svelte';
     import TilingFilterBar from '$lib/components/TilingFilterBar.svelte';
     
-    let showFilters = $state(false);
+    let showFilters = $state(true);
     
     const toggleFilters = () => {
         showFilters = !showFilters;

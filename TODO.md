@@ -12,6 +12,7 @@
 
 ## Algorithm
 
+- [x] expand notation to allow rotations of a certain angle around a point
 - [ ] Figure out a way to detect the vertices types molteplicity automatically
 
 ## Optimizations
@@ -34,14 +35,16 @@
 ## UI
 
 - [x] remove unnecessary buttons and checkboxes (or move them to dev visualization)
+- [ ] add a visualization for the construction steps
+- [ ] add constructing animations
 
 ## Bugs
 
 - [x] fix adjustable angle tilings
+- [x] fix screenshot delay
 - [ ] fix polygon angles in some tilings
 - [ ] fix missing tiling (with overlapping between polygons)
 - [ ] add missing R&C notations and fix checks on same vertices
-- [ ] fix screenshot delay
 - [ ] fix text size based on zoom
 
 ## Ideas

@@ -72,53 +72,58 @@ export class Tiling {
     }
 
     drawConstructionPoints = (ctx) => {
-        let offset = new Vector(6 / get(controls).zoom, 0 / get(controls).zoom)
-        let pointSize = 6 / get(controls).zoom
-
-        ctx.scale(1, -1);
-        ctx.textSize(12 / get(controls).zoom);
-        ctx.fill(0, 0, 100);
-        ctx.strokeWeight(1.5 / get(controls).zoom);
-        ctx.stroke(0, 0, 0);
-
         let uniqueCentroids = [];
         for (let anchorNode of this.anchorNodes)
             if (!uniqueCentroids.some(c => isWithinTolerance(c, anchorNode.centroid)))
                 uniqueCentroids.push(anchorNode.centroid);
-
         let uniqueCentroidsSorted = sortPointsByAngleAndDistance(uniqueCentroids);
         uniqueCentroidsSorted = uniqueCentroidsSorted.filter(centroid => !isWithinTolerance(centroid, new Vector()));
-        for (let i = 0; i < uniqueCentroidsSorted.length; i++) {
-            let centroid = uniqueCentroidsSorted[i];
-            ctx.ellipse(centroid.x, -centroid.y, pointSize);
-            ctx.text('c' + (i + 1), centroid.x + offset.x, -centroid.y + offset.y);
-        }
 
         let uniqueHalfways = [];
         for (let anchorNode of this.anchorNodes)
             for (let halfway of anchorNode.halfways)
                 if (!uniqueHalfways.some(h => isWithinTolerance(h, halfway)))
                     uniqueHalfways.push(halfway);
-
         let uniqueHalfwaysSorted = sortPointsByAngleAndDistance(uniqueHalfways);
-        for (let i = 0; i < uniqueHalfwaysSorted.length; i++) {
-            let halfway = uniqueHalfwaysSorted[i];
-            ctx.ellipse(halfway.x, -halfway.y, pointSize);
-            ctx.text('h' + (i + 1), halfway.x + offset.x, -halfway.y + offset.y);
-        }
 
         let uniqueVertices = [];
         for (let anchorNode of this.anchorNodes)
             for (let vertex of anchorNode.vertices)
                 if (!uniqueVertices.some(v => isWithinTolerance(v, vertex)))
                     uniqueVertices.push(vertex);
+        let uniqueVerticesSorted = sortPointsByAngleAndDistance(uniqueVertices);
 
-        let uniqueVerticesSorted = sortPointsByAngleAndDistance(uniqueVertices); 
-        for (let i = 0; i < uniqueVerticesSorted.length; i++) {
-            let vertex = uniqueVerticesSorted[i];
-            ctx.ellipse(vertex.x, -vertex.y, pointSize);
-            ctx.text('v' + (i + 1), vertex.x + offset.x, -vertex.y + offset.y);
-        }
+
+        let offset = new Vector(6 / get(controls).zoom, 0 / get(controls).zoom)
+        let pointSize = 6 / get(controls).zoom
+
+        ctx.scale(1, -1);
+        ctx.textSize(18 / get(controls).zoom);
+        ctx.fill(0, 0, 100);
+        ctx.stroke(0, 0, 0);
+
+        ctx.strokeWeight(1 / get(controls).zoom);
+
+        for (let i in uniqueCentroidsSorted)
+            ctx.ellipse(uniqueCentroidsSorted[i].x, -uniqueCentroidsSorted[i].y, pointSize);
+
+        for (let i in uniqueHalfwaysSorted)
+            ctx.ellipse(uniqueHalfwaysSorted[i].x, -uniqueHalfwaysSorted[i].y, pointSize);
+
+        for (let i in uniqueVerticesSorted)
+            ctx.ellipse(uniqueVerticesSorted[i].x, -uniqueVerticesSorted[i].y, pointSize);
+
+        ctx.strokeWeight(3 / get(controls).zoom);
+
+        for (let i in uniqueCentroidsSorted)
+            ctx.text('c' + (i + 1), uniqueCentroidsSorted[i].x + offset.x, -uniqueCentroidsSorted[i].y + offset.y);
+
+        for (let i in uniqueHalfwaysSorted)
+            ctx.text('h' + (i + 1), uniqueHalfwaysSorted[i].x + offset.x, -uniqueHalfwaysSorted[i].y + offset.y);
+
+        for (let i in uniqueVerticesSorted)
+            ctx.text('v' + (i + 1), uniqueVerticesSorted[i].x + offset.x, -uniqueVerticesSorted[i].y + offset.y);
+
         
         const showDualConnectionsValue = get(showDualConnections);
         if (showDualConnectionsValue)

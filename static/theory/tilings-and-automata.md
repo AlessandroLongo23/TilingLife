@@ -1,12 +1,36 @@
-# Tilings
+# Theory
 
-## Classification
+## Tilings
+
+### Classification
 
 A tiling is a covering of the plane using one or more geometric shapes, called tiles, with no overlaps and no gaps. In mathematics, tilings are studied in various contexts and have applications in crystallography, material science, and art.
 
-### The 15 valid vertex shapes
+Tilings can be categorized based on various properties, including:
 
-When trying to analyze tilings in a rigorous way, the first thing we need to consider is how many ways there are to build vertices, i.e. what are the different combinations of regular polygons that, when wrapped around a point, cover exactly 360°.
+#### Symmetry Groups
+
+Tilings can be classified by their symmetry groups. The 17 wallpaper groups describe all possible symmetry types of periodic tilings in the Euclidean plane.
+
+#### Regularity
+
+Tilings can be regular, semi-regular, demi-regular, or irregular based on the types of polygons used and vertex configurations.
+
+#### Periodicity
+
+Periodic tilings repeat in a regular pattern, while aperiodic tilings (like Penrose tilings) do not have translational symmetry.
+
+#### Tile type
+
+Tilings can consist of curved shapes, regular or irregular polygons, convex or concave shapes. They can be edge-to-edge, or non edge-to-edge, where you can shift tiles so that their sides don't align with each other.
+
+For now, we only have $k$-uniform periodic tilings available, which are the easiest and most "regular" kind of tiling there is, but in the future we plan on introducing more types and ways to construct them.
+
+To explain what a $k$-uniform tiling is, we first need to understand what a vertex configuration is.
+
+#### The 15 valid vertex configurations
+
+The first thing we need to consider is how many ways there are to build vertices, i.e. what are the different combinations of regular polygons that, when wrapped around a point, cover exactly 360°.
 
 Turns out that there are only 21 ways to do that:
 
@@ -21,19 +45,35 @@ Turns out that there are only 21 ways to do that:
 | $6$ | ![3^6](../theory/images/vertexTypes/3^6.png) | | | | | | | | | |
 | | $\textcolor{lightgreen}{3^6}$ | | | | | | | | | |
 
-Of which only 15 can generate valid tilings (in green).
+Of which only 15 can generate valid tilings (in green). If you start by laying out any of the other 6, you'll quickly discover that there's no way to continue adding tiles without overlapping them or leaving empty space between them.
 
-### Regular Tilings
+A $k$-uniform tiling is then an edge-to-edge periodic tiling that contains $k$ vertex configurations such that each of them can not be mapped, via a combination of translation and rotation, to another. This means that a $k$-uniform tiling can have less than $k$ distinct vertex configurations.
 
-Regular tilings are composed of regular polygons arranged in a way that every vertex looks the same. There are only three regular tilings of the plane: triangular, square, and hexagonal.
+A tiling that has exactly $k$ distinct configurations is called $k$-archimedean.
+
+Here's the table with the tiling count for each combination of number of total vertex configurations $k\le6$ and distinct vertex configurations $m\le6$.
+
+| $k$ / $m$ |  1  |  2  |  3  |  4  |  5  |  6  | Total |
+|:---------:|:---:|:---:|:---:|:---:|:---:|:---:|:-----:|
+|     1     | 11  |  0  |  0  |  0  |  0  |  0  |  11   |
+|     2     |  0  | 20  |  0  |  0  |  0  |  0  |  20   |
+|     3     |  0  | 22  | 39  |  0  |  0  |  0  |  61   |
+|     4     |  0  | 33  | 85  | 33  |  0  |  0  |  151  |
+|     5     |  0  | 74  | 149 | 94  | 15  |  0  |  332  |
+|     6     |  0  | 100 | 284 | 187 | 92  | 10  |  673  |
+|   Total   | 11  | ∞   | ∞   | ∞   | ∞   | ∞   |  ∞    |
+
+#### Regular Tilings
+
+**Regular tilings** are $1$-uniform tilings composed of regular polygons arranged in a way that every vertex looks the same. There are only $3$ regular tilings of the plane: triangular, square, and hexagonal.
 
 | ![3^6](../tilings/1Ur/3_r60_r(h2).png) | ![4^4](../tilings/1Ur/4-4-0,4_r90_m(v2).png) | ![6^3](../tilings/1Ur/6_r60_r(h1).png) |
 | :---: | :---: | :---: |
 | $3^6$ | $4^4$ | $6^3$ |
 
-### Semi-Regular Tilings
+#### Semi-Regular Tilings
 
-Semi-regular tilings use two or more regular polygons, with the same arrangement of polygons at each vertex. There are eight semi-regular tilings (also known as Archimedean tilings):
+The other $8$ $1$-uniform tilings are called **Semi-regular** tilings, but they consists of two or more regular polygons.
 
 | ![3^4.6](../tilings/1Usr/6-3-3_r60_r(h5).png) | ![3.3.3.3.6](../tilings/1Usr/4-3_m90_r(h2).png) | ![3.3.3.4](../tilings/1Usr/4-3-3,0,0,0,4_r90_r(h2).png) | ![3.12.12](../tilings/1Usr/6-4-3_m30_r(c2).png) |
 | :---: | :---: | :---: | :---: |
@@ -41,43 +81,70 @@ Semi-regular tilings use two or more regular polygons, with the same arrangement
 | ![(3.6)^2](../tilings/1Usr/6-3-6_m30_r(v4).png) | ![3.12^2](../tilings/1Usr/12-3_m30_r(h3).png) | ![4.6.12](../tilings/1Usr/12-6,4_m30_r(c2).png) | ![4.8^2](../tilings/1Usr/8-4_m90_r(h4).png) |
 | $(3.6)^2$ (Trihexagonal) | $3.12^2$ (Truncated hexagonal) | $4.6.12$ (Truncated trihexagonal) | $4.8^2$ (Truncated square) |
 
-Tilings can be categorized based on various properties:
+Currently, our tiling catalogue contains all $k$-uniform tilings up to $k=3$, and some for $k=4,5$ and $6$.
 
-### Symmetry Groups
+### GomJau-Hogg Generation Method
 
-Tilings can be classified by their symmetry groups. The 17 wallpaper groups describe all possible symmetry types of periodic tilings in the Euclidean plane.
+In this application, we generate tilings using a systematic approach based on the GomJau-Hogg notation:
 
-### Regularity
+#### Seed
 
-Tilings can be regular, semi-regular, demi-regular, or irregular based on the types of polygons used and vertex configurations.
+Each tiling can be expressed with a string of characters which defines the base shape, called **seed**, and a set of transformations, all divided by the "/" character.
 
-### Periodicity
+The seed is composed by groups, divided by the hyphen "-", which are further divided in shapes by a comma ",", where the numbers represents the number of sides.
 
-Periodic tilings repeat in a regular pattern, while aperiodic tilings (like Penrose tilings) do not have translational symmetry.
+After the first group, which can only consists of one shape (the central tile), each new one starts laying the tiles clockwise from the top, aligning them edge-to-edge to the free sides. Note that $0$ can be used as a placeholder to skip one side we don't want to cover.
 
-For now, we only have $k$-uniform periodic tilings available, but in the future we plan on introducing different types and ways to construct them.
+```ad-example
+Example
 
-## Generation Method
+The following seed:
 
-In this application, we generate tilings using a systematic approach based on mathematical rules:
+$$\text{4-3,3-6-4,3}$$
 
-### Rule Strings
+is composed by three groups of one (red square), two (green triangles), one (blue hexagon) and two (pink) shapes each.
 
-The rule strings define the base shape, orientation, and transformations to generate a specific tiling pattern. For example,
+![seed](../theory/images/4-3,3-6-4,3.png)
+```
+
+#### Geometrical transformation
+
+Once the seed is laid out, the algorithm proceeds to perform the geometrical transformations, which are:
+
+- mirroring, represented by the letter $m$
+- rotations, represented by the letter $r$
+- translations (added by us to make the notations more flexible), represented by the letter $t$
+
+What follows encodes the geometrical entity that the transformation is operated with respect to. It can be:
+
+- a line: a number represents its inclination (in degrees), and the transformation is repeated doubling the angle until it reaches $360\degree$
+- a point: a letter represents the type ($v$ for vertex, $h$ for halfway point, $c$ for centroid) and a following number represents its ordering when counting clockwise from the top
+
+The list of transformations can be repeated any number of times. With every additional iteration, the tiling grows more and more.
+
+```ad-example
+Example
+
+For example:
 
 $$
 \text{4/m45/r(h1)}
 $$
 
-defines a square tiling with a 45-degree rotation.
+Here:
+- $4$ is the seed: just one square
+- $m45$ defines a set of mirroring trasformations starting from $45\degree$
+- $r(h1)$ defines a rotation around the first halfway point found in a clockwise order starting from the top, i.e. the midpoint of the square's top side
 
-### Transformations
+![seed](../theory/images/4_m45_r(h1).png)
+```
 
-We apply transformations like rotations, translations, and reflections to create complex patterns from simple base shapes. The number of transformation steps determines the complexity of the resulting pattern.
+This simple setup allows to construct all $k$-uniform tilings.
 
-# Conway's Game of Life
+## Conway's Game of Life
 
-## Definition
+### Definition
+
 Conway's Game of Life is a two-dimensional cellular automaton created by John
 Conway in 1970. It's a zero-player game where evolution is determined by the initial state.
 Despite its very simple rules, it exhibits complex and often unpredictable behaviors.
@@ -86,10 +153,10 @@ In its original version, the Game of Life operates on an infinite grid of
 square cells. Each cell can be in one of two states: dead or alive. At every
 iteration, the state of each cell evolves according to the following rules:
 
-* Any alive cell with fewer than 2 alive neighbors dies (underpopulation).
-* Any alive cell with 2 or 3 alive neighbors survives to the next generation.
-* Any alive cell with more than 3 alive neighbors dies (overpopulation).
-* Any dead cell with exactly 3 alive neighbors becomes alive (reproduction).
+- Any alive cell with fewer than 2 alive neighbors dies (underpopulation).
+- Any alive cell with 2 or 3 alive neighbors survives to the next generation.
+- Any alive cell with more than 3 alive neighbors dies (overpopulation).
+- Any dead cell with exactly 3 alive neighbors becomes alive (reproduction).
 
 These transition rules are concisely described by the string **B3/S23**, where
 **B3** indicates birth on exactly three neighbors, and **S23** indicates
@@ -97,24 +164,25 @@ survival on two or three neighbors.
 
 ![gol](./images/videos/gol.gif)
 
-### Patterns
+#### Patterns
 
 Various patterns can emerge:
 
-* Still lifes: Patterns that don't change
-* Oscillators: Patterns that repeat after a fixed number of generations
-* Spaceships: Patterns that translate across the grid
-* Methuselahs: Patterns that evolve for many generations before stabilizing
+- Still lifes: Patterns that don't change
+- Oscillators: Patterns that repeat after a fixed number of generations
+- Spaceships: Patterns that translate across the grid
+- Methuselahs: Patterns that evolve for many generations before stabilizing
 
 ![still life](videos/still_life.gif)
 ![oscillator](videos/oscillators.gif)
 ![spaceships](videos/spaceships.gif)
 ![methuselahs](videos/methuselahs.gif)
 
-## Extensions
+### Extensions
+
 We also explored some extensions of the Game of Life:
 
-### Generations
+#### Generations
 
 In the "Generations" variant, cells can pass through intermediate states between
 alive and dead before fully transitioning. Each cell is associated with a small integer
@@ -125,14 +193,14 @@ in the binary model.
 
 ![generations1](./images/videos/generations.gif)
 
-### Larger than Life
+#### Larger than Life
 
 "Larger than Life" generalizes the neighborhood radius beyond the immediate
 adjacent cells. Instead of counting only the eight nearest neighbors, these
 rules consider all cells within a specified radius *r* on the grid, with
 distinct birth and survival intervals defined over that neighborhood.
 
-### Non-square grids
+#### Non-square grids
 
 The underlying grid can be replaced by arbitrary tilings or graphs, allowing
 each cell to have a non-uniform number of neighbors. Examples include hexagonal
@@ -145,7 +213,7 @@ structures.
 ![NonSquare2](./images/videos/tiling2.gif)
 ![NonSquare3](./images/videos/tiling3.gif)
 
-## Searching for interesting rules
+### Searching for interesting rules
 
 One thing that one can realize while trying rules and tilings on the simulator
 is that it is really hard to find interesting rules, especially on complex
@@ -154,7 +222,7 @@ tilings.
 In order to define what a rule should satisfy to be "interesting", we
 used the following metrics:
 
-### Used metrics
+#### Used metrics
 
 These metrics are presented in **Life Worth Mentioning: Complexity in Life-Like Cellular Automata**
 Peña et al.
@@ -163,14 +231,14 @@ To systematically compare the dynamical regimes generated by different rules,
 the authors employ two complementary information-theoretic metrics computed on each
 configuration:
 
-* **Density ($\rho$).** The fraction of live cells in the system,
+- **Density ($\rho$).** The fraction of live cells in the system,
   $$
   \rho=\dfrac{1}{N}\sum_i s_i
   $$
   where $s_i\in\{0,1\}$ and $N$ is the total
   number of cells. Density measures the overall activity or fill ratio.
 
-* **Statistical complexity ($D$).** The difference between the marginal entropy
+- **Statistical complexity ($D$).** The difference between the marginal entropy
   of the cell-state distribution,
   $$
   H(S)=-\rho\log_2\rho - (1-\rho)\log_2(1-\rho)
@@ -191,14 +259,14 @@ behaviors and identify those that produce the richest dynamics, such as
 We tried to use these metrics to search for interesting rules on non-square
 tilings.
 
-### Parallel computing
+#### Parallel computing
 
 Let us now think about the number of iterations of the automaton we need to compute.
 
 1. 1000 iterations
 2. 100 random starts
-3. all possible rules, which is $2^(n+1)$, where $n$ is the maximum number of neighbors
-of each cell.
+3. all possible rules, which is $2^{2(n+1)}$, where $n$ is the maximum number of neighbors
+of each cell (all combinations of $2^{n+1}$ birth rules and $2^{n+1}$ survival rules).
 
 It is easy to see that this number is very big, making the computation impossible
 to be ran sequentially.
@@ -229,12 +297,11 @@ In order to run this code on a machine with a powerful GPU, we made use of the c
 provided by DTU. The file responsible for creating the job that runs the simulation
 is `job.lsf`.
 
+#### Results
 
-### Results
 We ran the simulation on 3 different tilings. We put a limit of 8 maximum neighbors
 on all of them (meaning that rules with more than 8 neighbors were not considered).
 
 The tilings that were used are the following:
 
-### Future work
-
+#### Future work

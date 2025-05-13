@@ -1,5 +1,4 @@
 <script>
-	import { onMount } from 'svelte';
 	import { createEventDispatcher } from 'svelte';
 	import katex from 'katex';
 	import 'katex/dist/katex.min.css';
@@ -24,17 +23,6 @@
 			}
 		});
 	}
-	
-	// Initialize MathJax on content changes
-	// $effect(() => {
-	// 	if (content && typeof window !== 'undefined' && window.MathJax) {
-	// 		// Allow content to be rendered first, then process math
-	// 		setTimeout(() => {
-	// 			window.MathJax.typeset();
-	// 			setTableColumnCounts();
-	// 		}, 100);
-	// 	}
-	// });
 	
 	// Process LaTeX with KaTeX
 	$effect(() => {
@@ -94,7 +82,7 @@
 		if (!containerElement) return;
 		
 		const scrollPosition = containerElement.scrollTop;
-		const headings = containerElement.querySelectorAll('h1, h2, h3');
+		const headings = containerElement.querySelectorAll('h2, h3, h4');
 		
 		for (let i = headings.length - 1; i >= 0; i--) {
 			const heading = headings[i];
@@ -108,19 +96,6 @@
 			}
 		}
 	}
-	
-	onMount(() => {
-		if (containerElement) {
-			// setTimeout(() => {
-			// 	handleScroll({ target: containerElement });
-			// 	// Initial MathJax typesetting
-			// 	if (typeof window !== 'undefined' && window.MathJax) {
-			// 		window.MathJax.typeset();
-			// 	}
-			// 	setTableColumnCounts();
-			// }, 100);
-		}
-	});
 </script>
 
 <div 
@@ -142,16 +117,16 @@
 </div>
 
 <style>
-	:global(.markdown-content h1) {
+	:global(.markdown-content h2) {
 		@apply text-4xl font-bold text-white mb-10 mt-24 pb-4 border-b border-green-400/80;
 		scroll-margin-top: 1rem;
 	}
 	
-	:global(.markdown-content h2) {
+	:global(.markdown-content h3) {
 		@apply text-2xl font-semibold text-white mb-4 mt-16 scroll-mt-20;
 	}
 	
-	:global(.markdown-content h3) {
+	:global(.markdown-content h4) {
 		@apply text-xl font-medium text-white mb-3 mt-8 scroll-mt-16;
 	}
 	
@@ -220,6 +195,13 @@
 	:global(.markdown-content tr:nth-child(even)) {
 		@apply bg-zinc-800/10;
 	}
+
+	:global(.markdown-content img) {
+		@apply object-contain mx-auto block;
+		width: 33%;
+		height: auto;
+		max-width: 33%;
+	}
 	
 	/* Table images styling for flexible sizing and distribution */
 	:global(.markdown-content table img) {
@@ -257,15 +239,6 @@
 		margin: 0 auto;
 	}
 	
-	/* MathJax styling (commented) */
-	/* :global(.markdown-content .MathJax) {
-		@apply text-zinc-200;
-	}
-
-	:global(.markdown-content mjx-container) {
-		@apply overflow-x-auto overflow-y-hidden my-6;
-	} */
-	
 	/* KaTeX styling */
 	:global(.markdown-content .katex) {
 		@apply text-zinc-200;
@@ -279,5 +252,58 @@
 	:global(.markdown-content .katex-display > .katex) {
 		@apply text-zinc-100;
 		font-size: 1.21em;
+	}
+	
+	/* Admonition styling */
+	:global(.markdown-content .admonition) {
+		@apply shadow-lg;
+	}
+	
+	:global(.markdown-content .admonition .content) {
+		@apply text-zinc-300;
+	}
+	
+	:global(.markdown-content .admonition .content p) {
+		@apply mb-4 last:mb-0;
+	}
+	
+	:global(.markdown-content .admonition .content ul) {
+		@apply list-none ml-0 mb-4 last:mb-0;
+	}
+	
+	:global(.markdown-content .admonition .content ul li) {
+		@apply flex items-start mb-2 last:mb-0;
+	}
+	
+	:global(.markdown-content .admonition .content ul li::before) {
+		content: '';
+		@apply inline-block w-2 h-2 mr-3 mt-2 bg-zinc-600 rounded-full;
+	}
+	
+	:global(.markdown-content .admonition .content ol) {
+		counter-reset: admonition-ol;
+		@apply list-none pl-0 mb-4 last:mb-0;
+	}
+	
+	:global(.markdown-content .admonition .content ol li) {
+		counter-increment: admonition-ol;
+		@apply flex items-start mb-2 last:mb-0;
+	}
+	
+	:global(.markdown-content .admonition .content ol li::before) {
+		content: counter(admonition-ol);
+		@apply inline-flex items-center justify-center min-w-6 h-6 mr-2 bg-zinc-700 text-white rounded-full text-sm font-semibold;
+	}
+	
+	:global(.markdown-content .admonition .content code) {
+		@apply bg-zinc-800/50;
+	}
+	
+	:global(.markdown-content .admonition .content pre) {
+		@apply bg-zinc-800/30;
+	}
+	
+	:global(.markdown-content .admonition .content .katex) {
+		@apply text-zinc-200;
 	}
 </style> 

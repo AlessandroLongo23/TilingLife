@@ -240,7 +240,7 @@ export class DualPolygon extends Polygon {
         
         const baseHue = hash % 360;
         const rotatedHue = (baseHue + a) % 360;
-        const displacedHue = rotatedHue + b * Math.sin(rotatedHue * Math.PI / 180);
+        const displacedHue = rotatedHue + b * this.vertices.length * Math.sin(rotatedHue * Math.PI / 180);
         
         return (displacedHue + 360) % 360;
     }

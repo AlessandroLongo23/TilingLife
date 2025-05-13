@@ -180,7 +180,8 @@ export class TilingGenerator {
                 if (!this.shapeSeed[i][j].includes('(')) {
                     this.shapeSeed[i][j] = {
                         type: 'regular',
-                        n: parseInt(this.shapeSeed[i][j])
+                        n: parseInt(this.shapeSeed[i][j]),
+                        special: this.shapeSeed[i][j].includes("'")
                     }
                 } else {
                     let n = this.shapeSeed[i][j].split('(')[0];
@@ -202,22 +203,36 @@ export class TilingGenerator {
         this.transforms = [];
         for (let i = 1; i < phases.length; i++) {
             let transform = {};
-            if (phases[i].includes('(')) {
+            if (phases[i].includes('(') && phases[i].includes(')')) {
+                let angle = 180;
+                if (phases[i].includes('[') && phases[i].includes(']')) {
+                    angle = parseInt(phases[i].split('[')[1].split(']')[0]);
+                }
+                if (!possibleAngles.includes(angle)) {
+                    console.error('Invalid angle', angle);
+                    angle = Math.PI;
+                } else {
+                    angle = angle * Math.PI / 180;
+                }
+
                 transform = {
                     type: phases[i][0],
                     relativeTo: phases[i].split('(')[1].split(')')[0],
+                    angle: angle,
                     anchor: null
                 }
             } else {
                 let type = phases[i][0];
                 let angle = parseInt(phases[i].slice(1));
+                if (!possibleAngles.includes(angle)) {
+                    console.error('Invalid angle', angle);
+                    angle = Math.PI;
+                } else {
+                    angle = angle * Math.PI / 180;
+                }
                 transform = {
                     type: type,
                     angle: angle
-                }
-
-                if (!possibleAngles.includes(parseInt(transform.angle))) {
-                    throw new Error('Invalid angle');
                 }
             }
             this.transforms.push(transform);
@@ -233,14 +248,22 @@ export class TilingGenerator {
                 alfa: this.shapeSeed[0][0].alfa
             });
         } else {
-            this.coreNode = new RegularPolygon({
-                centroid: new Vector(
-                    this.shapeSeed[0][0].n == 3 ? Math.sqrt(3) / 6 : 0,
-                    this.shapeSeed[0][0].n == 3 ? 0.5 : 0
-                ),
-                n: this.shapeSeed[0][0].n,
-                angle: this.shapeSeed[0][0].n == 3 ? 0 : Math.PI / this.shapeSeed[0][0].n
-            });
+            if (this.shapeSeed[0][0].special) {
+                this.coreNode = new RegularPolygon({
+                    centroid: new Vector(),
+                    n: 3,
+                    angle: -Math.PI / 2
+                });
+            } else {
+                this.coreNode = new RegularPolygon({
+                    centroid: new Vector(
+                        this.shapeSeed[0][0].n == 3 ? Math.sqrt(3) / 6 : 0,
+                        this.shapeSeed[0][0].n == 3 ? 0.5 : 0
+                    ),
+                    n: this.shapeSeed[0][0].n,
+                    angle: this.shapeSeed[0][0].n == 3 ? 0 : Math.PI / this.shapeSeed[0][0].n
+                });
+            }
         }
 
         this.tiling.nodes.push(this.coreNode);
@@ -426,10 +449,9 @@ export class TilingGenerator {
 
     mirrorByAngle = (angle, additionalNodes) => {
         const anglesToProcess = [];
-        let angleRad = angle * Math.PI / 180;
-        while (angleRad < 2 * Math.PI) {
-            anglesToProcess.push(angleRad + Math.PI / 2);
-            angleRad *= 2;
+        while (angle < 2 * Math.PI) {
+            anglesToProcess.push(angle + Math.PI / 2);
+            angle *= 2;
         }
         
         let newNodes = [];
@@ -462,31 +484,30 @@ export class TilingGenerator {
         }
 
         let newNodes = [];
-        for (let newLayerNode of [...this.newLayerNodes, ...this.seedNodes, ...additionalNodes]) {
-            let newNode = newLayerNode.clone();
+        for (let alfa = this.transforms[transformationIndex].angle; alfa < 2 * Math.PI; alfa += this.transforms[transformationIndex].angle) {
+            for (let newLayerNode of [...this.newLayerNodes, ...this.seedNodes, ...additionalNodes]) {
+                let newNode = newLayerNode.clone();
 
-            newNode.centroid.x = origin.x - (newNode.centroid.x - origin.x);
-            newNode.centroid.y = origin.y - (newNode.centroid.y - origin.y);
-            newNode.angle = (Math.PI + newNode.angle) % (Math.PI * 2);
+                newNode.centroid = Vector.add(origin, Vector.sub(newNode.centroid, origin).rotate(alfa));
+                newNode.angle = (alfa + newNode.angle) % (Math.PI * 2);
 
-            newNode.calculateCentroid();
-            newNode.calculateVertices();
-            newNode.calculateHalfways();
-            
-            newNodes.push(newNode);
+                newNode.calculateCentroid();
+                newNode.calculateVertices();
+                newNode.calculateHalfways();
+                
+                newNodes.push(newNode);
+            }
         }
 
         return newNodes;
     }
     
     rotateByAngle = (alfa, additionalNodes) => {
-        const angleRad = alfa * Math.PI / 180;
-        
         const anglesToProcess = [];
-        let currentAngle = angleRad;
+        let currentAngle = alfa;
         while (currentAngle < 2 * Math.PI) {
             anglesToProcess.push(currentAngle);
-            currentAngle += angleRad;
+            currentAngle += alfa;
         }
         
         const rotationCache = new Map();
