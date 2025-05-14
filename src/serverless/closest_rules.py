@@ -1,99 +1,61 @@
-#!/usr/bin/env python3
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
-import json
-import math
-from typing import List, Dict, Any, Tuple
+# 1. load the data
+df = pd.read_csv("./out/tiling-graph-3.csv")
 
-def load_data(json_file: str) -> List[Dict[str, Any]]:
-    """Load data from a JSON file."""
-    print(f"Loading data from {json_file}...")
-    with open(json_file, 'r') as f:
-        return json.load(f)
+# identify Conway’s Game of Life by its rule string
+life_str = "B3/S23"
+life_row = df[df["rulestr"] == life_str].iloc[0]
+life_rho = life_row["rho"]
+life_D   = life_row["D"]
 
-def find_rule_by_index(data: List[Dict[str, Any]], rule_index: int) -> Dict[str, Any]:
-    """Find a rule by its index."""
-    for rule in data:
-        if rule.get("rule_index") == rule_index:
-            return rule
-    raise ValueError(f"Rule with index {rule_index} not found")
+# 2. ρ–D scatter
+plt.figure()
+plt.scatter(df["rho"], df["D"], alpha=0.5)
+plt.scatter([life_rho], [life_D], color="orange", edgecolors="black", s=80, label="Game of Life")
+plt.legend()
+plt.xlabel("ρ (density)")
+plt.ylabel("D (complexity)")
+plt.title("Density vs Complexity")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
 
-def calculate_distances(data: List[Dict[str, Any]], target_rule: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Calculate distances between target rule and all other rules for each metric."""
-    # Get the target metrics
-    target_metrics = target_rule["rule_metrics"]
-    
-    results = []
-    
-    for rule in data:
-        # Skip if it's the target rule itself
-        if rule["rule_index"] == target_rule["rule_index"]:
-            continue
-        
-        rule_metrics = rule["rule_metrics"]
-        
-        # Calculate distances for each metric
-        avg_pop_distance = abs(target_metrics["average_population"] - rule_metrics["average_population"])
-        activity_distance = abs(target_metrics["activity"] - rule_metrics["activity"])
-        final_alive_distance = abs(target_metrics["final_alive"] - rule_metrics["final_alive"])
-        
-        # Calculate combined distance (Euclidean distance)
-        combined_distance = math.sqrt(
-            avg_pop_distance**2 + 
-            activity_distance**2 + 
-            final_alive_distance**2
-        )
-        
-        results.append({
-            "rule_index": rule["rule_index"],
-            "rule_format": rule["rule_format"],
-            "avg_pop_distance": avg_pop_distance,
-            "activity_distance": activity_distance,
-            "final_alive_distance": final_alive_distance,
-            "combined_distance": combined_distance
-        })
-    
-    return results
+# 3. complexity vs rule index
+plt.figure()
+plt.plot(df["rule"], df["D"], marker="o", linestyle="", alpha=0.5, label="all rules")
+plt.scatter([life_row["rule"]], [life_D], color="orange", edgecolors="black", s=80, label="Game of Life")
+plt.legend()
+plt.xlabel("Rule index")
+plt.ylabel("D (complexity)")
+plt.title("Complexity for each rule")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
 
-def find_closest_rules(distances: List[Dict[str, Any]], metric: str, n: int = 50) -> List[Dict[str, Any]]:
-    """Find the n closest rules based on a specific metric."""
-    sorted_distances = sorted(distances, key=lambda x: x[f"{metric}_distance"])
-    return sorted_distances[:n]
+# 4. 100 closest rules to Game of Life in the ρ–D plane
+# compute Euclidean distance in (rho, D)
+df["dist"] = np.sqrt((df["rho"] - life_rho)**2 + (df["D"] - life_D)**2)
 
-def display_closest_rules(closest: List[Dict[str, Any]], metric: str) -> None:
-    """Display the closest rules for a specific metric."""
-    print(f"\nTop 50 closest rules to rule 6152 by {metric}:")
-    print(f"{'Rule Index':<10} {'Rule Format':<10} {'Distance':<15}")
-    print("-" * 35)
-    
-    for rule in closest:
-        distance = rule[f"{metric}_distance"]
-        print(f"{rule['rule_index']:<10} {rule['rule_format']:<10} {distance:<15.6f}")
+# exclude the Game of Life itself and pick 100 nearest
+nearest = df[df["rulestr"] != life_str].nsmallest(100, "dist")
 
-def main():
-    # Define file paths
-    json_file = "24734614.json"
-    target_rule_index = 6152
-    
-    try:
-        # Load data
-        data = load_data(json_file)
-        
-        # Find target rule
-        target_rule = find_rule_by_index(data, target_rule_index)
-        print(f"Found rule {target_rule_index} ({target_rule['rule_format']})")
-        
-        # Calculate distances
-        distances = calculate_distances(data, target_rule)
-        
-        # Find and display closest rules for each metric
-        metrics = ["avg_pop", "activity", "final_alive", "combined"]
-        
-        for metric in metrics:
-            closest = find_closest_rules(distances, metric)
-            display_closest_rules(closest, metric)
-            
-    except Exception as e:
-        print(f"Error: {e}")
+plt.figure()
+plt.scatter(nearest["rho"], nearest["D"], alpha=0.7)
+# annotate each point with its rulestr
+for _, row in nearest.iterrows():
+    plt.text(row["rho"], row["D"], row["rulestr"],
+             fontsize=6, ha="right", va="bottom")
 
-if __name__ == "__main__":
-    main()
+# also mark Game of Life in orange
+plt.scatter([life_rho], [life_D], color="orange", edgecolors="black", s=80, label="Game of Life")
+plt.legend()
+plt.xlabel("ρ (density)")
+plt.ylabel("D (complexity)")
+plt.title("100 Rules Closest to Game of Life")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
