@@ -10,25 +10,6 @@
 	let showVolumeSlider = $state(false);
 	let sliderStyle = $state('');
 
-	function togglePlay() {
-		if (isPlaying) {
-			audio.pause();
-			isPlaying = false;
-		} else {
-			const playPromise = audio.play();
-			if (playPromise !== undefined) {
-				playPromise
-					.then(() => {
-						isPlaying = true;
-					})
-					.catch(error => {
-						console.log("Playback failed:", error);
-						isPlaying = false;
-					});
-			}
-		}
-	}
-
 	function toggleMute() {
 		if (isMuted) {
 			// Unmute - restore previous volume
@@ -103,7 +84,7 @@
 </script>
 
 <div 
-	class="fixed bottom-5 right-5 z-[1000] flex items-center gap-2"
+	class="fixed top-5 right-5 z-[1000] flex items-center gap-2"
 	onmouseenter={() => showVolumeSlider = true}
 	onmouseleave={() => showVolumeSlider = false}
 >
@@ -135,7 +116,7 @@
 
 <audio 
 	bind:this={audio} 
-	src="/audio.mp3"
+	src="/sound/soundtrack.mp3"
 	preload="auto"
 >
 	<track kind="captions" />

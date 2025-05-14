@@ -1,4 +1,6 @@
 <script>
+	import { sounds } from '$lib/utils/sounds.js';
+	
 	let { name, cr, rulestring, groupId, onClick, golRules } = $props();
 
 	let isDual = $derived(rulestring.includes('*'));
@@ -17,16 +19,21 @@
 		
 		return formatted;
 	}
+	
+	function handleClick() {
+		sounds.button();
+		onClick({
+			name,
+			cr,
+			rulestring,
+			golRules
+		});
+	}
 </script>
 
 <button 
 	class="w-full p-3 border border-zinc-700/50 bg-zinc-800/40 hover:bg-zinc-700/60 transition-all rounded-lg mb-2 text-left group"
-	onclick={() => onClick({
-		name,
-		cr,
-		rulestring,
-		golRules
-	})}
+	onclick={handleClick}
 >
 	<div class="flex flex-col gap-2">
 		<span class="text-sm font-medium mb-1 text-white/90 group-hover:text-white truncate">{capitalize(name)}</span>

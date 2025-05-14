@@ -1,4 +1,6 @@
 <script>
+	import { sounds } from '$lib/utils/sounds.js';
+	
 	let { 
 		id = null,
 		leftValue, 
@@ -9,6 +11,20 @@
 		align = 'left',
 		padding = 'py-2 px-4'
 	} = $props();
+	
+	function handleLeftClick() {
+		if (value !== leftValue && !disabled) {
+			value = leftValue;
+			sounds.toggleOn();
+		}
+	}
+	
+	function handleRightClick() {
+		if (value !== rightValue && !disabled) {
+			value = rightValue;
+			sounds.toggleOff();
+		}
+	}
 </script>
 
 <div class="w-full {align === 'center' ? 'flex flex-col items-center' : 'grid'} gap-1.5">
@@ -25,7 +41,7 @@
 			role="radio"
 			aria-checked={value === leftValue}
 			disabled={disabled}
-			onclick={() => value = leftValue}
+			onclick={handleLeftClick}
 			class="relative {padding} text-sm font-medium transition-all duration-200 ease-in-out
 				rounded-l-md border border-r-0 border-zinc-700/50 focus:z-10 focus:outline-none focus:ring-1 focus:ring-green-500/40
 				{value == leftValue 
@@ -41,7 +57,7 @@
 			role="radio"
 			aria-checked={value === rightValue}
 			disabled={disabled}
-			onclick={() => value = rightValue}
+			onclick={handleRightClick}
 			class="relative {padding} text-sm font-medium transition-all duration-200 ease-in-out
 				rounded-r-md border border-zinc-700/50 focus:z-10 focus:outline-none focus:ring-1 focus:ring-green-500/40
 				{value == rightValue 

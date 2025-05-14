@@ -8,6 +8,8 @@
     import { Cr } from '$lib/classes/Cr.svelte.js';
     import * as ls from 'lucide-svelte';
     import { onMount } from 'svelte';
+    import { browser } from '$app/environment';
+    import { sounds } from '$lib/utils/sounds.js';
 
     import LiveChart from '$lib/components/LiveChart.svelte';
     import ColorPad from '$lib/components/ui/ColorPad.svelte';
@@ -91,6 +93,16 @@
         }
     });
 
+    $effect(() => {
+        if ($takeScreenshot) {
+            (async () => {
+                sounds.screenshot();
+                await p5.takeScreenshot();
+                $takeScreenshot = false;
+            })();
+        }
+    });
+
 	let sketch = function(p5) {
         p5.setup = () => {
             p5.createCanvas(width, height);
@@ -119,7 +131,7 @@
             }
         }
 
-        p5.draw = () => {
+        p5.draw = async () => {
             $controls.zoom += ($controls.targetZoom - $controls.zoom) * $controls.dampening;
             $controls.offset.add(Vector.sub($controls.targetOffset, $controls.offset).scale($controls.dampening));
             
@@ -245,7 +257,7 @@
                         p5.drawCr();
 
                     if ($takeScreenshot) {
-                        p5.takeScreenshot();
+                        await p5.takeScreenshot();
                         $takeScreenshot = false;
                     }
 
@@ -384,7 +396,7 @@
             $controls.targetOffset.add(Vector.sub(mouse, newScreen));
         }
 
-        p5.takeScreenshot = () => {
+        p5.takeScreenshot = async () => {
             const filename = `${$selectedTiling.rulestring}.png`;
             
             let screenshotCanvas = p5.createGraphics(300, 300);
@@ -523,7 +535,7 @@
     {#if showExtra}
         {#if !showGameOfLife}
             {#if $selectedTiling.rulestring.includes('*')}
-                <div class="absolute bottom-4 left-4 z-20">
+                <div class="absolute bottom-4 right-4 z-20">
                     <ColorPad />
                 </div>
             {/if}

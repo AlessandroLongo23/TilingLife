@@ -1,4 +1,5 @@
 <script>
+	import { sounds } from '$lib/utils/sounds.js';
 	import { 
 		Activity, // For Generations
 		Grid, // For Totalistic 
@@ -12,6 +13,11 @@
 	} from 'lucide-svelte';
 	
 	let { name, rule, description, onClick } = $props();
+	
+	function handleClick() {
+		sounds.button();
+		onClick(rule);
+	}
 	
 	function parseRuleString(ruleString) {
 		const characteristics = {
@@ -80,7 +86,7 @@
 
 <button 
 	class="w-full p-4 border border-zinc-700/50 bg-zinc-800/40 hover:bg-zinc-700/60 transition-all rounded-lg mb-2 text-left group"
-	onclick={() => onClick(rule)}
+	onclick={handleClick}
 >
 	<div class="flex flex-col">
 		<span class="text-base font-medium mb-1 text-white/90 group-hover:text-white">{name}</span>

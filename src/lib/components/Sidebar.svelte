@@ -7,6 +7,7 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { slide, fade } from 'svelte/transition';
 	import * as ls from 'lucide-svelte';
+	import { sounds } from '$lib/utils/sounds.js';
 
 	import TheorySidebar from '$lib/components/TheorySidebar.svelte';
 	import GolRuleCard from '$lib/components/GolRuleCard.svelte';
@@ -364,7 +365,10 @@
 											id="screenshotButton"
 											label="Screenshot"
 											classes="w-full"
-											onclick={() => { $takeScreenshot = true; }}
+											onclick={() => { 
+												$takeScreenshot = true; 
+												sounds.screenshot();
+											}}
 											icon={ls.Camera}
 										/>
 									</div>

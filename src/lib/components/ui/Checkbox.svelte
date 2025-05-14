@@ -1,5 +1,6 @@
 <script>
 	import { Check } from 'lucide-svelte';
+	import { sounds } from '$lib/utils/sounds.js';
 
 	let { 
 		id,
@@ -8,6 +9,19 @@
 		disabled = false,
 		// position = 'right'
 	} = $props();
+	
+	function handleToggle() {
+		if (!disabled) {
+			const newValue = !checked;
+			checked = newValue;
+			
+			if (newValue) {
+				sounds.toggleOn();
+			} else {
+				sounds.toggleOff();
+			}
+		}
+	}
 </script>
 
 <div 
@@ -15,7 +29,7 @@
 	role="checkbox"
 	aria-checked={checked}
 	class="flex items-center space-x-3 cursor-pointer" 
-	onclick={() => (checked = !checked)}
+	onclick={handleToggle}
 	onkeypress={(e) => {}}
 >
 	<div class="relative flex items-center">
@@ -23,7 +37,11 @@
 			type="checkbox"
 			id={id}
 			bind:checked={checked}
-			onchange={(e) => (checked = e.target.checked)}
+			onchange={(e) => {
+				checked = e.target.checked;
+				if (checked) sounds.toggleOn();
+				else sounds.toggleOff();
+			}}
 			disabled={disabled}
 			class="peer h-4 w-4 appearance-none rounded border border-zinc-600/60 bg-zinc-800/50 checked:bg-green-500/90 checked:border-green-500/80 focus:outline-none focus:ring-1 focus:ring-green-500/40 focus:ring-offset-1 focus:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
 		/>

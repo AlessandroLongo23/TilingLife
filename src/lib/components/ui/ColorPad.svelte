@@ -96,9 +96,6 @@
 
 <style>
 	.color-pad-container {
-		/* position: fixed; */
-		/* bottom: 20px; */
-		/* right: 20px; */
 		background-color: rgba(30, 30, 30, 0.8);
 		border-radius: 8px;
 		z-index: 1000;
