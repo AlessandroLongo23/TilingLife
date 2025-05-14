@@ -67,7 +67,7 @@ Here's the table with the tiling count for each combination of number of total v
 
 **Regular tilings** are $1$-uniform tilings composed of regular polygons arranged in a way that every vertex looks the same. There are only $3$ regular tilings of the plane: triangular, square, and hexagonal.
 
-| ![3^6](../tilings/1Ur/3_r60_r(h2).png) | ![4^4](../tilings/1Ur/4-4-0,4_r90_m(v2).png) | ![6^3](../tilings/1Ur/6_r60_r(h1).png) |
+| ![3^6](../tilings/1Ur/3_r60_r(h2).webp) | ![4^4](../tilings/1Ur/4-4-0,4_r90_m(v2).webp) | ![6^3](../tilings/1Ur/6_r60_r(h1).webp) |
 | :---: | :---: | :---: |
 | $3^6$ | $4^4$ | $6^3$ |
 
@@ -75,10 +75,10 @@ Here's the table with the tiling count for each combination of number of total v
 
 The other $8$ $1$-uniform tilings are called **Semi-regular** tilings, but they consists of two or more regular polygons.
 
-| ![3^4.6](../tilings/1Usr/6-3-3_r60_r(h5).png) | ![3.3.3.3.6](../tilings/1Usr/4-3_m90_r(h2).png) | ![3.3.3.4](../tilings/1Usr/4-3-3,0,0,0,4_r90_r(h2).png) | ![3.12.12](../tilings/1Usr/6-4-3_m30_r(c2).png) |
+| ![3^4.6](../tilings/1Usr/6-3-3_r60_r(h5).webp) | ![3.3.3.3.6](../tilings/1Usr/4-3_m90_r(h2).webp) | ![3.3.3.4](../tilings/1Usr/4-3-3,0,0,0,4_r90_r(h2).webp) | ![3.12.12](../tilings/1Usr/6-4-3_m30_r(c2).webp) |
 | :---: | :---: | :---: | :---: |
 | $3^4.6$ (Snub trihexagonal)| $3^3.4^2$ (Elongated triangular) | $3^2.4.3.4$ (Snub square) | $3.4.6.4$ (Rhombitrihexagonal) |
-| ![(3.6)^2](../tilings/1Usr/6-3-6_m30_r(v4).png) | ![3.12^2](../tilings/1Usr/12-3_m30_r(h3).png) | ![4.6.12](../tilings/1Usr/12-6,4_m30_r(c2).png) | ![4.8^2](../tilings/1Usr/8-4_m90_r(h4).png) |
+| ![(3.6)^2](../tilings/1Usr/6-3-6_m30_r(v4).webp) | ![3.12^2](../tilings/1Usr/12-3_m30_r(h3).webp) | ![4.6.12](../tilings/1Usr/12-6,4_m30_r(c2).webp) | ![4.8^2](../tilings/1Usr/8-4_m90_r(h4).webp) |
 | $(3.6)^2$ (Trihexagonal) | $3.12^2$ (Truncated hexagonal) | $4.6.12$ (Truncated trihexagonal) | $4.8^2$ (Truncated square) |
 
 Currently, our tiling catalogue contains all $k$-uniform tilings up to $k=3$, and some for $k=4,5$ and $6$.

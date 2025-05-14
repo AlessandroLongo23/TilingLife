@@ -387,18 +387,16 @@
         p5.takeScreenshot = () => {
             const filename = `${$selectedTiling.rulestring}.png`;
             
-            let screenshotCanvas = p5.createGraphics(600, 600);
+            let screenshotCanvas = p5.createGraphics(300, 300);
 
             screenshotCanvas.colorMode(p5.HSB, 360, 100, 100);
             
-            screenshotCanvas.translate(0, 600);
-            screenshotCanvas.scale(1, -1);
-            
+            screenshotCanvas.translate(0, 300);
+            screenshotCanvas.scale(1/2, -1/2);
             
             screenshotCanvas.background(240, 7, 16);
-            
-            screenshotCanvas.translate(300, 300);
-            
+
+            screenshotCanvas.translate(150, 150);
             screenshotCanvas.stroke(0);
             screenshotCanvas.strokeWeight(2 / $controls.zoom);
 

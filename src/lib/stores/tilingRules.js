@@ -612,9 +612,9 @@ export const tilingRules = [
 		]
 	},
 	{
-		title: "Uniform non-Convex (adjustable angles)",
-		id: "UnC-a",
-		dual: false,
+		title: "concave 1-Uniform",
+		id: "c1U",
+		dual: true,
 		rules: [
 			{
 				rulestring: "6(a)-3/r60/r(h4)",
@@ -631,10 +631,16 @@ export const tilingRules = [
 		]
 	},
 	{
-		title: "Uniform non-Convex (specific angles)",
-		id: "UnC-s",
-		dual: false,
+		title: "concave 2-Uniform",
+		id: "c2U",
+		dual: true,
 		rules: [
+			{
+				rulestring: "4(18)-5,5,5,5-0,5,4(18)-0,4(18)/r90/m(c4)",
+			},
+			{
+				rulestring: "4(30)-3,3-0,0,4/r90/r(h2)"
+			},
 			{
 				rulestring: "4(30)-6-0,4/r90/m(c1)",
 			},
@@ -642,10 +648,22 @@ export const tilingRules = [
 				rulestring: "4(45)-8/r90/m(v5)",
 			},
 			{
-				rulestring: "12-0,4(60)/m45/m(h1)",
+				rulestring: "6(30)-4/r60/m(c2)",
 			},
 			{
-				rulestring: "8(15)-0,3,0,4(60)-0,3/r90/m(h7)",
+				rulestring: "6(60)-3,3/r60/r(h3)"
+			},
+			{
+				rulestring: "6(60)-3,3-0,3/r60/r(h2)"
+			},
+			{
+				rulestring: "6(60)-6/r60/m(v1)",
+			},
+			{
+				rulestring: "6(60)-6-3/r60/m(c2)",
+			},
+			{
+				rulestring: "6(80)-9-0,6(80),9/r60/m(c1)",
 			},
 			{
 				rulestring: "8(15)-3,3-3,4-0,3/r90/m(h1)",
@@ -654,41 +672,136 @@ export const tilingRules = [
 				rulestring: "8(15)-3,3-8,4/r90/m(c4)",
 			},
 			{
-				rulestring: "4(18)-5,5,5,5-0,5,4(18)-0,4(18)/r90/m(c4)",
+				rulestring: "9-3(20),3-9/r120/t(c1)",
 			},
 			{
-				rulestring: "6(30)-0,4,6(90)/r120/m(c1)",
-			},
-			{
-				rulestring: "6(30)-4/r60/m(c2)",
-			},
-			{
-				rulestring: "6(80)-9-0,6(80),9/r60/m(c1)",
-			},
-			{
-				rulestring: "6(60)-6/r60/m(v1)",
+				rulestring: "12-0,4(60)/m45/m(h1)",
 			},
 			{
 				rulestring: "12-3(30)-12/r60/m(v5)",
 			},
 			{
-				rulestring: "12(30)-3,3-4,6/m30/m(c2)",
+				rulestring: "12(30)-3,3-0,3/m30/m(h1)",
 			},
 			{
-				rulestring: "12(30)-3,3-0,3/m30/m(h1)",
+				rulestring: "12(30)-3,3-4,6/m30/m(c2)",
 			},
 			{
 				rulestring: "18-0,18,3(40)-0,3(40)/m30/m(c3)",
 			},
+		]
+	},
+	{
+		title: "concave 3-Uniform",
+		id: "c3U",
+		dual: true,
+		rules: [
 			{
-				rulestring: "6(60)-6-3/r60/m(c2)",
+				rulestring: "6(30)-0,4,6(90)/r120/m(c1)",
+			},
+			{
+				rulestring: "6(30)-3,3-3,6/r60/r(h5)"
+			},	
+			{
+				rulestring: "6(60)-6-3,0,3/r60/r(v2)"
 			},
 			{
 				rulestring: "6(75)-8-3(15)/r60/m(c2)",
 			},
 			{
-				rulestring: "9-3(20),3-9/r120/t(c1)",
+				rulestring: "8(15)-0,3,0,4(60)-0,3/r90/m(h7)",
+			},
+			{
+				rulestring: "8(15)-3,3-4(45)/r90/r(v9)",
+			},
+			{
+				rulestring: "8(45)-4,4/m45/m(v5)/m(c1)",
+			},
+			{
+				rulestring: "12(30)-3,3-3,12/r60/r(h2)"
+			}
+		]
+	},
+	{
+		title: "concave 4-Uniform",
+		id: "c4U",
+		dual: true,
+		rules: [
+			{
+				rulestring: "6(60)-6-3/r60/m(h1)"
+			},
+			{
+				rulestring: "6(60)-6-3,0,3-0,0,0,3/r60/r(h4)"
+			},
+			{
+				rulestring: "8(45)-4-8(90)/r90/r(v2)"
+			},
+			{
+				rulestring: "8(45)-4,4-8-8,4/r90/r(h11)"
+			},
+			{
+				rulestring: "8(75)-3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3-0,4(30)/r(h1)/r(c11)[90]"
+			},
+			{
+				rulestring: "12(30)-3,3,3-4(60),12/r90/r(c2)"
+			}
+		]
+	},
+	{
+		title: "concave 5-Uniform",
+		id: "c5U",
+		dual: true,
+		rules: [
+			{
+				rulestring: "6(75)-3,3-8(15)-3,3,3,3,3,3-3(15)/r60/m(c6)"		
+			}
+		]
+	},
+	{
+		title: "concave 7-Uniform",
+		id: "c7U",
+		dual: true,
+		rules: [
+			{
+				rulestring: "6(75)-3,3-8(15)-3,3,3,3,3,3-3(15)-8,6(75)/r60/m(c2)"
+			},
+		]
+	},
+	{
+		title: "concave k-Uniform",
+		id: "ckU",
+		dual: true,
+		rules: [
+			{
+				rulestring: "12-3,3-4,4-6,6-4(30),4(30)-3,3,3,3,3,3-3,3,3,3,3-3,3,0,0,3,3/m30/m(h2)"
+			},
+			{
+				rulestring: "12-3,3-4,4-6,6-4(30),4(30)-3,3,3,3,3,3-3,3,3,3,3-3,3,0,0,6/m30/m(h2)"
+			},
+			{
+				rulestring: "12-3,3,3-4,4,4-3,3,3,3-0,12,4,3-0,0,0,0,0,0,4,3(30)-0,0,0,0,0,0,3(30),3/r60/r(c4)"
+			},
+			{
+				rulestring: "12-4,4-3,0,3(30)-6,0,3-0,3,3,0,4(30)-0,0,0,0,4,3-0,0,0,0,0,3/m30/r(h4)"
+			},
+			{
+				rulestring: "12(60)-4,4,4-3,3-12,4,6/m45/m(c7)"
+			},
+			{
+				rulestring: "12(60)-4,4,4-3,3,3,3-12,4,3/m45/m(v14)"
+			},
+			{
+				rulestring: "12(60)-4,4,4-3,3,3,3-12,4,3-0,0,0,4,3(30)-0,0,0,3(30),3/r60/r(c2)"
+			},
+			{
+				rulestring: "12(90)-3,3,3,3-0,12,4,3-0,0,0,0,0,0,4,3(30)-0,0,0,0,0,0,3(30),3/r60/r(c2)"
+			},
+			{
+				rulestring: "12(90)-6,6-4(30),4(30)-3,3,3,3-3,0,0,3-0,0,3,6/m30/m(h1)"
+			},
+			{
+				rulestring: "12(120)-12,4,3-0,0,0,4,3(30)-0,0,0,3(30),3/r60/r(c1)"
 			}
 		]
 	}
-];
+]

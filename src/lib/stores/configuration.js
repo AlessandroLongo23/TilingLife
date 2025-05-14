@@ -43,8 +43,8 @@ export let exportGraph = writable(false);
 
 export const tolerance = 0.01;
 export const colorParams = writable({ a: 180, b: 0 });
-export let possibleAngles = [30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
-export let possibleSides = [0, 3, 4, 5, 6, 8, 9, 12, 18];
+export let possibleAngles = [15, 20, 30, 40, 45, 60, 75, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
+export let possibleSides = [0, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 16, 18];
 
 export const offsets = [
 	[-1, -1], [-1, 0], [-1, 1],

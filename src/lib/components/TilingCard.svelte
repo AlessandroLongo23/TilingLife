@@ -31,7 +31,7 @@
 	<div class="flex flex-col gap-2">
 		<span class="text-sm font-medium mb-1 text-white/90 group-hover:text-white truncate">{capitalize(name)}</span>
 		<div class="relative w-full aspect-square bg-zinc-700/30 rounded-md flex items-center justify-center overflow-hidden border border-zinc-700/40 group-hover:border-green-500/50">
-			<img src={`/tilings/${groupId}/${rulestring.replaceAll('/', '_').replaceAll('*', '_')}.png`} alt={name} class="w-full h-full object-cover rounded-md group-hover:scale-105 transition-transform duration-300">
+			<img src={`/tilings/${groupId}/${rulestring.replaceAll('/', '_').replaceAll('*', '_')}.webp`} alt={name} class="w-full h-full object-cover rounded-md group-hover:scale-105 transition-transform duration-300">
 			{#if isDual}
 				<div class="absolute top-0 right-1">
 					<span class="text-xs font-medium text-white/90 group-hover:text-white bg-zinc-800 rounded-full px-2 py-[2px]">Dual</span>
