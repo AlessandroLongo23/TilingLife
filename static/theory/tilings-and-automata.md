@@ -85,7 +85,7 @@ Currently, our tiling catalogue contains all $k$-uniform tilings up to $k=3$, an
 
 ### GomJau-Hogg Generation Method
 
-In this application, we generate tilings using a systematic approach based on the GomJau-Hogg notation:
+In this application, we generate tilings using a sysCtematic approach based on the GomJau-Hogg notation:
 
 #### Seed
 
@@ -168,14 +168,12 @@ survival on two or three neighbors.
 
 Various patterns can emerge:
 
-- Still lifes: Patterns that don't change from one iteration to the other
-    ![still life](../theory/video/still_life.png)
-- Oscillators: Patterns that repeat after a fixed number of generations
-    ![oscillator](../theory/video/oscillator.gif)
-- Spaceships: Patterns that translate across the grid
-    ![spaceships](../theory/video/glider.gif)
-- Methuselahs: Patterns that evolve for many generations before stabilizing
+| Still Lifes | Oscillators | Spaceships |
+| :---: | :---: | :---: |
+| ![still life](../theory/video/still_life.png) | ![oscillator](../theory/video/oscillator.gif) | ![spaceships](../theory/video/glider.gif) |
+| Patterns that don't change from one iteration to the other | Patterns that repeat after a fixed number of generations | Patterns that translate across the grid |
 
+- Methuselahs: Patterns that evolve for many generations before stabilizing
 
 ### Extensions
 
@@ -208,9 +206,9 @@ topology, the life-like rules (B/S strings) apply uniformly based on each
 cell's local neighbor count, unlocking new pattern classes and emergent
 structures.
 
-![NonSquare1](../theory/video/til1.gif)
-![NonSquare2](../theory/video/til2.gif)
-![NonSquare3](../theory/video/til3.gif)
+| | | |
+| :---: | :---: | :---: |
+| ![NonSquare1](../theory/video/til1.gif) | ![NonSquare2](../theory/video/til2.gif) | ![NonSquare3](../theory/video/til3.gif) |
 
 ### Searching for interesting rules
 
@@ -307,7 +305,7 @@ The tilings that were used are the following:
 - Square
 - Hexagonal
 
-##### Triangular
+**Triangular**
 The plot for the Density and complexity for the triangular tiling is the following:
 ![t1-dvc](../theory/plots/t1_dvc.png)
 
@@ -317,12 +315,17 @@ rule, to see some rules that should be similar:
 
 Same thing is done for the Square and Hexagonal tiling
 
-##### Square
-![t2-dvc](../theory/plots/t2_dvc.png)
-![t2-gol](../theory/plots/t2_gol.png)
-##### Hexagonal
-![t3-dvc](../theory/plots/t3_dvc.png)
-![t3-gol](../theory/plots/t3_gol.png)
+**Square**
+
+| All rules | B3/S23 neighborhood |
+| :-------: | :-----------------: |
+| ![t2-dvc](../theory/plots/t2_dvc.png) | ![t2-gol](../theory/plots/t2_gol.png) |
+
+**Hexagonal**
+
+| All rules | B3/S23 neighborhood |
+| :-------: | :-----------------: |
+| ![t3-dvc](../theory/plots/t3_dvc.png) | ![t3-gol](../theory/plots/t3_gol.png) |
 
 #### Interpretation of the results
 

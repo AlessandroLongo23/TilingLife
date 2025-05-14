@@ -49,6 +49,10 @@
 	
 	// Handle GIF click events
 	function handleGifClick(event) {
+		// Disable GIF expansion on click
+		return;
+		
+		// Original code below is now unreachable
 		const gifElement = event.target;
 		if (gifElement.classList.contains('markdown-gif')) {
 			if (expandedGif === gifElement.src) {
@@ -270,7 +274,7 @@
 	
 	/* GIF-specific styling */
 	:global(.markdown-content .markdown-gif) {
-		@apply object-contain mx-auto block cursor-pointer;
+		@apply object-contain mx-auto block cursor-default;
 		width: 50%;  /* GIFs are typically shown larger */
 		height: auto;
 		max-width: 50%;
@@ -288,7 +292,7 @@
 	}
 
 	:global(.markdown-content .markdown-gif:hover) {
-		transform: scale(1.02);  /* Subtle zoom on hover */
+		transform: scale(1);  /* Remove hover scaling */
 	}
 
 	/* Ensure GIFs in tables maintain proper sizing */
