@@ -168,15 +168,14 @@ survival on two or three neighbors.
 
 Various patterns can emerge:
 
-- Still lifes: Patterns that don't change
+- Still lifes: Patterns that don't change from one iteration to the other
+    ![still life](../theory/video/still_life.png)
 - Oscillators: Patterns that repeat after a fixed number of generations
+    ![oscillator](../theory/video/oscillator.gif)
 - Spaceships: Patterns that translate across the grid
+    ![spaceships](../theory/video/glider.gif)
 - Methuselahs: Patterns that evolve for many generations before stabilizing
 
-![still life](../theory/video//still_life.gif)
-![oscillator](../theory/video//oscillators.gif)
-![spaceships](../theory/video//spaceships.gif)
-![methuselahs](../theory/video//methuselahs.gif)
 
 ### Extensions
 
@@ -209,9 +208,9 @@ topology, the life-like rules (B/S strings) apply uniformly based on each
 cell's local neighbor count, unlocking new pattern classes and emergent
 structures.
 
-![NonSquare1](../theory/video/tiling1.gif)
-![NonSquare2](../theory/video/tiling2.gif)
-![NonSquare3](../theory/video/tiling3.gif)
+![NonSquare1](../theory/video/til1.gif)
+![NonSquare2](../theory/video/til2.gif)
+![NonSquare3](../theory/video/til3.gif)
 
 ### Searching for interesting rules
 
@@ -304,4 +303,36 @@ on all of them (meaning that rules with more than 8 neighbors were not considere
 
 The tilings that were used are the following:
 
+- Triangular
+- Square
+- Hexagonal
+
+##### Triangular
+The plot for the Density and complexity for the triangular tiling is the following:
+![t1-dvc](../theory/plots/t1_dvc.png)
+
+It is possible to see that some clusters emerge. We can Zoom in into the Game-of-Life
+rule, to see some rules that should be similar:
+![t1-gol](../theory/plots/t1_gol.png)
+
+Same thing is done for the Square and Hexagonal tiling
+
+##### Square
+![t2-dvc](../theory/plots/t2_dvc.png)
+![t2-gol](../theory/plots/t2_gol.png)
+##### Hexagonal
+![t3-dvc](../theory/plots/t3_dvc.png)
+![t3-gol](../theory/plots/t3_gol.png)
+
+#### Interpretation of the results
+
+It is very interesting to see that cluster emerge from the used metrics. Unfortunately,
+even the rules that are close to Game-of-Life, don't present any life-like behavior,
+and most of the times die immediately or fill the grid with living cells.
+
+> What could cause this?
+
 #### Future work
+
+> More metrics, (CNN, GNN etc..)
+
