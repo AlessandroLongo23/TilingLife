@@ -1,5 +1,5 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph } from '$lib/stores/configuration.js';
+	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, islamicAngle } from '$lib/stores/configuration.js';
 	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
 	import { contentService } from '$lib/services/contentService';
 	import { tilingModalOpen } from '$lib/stores/modalState.js';
@@ -99,6 +99,7 @@
 	}
 
 	let isParametrized = $derived($selectedTiling.rulestring.includes('a'));
+	let isIslamic = $derived($selectedTiling.rulestring.includes('i'));
 	
 	// Track current visible folder
 	let catalogContainer;
@@ -318,6 +319,18 @@
 										bind:value={$parameter}
 										min={15}
 										max={165}
+										step={1}
+										unit="°"
+									/>
+								{/if}
+
+								{#if isIslamic}
+									<Slider
+										id="islamicAngle"
+										label="Islamic Angle"
+										bind:value={$islamicAngle}
+										min={0}
+										max={180}
 										step={1}
 										unit="°"
 									/>

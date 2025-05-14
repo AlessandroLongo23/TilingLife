@@ -1,4 +1,4 @@
-import { tolerance, parameter, debugView, transformSteps, offsets, possibleSides, possibleAngles } from '$lib/stores/configuration.js';
+import { tolerance, parameter, debugView, transformSteps, offsets, possibleSides, possibleAngles, isIslamic } from '$lib/stores/configuration.js';
 import { sortPointsByAngleAndDistance, getClockwiseAngle } from '$lib/utils/geometry.svelte';
 import { RegularPolygon, StarPolygon, DualPolygon} from '$lib/classes/Polygon.svelte';
 import { debugManager, updateDebugStore } from '$lib/stores/debug.js';
@@ -167,9 +167,13 @@ export class TilingGenerator {
 
     parseRule = (tilingRule) => {
         this.tiling.dual = false;
+        this.tiling.islamic = false;
+
         if (tilingRule[tilingRule.length - 1] === '*') {
             this.tiling.dual = true;
             tilingRule = tilingRule.slice(0, -1);
+        } else if (tilingRule.includes('i')) {
+            this.tiling.islamic = true;
         }
 
         let phases = tilingRule.split('/');

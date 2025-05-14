@@ -1,4 +1,4 @@
-import { tolerance, lineWidth, colorParams, liveChartMode, controls } from '$lib/stores/configuration.js';
+import { tolerance, lineWidth, colorParams, liveChartMode, controls, islamicAngle } from '$lib/stores/configuration.js';
 import { Vector } from '$lib/classes/Vector.svelte.js';
 import { map } from '$lib/utils/math.svelte.js';
 import { get } from 'svelte/store';
@@ -38,7 +38,7 @@ export class Polygon {
         return inside;
     }
 
-    show = (ctx, showPolygonPoints, customColor = null, opacity = 0.80) => {
+    show = (ctx, showPolygonPoints, customColor = null, opacity = 0.80, isIslamic = false) => {
         if (this.centroid.x < -ctx.width / 2 - 10 || this.centroid.y < -ctx.height / 2 - 10 || this.centroid.x > ctx.width / 2 + 10 || this.centroid.y > ctx.height / 2 + 10)
             return;
 
@@ -57,28 +57,56 @@ export class Polygon {
             ctx.stroke(0, 0, 0, lineWidthValue * opacity); // Use lineWidth as opacity
         }
 
-        ctx.fill(customColor || this.hue, 40, 100 / opacity, 0.80 * opacity);
-        ctx.beginShape();
-        for (let i = 0; i < this.vertices.length; i++) {
-            ctx.vertex(this.vertices[i].x, this.vertices[i].y);
-        }
-        ctx.endShape(ctx.CLOSE);
-        
-        if (showPolygonPoints) {
-            ctx.fill(0, 100, 100);
-            ctx.ellipse(this.centroid.x, this.centroid.y, 5 / get(controls).zoom);
-            
-            ctx.fill(120, 100, 100);
-            for (let i = 0; i < this.halfways.length; i++) {
-                ctx.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / get(controls).zoom);
-            }
-            
-            ctx.fill(240, 100, 100);
+
+        if (!isIslamic) {
+            ctx.fill(customColor || this.hue, 40, 100 / opacity, 0.80 * opacity);
+            ctx.beginShape();
             for (let i = 0; i < this.vertices.length; i++) {
-                ctx.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / get(controls).zoom);
+                ctx.vertex(this.vertices[i].x, this.vertices[i].y);
             }
+            ctx.endShape(ctx.CLOSE);
+            
+            if (showPolygonPoints) {
+                ctx.fill(0, 100, 100);
+                ctx.ellipse(this.centroid.x, this.centroid.y, 5 / get(controls).zoom);
+                
+                ctx.fill(120, 100, 100);
+                for (let i = 0; i < this.halfways.length; i++) {
+                    ctx.ellipse(this.halfways[i].x, this.halfways[i].y, 5 / get(controls).zoom);
+                }
+                
+                ctx.fill(240, 100, 100);
+                for (let i = 0; i < this.vertices.length; i++) {
+                    ctx.ellipse(this.vertices[i].x, this.vertices[i].y, 5 / get(controls).zoom);
+                }
+            }
+        } else {
+            this.showIslamic(ctx);
         }
+
         ctx.pop();
+    }
+
+    showIslamic(ctx) {
+        ctx.noFill();
+        ctx.strokeWeight(5 / get(controls).zoom);
+        ctx.stroke(0, 0, 100);
+        let angle = get(islamicAngle) * Math.PI / 180;
+        for (let i = 0; i < this.halfways.length; i++) {
+            let side = 0.5
+            let perp = Vector.sub(this.centroid, this.halfways[i]);
+            let dir1 = Vector.rotate(perp, angle / 2).normalize();
+            let dir2 = Vector.rotate(perp, -angle / 2).normalize();
+            
+            let beta = Math.PI / this.n;
+            let epsilon = Math.PI - beta - angle / 2;
+            let gamma = Math.PI / 2 - beta;
+
+            let dist = side * Math.tan(gamma) * Math.sin(beta) / Math.sin(epsilon);
+
+            ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[i].x + dir1.x * dist, this.halfways[i].y + dir1.y * dist);
+            ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[i].x + dir2.x * dist, this.halfways[i].y + dir2.y * dist);
+        }
     }
 
     showGameOfLife = (ctx, ruleType, parsedGolRule, rules) => {
@@ -304,6 +332,15 @@ export class StarPolygon extends Polygon {
 
     calculateHue = () => {
         this.hue = map(this.vertices.length / 2, 3, 12, 300, 0) + 300 / 12;
+    }
+
+    showIslamic(ctx) {
+        ctx.noFill();
+        ctx.strokeWeight(5 / get(controls).zoom);
+        ctx.stroke(0, 0, 100);
+        for (let i = 1; i < this.halfways.length + 1; i += 2) {
+            ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[(i + 1) % this.halfways.length].x, this.halfways[(i + 1) % this.halfways.length].y);
+        }
     }
 
     clone = () => {

@@ -111,6 +111,13 @@ export class Vector {
         return this.copy();
     }
 
+    static rotate(v, angle) {
+        let newVector = v.copy();
+        newVector.rotate(angle);
+
+        return newVector;
+    }
+
     rotate(angle) {
         let newX = this.x * Math.cos(angle) - this.y * Math.sin(angle);
         let newY = this.x * Math.sin(angle) + this.y * Math.cos(angle);

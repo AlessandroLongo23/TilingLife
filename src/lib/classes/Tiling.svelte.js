@@ -35,7 +35,7 @@ export class Tiling {
         }
         
         for (let i = 0; i < this.nodes.length; i++) {
-            this.nodes[i].show(ctx, showPolygonPoints, null, opacity);
+            this.nodes[i].show(ctx, showPolygonPoints, null, opacity, this.islamic);
         }
         
         const showDualConnectionsValue = get(showDualConnections);
