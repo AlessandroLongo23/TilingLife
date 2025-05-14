@@ -171,6 +171,34 @@ function admonitionPlugin(md) {
 	});
 }
 
+function gifPlugin(md) {
+	// Store the original image renderer
+	const defaultRender = md.renderer.rules.image || function(tokens, idx, options, env, self) {
+		return self.renderToken(tokens, idx, options);
+	};
+
+	md.renderer.rules.image = function(tokens, idx, options, env, self) {
+		const token = tokens[idx];
+		const srcIndex = token.attrIndex('src');
+		const src = token.attrs[srcIndex][1];
+		
+		// Check if the image is a GIF
+		if (src.toLowerCase().endsWith('.gif')) {
+			// Add gif-specific classes and attributes
+			token.attrPush(['class', 'markdown-gif lazy-gif']);
+			token.attrPush(['loading', 'lazy']);
+			token.attrPush(['decoding', 'async']);
+			
+			// Create a placeholder while the GIF loads
+			token.attrPush(['data-src', src]);
+			// Set a temporary small placeholder image
+			token.attrs[srcIndex][1] = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+		}
+		
+		return defaultRender(tokens, idx, options, env, self);
+	};
+}
+
 const md = new MarkdownIt({
 	html: true,
 	linkify: true,
@@ -184,6 +212,7 @@ md.use(anchor, {
 
 md.use(tableClassPlugin);
 md.use(admonitionPlugin);
+md.use(gifPlugin);
 
 export function renderMarkdown(markdownContent) {
 	// remove first two lines

@@ -577,7 +577,7 @@
 									label="Simulation Speed"
 									bind:value={$speed}
 									min={0}
-									max={180}
+									max={60}
 									step={1}
 									unit="iterations/s"
 								/>

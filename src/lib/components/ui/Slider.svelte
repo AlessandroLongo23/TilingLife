@@ -1,4 +1,6 @@
 <script>
+	import { sounds } from '$lib/utils/sounds.js';
+	
 	let { 
 		id, 
 		label,
@@ -9,6 +11,20 @@
 		disabled = false,
 		unit = ''
 	} = $props();
+	
+	let lastValue = value;
+	
+	// Only play sound when value actually changes
+	function handleMouseMove(e) {
+		if (e.buttons === 1) { // Left mouse button is pressed
+			const newValue = Number(e.target.value);
+			if (newValue !== lastValue) {
+				sounds.slider();
+				lastValue = newValue;
+			}
+			value = newValue;
+		}
+	}
 </script>
 
 <div class="grid w-full gap-2">
@@ -25,7 +41,7 @@
 		id={id}
 		type="range"
 		bind:value={value}
-		oninput={(e) => (value = Number(e.target.value))}
+		onmousemove={handleMouseMove}
 		min={min}
 		max={max}
 		step={step}

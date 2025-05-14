@@ -73,7 +73,7 @@ Here's the table with the tiling count for each combination of number of total v
 
 #### Semi-Regular Tilings
 
-The other $8$ $1$-uniform tilings are called **Semi-regular** tilings, but they consists of two or more regular polygons.
+The other eight $1$-uniform tilings are called **Semi-regular** tilings, but they consists of two or more regular polygons.
 
 | ![3^4.6](../tilings/1Usr/6-3-3_r60_r(h5).webp) | ![3.3.3.3.6](../tilings/1Usr/4-3_m90_r(h2).webp) | ![3.3.3.4](../tilings/1Usr/4-3-3,0,0,0,4_r90_r(h2).webp) | ![3.12.12](../tilings/1Usr/6-4-3_m30_r(c2).webp) |
 | :---: | :---: | :---: | :---: |
@@ -162,7 +162,7 @@ These transition rules are concisely described by the string **B3/S23**, where
 **B3** indicates birth on exactly three neighbors, and **S23** indicates
 survival on two or three neighbors.
 
-![gol](./images/videos/gol.gif)
+![gol](../theory/video/gol.gif)
 
 #### Patterns
 
@@ -173,10 +173,10 @@ Various patterns can emerge:
 - Spaceships: Patterns that translate across the grid
 - Methuselahs: Patterns that evolve for many generations before stabilizing
 
-![still life](videos/still_life.gif)
-![oscillator](videos/oscillators.gif)
-![spaceships](videos/spaceships.gif)
-![methuselahs](videos/methuselahs.gif)
+![still life](../theory/video//still_life.gif)
+![oscillator](../theory/video//oscillators.gif)
+![spaceships](../theory/video//spaceships.gif)
+![methuselahs](../theory/video//methuselahs.gif)
 
 ### Extensions
 
@@ -191,7 +191,7 @@ Rules specify both birth thresholds and decay durations,
 producing interesting phenomena that are not possible
 in the binary model.
 
-![generations1](./images/videos/generations.gif)
+![generations1](../theory/video/generations.gif)
 
 #### Larger than Life
 
@@ -209,9 +209,9 @@ topology, the life-like rules (B/S strings) apply uniformly based on each
 cell's local neighbor count, unlocking new pattern classes and emergent
 structures.
 
-![NonSquare1](./images/videos/tiling1.gif)
-![NonSquare2](./images/videos/tiling2.gif)
-![NonSquare3](./images/videos/tiling3.gif)
+![NonSquare1](../theory/video/tiling1.gif)
+![NonSquare2](../theory/video/tiling2.gif)
+![NonSquare3](../theory/video/tiling3.gif)
 
 ### Searching for interesting rules
 

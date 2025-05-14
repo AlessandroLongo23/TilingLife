@@ -1,39 +1,104 @@
 import { browser } from '$app/environment';
 
-// Cache audio elements for better performance
-const soundCache = new Map();
-
-/**
- * Play a sound effect
- * @param {string} sound - The sound file to play
- * @param {number} volume - Volume level between 0 and 1
- * @returns {Promise<void>}
- */
-export function playSound(sound, volume = 0.5) {
-  if (!browser) return Promise.resolve();
-  
-  // Check if sound is already in cache
-  let audio = soundCache.get(sound);
-  
-  if (!audio) {
-    // Create new audio element if not in cache
-    audio = new Audio(sound);
-    soundCache.set(sound, audio);
-  }
-  
-  // Reset audio to beginning if already playing
-  audio.currentTime = 0;
-  audio.volume = volume;
-  
-  return audio.play().catch(err => {
-    console.log('Error playing sound:', err);
-  });
+let audioContext;
+if (browser) {
+	try {
+		audioContext = new (window.AudioContext || window.webkitAudioContext)();
+	} catch (e) {
+		console.error("Web Audio API not supported", e);
+	}
 }
 
-// Predefined sound functions
+const soundBuffers = {};
+let loadingPromises = {};
+
+const MAX_INSTANCES = 10;
+let activeSounds = {
+	slider: 0
+};
+
+async function loadSound(url) {
+	if (!audioContext) return null;
+	
+	if (loadingPromises[url]) {
+		return loadingPromises[url];
+	}
+	
+	if (soundBuffers[url]) {
+		return soundBuffers[url];
+	}
+	
+	loadingPromises[url] = fetch(url)
+		.then(response => response.arrayBuffer())
+		.then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+		.then(audioBuffer => {
+			soundBuffers[url] = audioBuffer;
+			delete loadingPromises[url];
+			return audioBuffer;
+		})
+		.catch(error => {
+			console.error("Error loading sound", url, error);
+			delete loadingPromises[url];
+			return null;
+		});
+	
+	return loadingPromises[url];
+}
+
+export function playSound(sound, volume = 0.5) {
+	if (!browser || !audioContext) {
+		return Promise.resolve();
+	}
+	
+	const soundType = sound.split('/').pop().split('.')[0].replace(/\s+/g, '').toLowerCase();
+	
+	if (soundType === 'slider') {
+		if (activeSounds.slider >= MAX_INSTANCES) {
+			return Promise.resolve();
+		}
+		activeSounds.slider++;
+	}
+	
+	return loadSound(sound).then(buffer => {
+		if (!buffer) return;
+		
+		const source = audioContext.createBufferSource();
+		source.buffer = buffer;
+		
+		const gainNode = audioContext.createGain();
+		gainNode.gain.value = volume;
+		
+		source.connect(gainNode);
+		gainNode.connect(audioContext.destination);
+		
+		source.start(0);
+		
+		source.onended = () => {
+			if (soundType === 'slider') {
+				activeSounds.slider = Math.max(0, activeSounds.slider - 1);
+			}
+		};
+		
+		return new Promise(resolve => {
+			source.onended = () => {
+				if (soundType === 'slider') {
+					activeSounds.slider = Math.max(0, activeSounds.slider - 1);
+				}
+				resolve();
+			};
+		});
+	}).catch(err => {
+		console.error("Error playing sound:", err);
+		if (soundType === 'slider') {
+			activeSounds.slider = Math.max(0, activeSounds.slider - 1);
+		}
+	});
+}
+
 export const sounds = {
-  toggleOn: () => playSound('/sound/Toggle On.mp3', 0.8),
-  toggleOff: () => playSound('/sound/Toggle Off.mp3', 0.8),
-  button: () => playSound('/sound/Button.mp3', 0.8),
-  screenshot: () => playSound('/sound/ScreenshotExport.mp3', 0.8)
+	toggleOn: () => playSound('/sound/Toggle On.mp3', 0.4),
+	toggleOff: () => playSound('/sound/Toggle Off.mp3', 0.4),
+	button: () => playSound('/sound/Button.mp3', 0.4),
+	screenshot: () => playSound('/sound/ScreenshotExport.mp3', 0.4),
+	slider: () => playSound('/sound/Slider.mp3', 0.2)
 }; 

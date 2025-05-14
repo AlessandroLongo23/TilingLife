@@ -1,4 +1,6 @@
 <script>
+	import { sounds } from '$lib/utils/sounds.js';
+	
 	let { 
 		id, 
 		type = "text", 
@@ -15,8 +17,17 @@
 
 	let incrementTimer;
 	let decrementTimer; 
-	let initialDelay = 500; // ms before starting continuous increments
-	let repeatInterval = 100; // ms between increments once started
+	let initialDelay = 300; // ms before starting continuous increments (reduced)
+	let repeatInterval = 80; // ms between increments once started (reduced)
+	let prevValue = value;
+	
+	// Track value changes and play sound
+	$effect(() => {
+		if (type === "number" && value !== prevValue) {
+			sounds.slider();
+			prevValue = value;
+		}
+	});
 
 	function increment() {
 		if (disabled || type !== 'number') return;
@@ -26,6 +37,8 @@
 		
 		value = newValue;
 		onChangeFunction({ target: { value: newValue } });
+		
+		// Sound is played by the effect
 	}
 
 	function decrement() {
@@ -36,6 +49,8 @@
 		
 		value = newValue;
 		onChangeFunction({ target: { value: newValue } });
+		
+		// Sound is played by the effect
 	}
 
 	function startIncrementing() {
@@ -78,6 +93,21 @@
 		clearInterval(incrementTimer);
 		clearInterval(decrementTimer);
 	}
+	
+	function handleInput(e) {
+		const oldValue = value;
+		
+		if (type === "number") {
+			value = Number(e.target.value);
+			
+			// Explicitly play sound on manual input
+			if (oldValue !== value) {
+				sounds.slider();
+			}
+		}
+		
+		onChangeFunction(e);
+	}
 </script>
 
 <div class="w-full {align === 'center' ? 'flex flex-col items-center' : 'grid'} gap-1.5">
@@ -92,12 +122,7 @@
 			id={id}
 			type={type}
 			bind:value={value}
-			oninput={(e) => {
-				if (type === "number") {
-					value = Number(e.target.value);
-				}
-				onChangeFunction(e);
-			}}
+			oninput={handleInput}
 			placeholder={placeholder}
 			min={min}
 			max={max}

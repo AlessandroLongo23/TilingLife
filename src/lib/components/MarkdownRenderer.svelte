@@ -7,8 +7,31 @@
 	
 	let containerElement;
 	let activeSection = $state('');
+	let expandedGif = $state(null);
 	
 	const dispatch = createEventDispatcher();
+	
+	// Function to handle lazy loading of GIFs
+	function setupLazyLoading() {
+		if (!containerElement) return;
+
+		const lazyGifs = containerElement.querySelectorAll('.lazy-gif');
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach(entry => {
+				if (entry.isIntersecting) {
+					const img = entry.target;
+					img.src = img.dataset.src;
+					img.classList.remove('lazy-gif');
+					observer.unobserve(img);
+				}
+			});
+		}, {
+			rootMargin: '50px 0px',
+			threshold: 0.1
+		});
+
+		lazyGifs.forEach(gif => observer.observe(gif));
+	}
 	
 	// Function to set CSS variable for column count on tables
 	function setTableColumnCounts() {
@@ -24,13 +47,43 @@
 		});
 	}
 	
-	// Process LaTeX with KaTeX
+	// Handle GIF click events
+	function handleGifClick(event) {
+		const gifElement = event.target;
+		if (gifElement.classList.contains('markdown-gif')) {
+			if (expandedGif === gifElement.src) {
+				expandedGif = null;
+				gifElement.style.width = '';
+				gifElement.style.maxWidth = '';
+			} else {
+				if (expandedGif) {
+					// Reset previous expanded GIF
+					const prevGif = containerElement.querySelector(`img[src="${expandedGif}"]`);
+					if (prevGif) {
+						prevGif.style.width = '';
+						prevGif.style.maxWidth = '';
+					}
+				}
+				expandedGif = gifElement.src;
+				gifElement.style.width = '100%';
+				gifElement.style.maxWidth = '100%';
+			}
+		}
+	}
+	
+	// Process LaTeX with KaTeX and setup GIFs
 	$effect(() => {
 		if (content && containerElement) {
-			// Allow content to be rendered first, then process LaTeX
+			// Allow content to be rendered first, then process LaTeX and setup GIFs
 			setTimeout(() => {
 				const container = containerElement.querySelector('#content-container');
 				if (!container) return;
+				
+				// Add click handler for GIFs
+				container.addEventListener('click', handleGifClick);
+				
+				// Setup lazy loading for GIFs
+				setupLazyLoading();
 				
 				// Process inline math elements
 				const inlineMathElements = container.querySelectorAll('.katex-inline');
@@ -58,6 +111,18 @@
 				setTableColumnCounts();
 			}, 100);
 		}
+	});
+	
+	// Cleanup effect
+	$effect(() => {
+		return () => {
+			if (containerElement) {
+				const container = containerElement.querySelector('#content-container');
+				if (container) {
+					container.removeEventListener('click', handleGifClick);
+				}
+			}
+		};
 	});
 	
 	$effect(() => {
@@ -201,6 +266,35 @@
 		width: 33%;
 		height: auto;
 		max-width: 33%;
+	}
+	
+	/* GIF-specific styling */
+	:global(.markdown-content .markdown-gif) {
+		@apply object-contain mx-auto block cursor-pointer;
+		width: 50%;  /* GIFs are typically shown larger */
+		height: auto;
+		max-width: 50%;
+		transition: all 0.2s ease-in-out;
+	}
+
+	:global(.markdown-content .markdown-gif.lazy-gif) {
+		filter: blur(10px);
+		transform: scale(0.95);
+	}
+
+	:global(.markdown-content .markdown-gif:not(.lazy-gif)) {
+		filter: blur(0);
+		transform: scale(1);
+	}
+
+	:global(.markdown-content .markdown-gif:hover) {
+		transform: scale(1.02);  /* Subtle zoom on hover */
+	}
+
+	/* Ensure GIFs in tables maintain proper sizing */
+	:global(.markdown-content table .markdown-gif) {
+		width: 100%;
+		max-width: 100%;
 	}
 	
 	/* Table images styling for flexible sizing and distribution */
