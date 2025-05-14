@@ -14,12 +14,11 @@
 	
 	let lastValue = value;
 	
-	// Only play sound when value actually changes
 	function handleMouseMove(e) {
-		if (e.buttons === 1) { // Left mouse button is pressed
+		if (e.buttons === 1) {
 			const newValue = Number(e.target.value);
 			if (newValue !== lastValue) {
-				sounds.slider();
+				sounds.slider(0.10);
 				lastValue = newValue;
 			}
 			value = newValue;

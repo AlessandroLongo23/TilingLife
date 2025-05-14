@@ -96,9 +96,9 @@ export function playSound(sound, volume = 0.5) {
 }
 
 export const sounds = {
-	toggleOn: () => playSound('/sound/Toggle On.mp3', 0.4),
-	toggleOff: () => playSound('/sound/Toggle Off.mp3', 0.4),
-	button: () => playSound('/sound/Button.mp3', 0.4),
-	screenshot: () => playSound('/sound/ScreenshotExport.mp3', 0.4),
-	slider: () => playSound('/sound/Slider.mp3', 0.2)
+	toggleOn: (volume = 0.4) => playSound('/sound/Toggle On.mp3', volume),
+	toggleOff: (volume = 0.4) => playSound('/sound/Toggle Off.mp3', volume),
+	button: (volume = 0.4) => playSound('/sound/Button.mp3', volume),
+	screenshot: (volume = 0.4) => playSound('/sound/ScreenshotExport.mp3', volume),
+	slider: (volume = 0.2) => playSound('/sound/Slider.mp3', volume)
 }; 
