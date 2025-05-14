@@ -700,7 +700,7 @@ export const tilingRules = [
 				rulestring: "6(30)-0,4,6(90)/r120/m(c1)",
 			},
 			{
-				rulestring: "6(30)-3,3-3,6/r60/r(h5)"
+				rulestring: "6(60)-3,3-3,6/r60/r(h5)"
 			},	
 			{
 				rulestring: "6(60)-6-3,0,3/r60/r(v2)"

@@ -5,41 +5,70 @@ import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
-def resize_and_convert_image(image_path, size=(300, 300), convert_to_webp=True, remove_png=True):
-    """Resize an image to the specified size and convert to WebP if requested."""
+def resize_and_convert_image(image_path, size=(300, 300), target_format="webp", remove_png=True):
+    """Resize an image to the specified size and convert to target format if needed."""
     try:
-        file_extension = Path(image_path).suffix.lower()
-        is_png = file_extension == '.png'
+        # Get the file extension
+        file_extension = Path(image_path).suffix.lower().lstrip('.')
+        is_png = file_extension == 'png'
+        output_extension = f".{target_format}"
+        
+        # Create the target path
+        path_obj = Path(image_path)
+        target_path = path_obj.with_suffix(output_extension)
+        
+        # Only check if it's the same file (not a different file with same name)
+        # and already correct size and format
+        if target_path.exists() and target_path.samefile(image_path):
+            with Image.open(image_path) as img:
+                if img.size == size:
+                    print(f"Already correct size and format: {image_path}")
+                    return
         
         with Image.open(image_path) as img:
-            # Resize the image
-            if img.size != size:
+            # Check if conversion or resize is needed
+            needs_resize = img.size != size
+            needs_format_change = file_extension != target_format
+            
+            if not (needs_resize or needs_format_change):
+                print(f"Already correct size and format: {image_path}")
+                return
+            
+            # Resize if needed
+            if needs_resize:
                 resized_img = img.resize(size, Image.Resampling.LANCZOS)
             else:
                 resized_img = img.copy()
             
-            if convert_to_webp:
-                # Create a new path with .webp extension
-                path_obj = Path(image_path)
-                new_path = path_obj.with_suffix('.webp')
+            # Convert to target format
+            if needs_format_change:
+                # Set quality parameter based on format
+                quality_param = {}
+                if target_format.lower() == "webp":
+                    quality_param = {"quality": 80}
+                elif target_format.lower() in ["jpg", "jpeg"]:
+                    quality_param = {"quality": 90}
                 
-                # Save as WebP with good quality
-                resized_img.save(new_path, 'WEBP', quality=80)
-                print(f"Resized and converted to WebP: {new_path}")
+                # Always save and overwrite if a file already exists
+                resized_img.save(target_path, target_format.upper(), **quality_param)
+                
+                if target_path.exists() and not target_path.samefile(image_path):
+                    print(f"Overwrote existing file and {'resized' if needs_resize else 'converted'}: {target_path}")
+                else:
+                    print(f"Converted to {target_format.upper()} and {'resized' if needs_resize else ''}: {target_path}")
                 
                 # Remove PNG files if specified
                 if remove_png and is_png:
                     os.remove(image_path)
                     print(f"Removed original PNG: {image_path}")
-                    
             else:
-                # Save with the original format
+                # Just save with the original format, overwriting the existing file
                 resized_img.save(image_path)
                 print(f"Resized: {image_path}")
     except Exception as e:
         print(f"Error processing {image_path}: {e}")
 
-def process_directory(directory, convert_to_webp=True, remove_png=True):
+def process_directory(directory, target_size=(300, 300), target_format="webp", remove_png=True):
     """Process all image files in the given directory."""
     image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
     image_files = []
@@ -51,7 +80,7 @@ def process_directory(directory, convert_to_webp=True, remove_png=True):
             if file_ext in image_extensions:
                 image_files.append(file_path)
     
-    print(f"Found {len(image_files)} images to process")
+    print(f"Found {len(image_files)} images to scan")
     
     # Use ThreadPoolExecutor to process images in parallel
     with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
@@ -59,7 +88,8 @@ def process_directory(directory, convert_to_webp=True, remove_png=True):
         executor.map(
             lambda img_path: resize_and_convert_image(
                 img_path, 
-                convert_to_webp=convert_to_webp,
+                size=target_size,
+                target_format=target_format,
                 remove_png=remove_png
             ), 
             image_files
@@ -75,7 +105,7 @@ def remove_all_png_files(directory):
                 png_path = os.path.join(root, file)
                 png_files.append(png_path)
     
-    print(f"Found {len(png_files)} PNG files to remove")
+    print(f"Found {len(png_files)} additional PNG files to remove")
     
     for png_file in png_files:
         try:
@@ -100,16 +130,20 @@ if __name__ == "__main__":
     
     print(f"Processing images in: {tilings_dir}")
     
-    # Set this to False if you want to resize without converting to WebP
-    convert_to_webp = True
+    # Set target parameters
+    target_size = (300, 300)
+    target_format = "webp"  # Can be "webp", "jpg", "png", etc.
     
-    # Set this to False if you don't want to remove PNG files during conversion
-    remove_png = True
-    
-    # Process directory - resize, convert to WebP, and remove PNGs during conversion
-    process_directory(tilings_dir, convert_to_webp, remove_png)
+    # Process directory - resize, convert to target format, and remove PNGs during conversion
+    process_directory(
+        tilings_dir, 
+        target_size=(300, 300),
+        target_format='webp', 
+        remove_png=True
+    )
     
     # Additional step to ensure all PNG files are removed, even if they weren't processed
-    remove_all_png_files(tilings_dir)
+    # if remove_png:
+    #     remove_all_png_files(tilings_dir)
     
-    print("Resizing, conversion, and PNG removal complete!") 
+    print(f"Processing complete! All images are now {target_size[0]}x{target_size[1]} in {target_format.upper()} format") 
