@@ -4,6 +4,7 @@
     import { fade, fly } from 'svelte/transition';
     import { browser } from '$app/environment';
     import { onMount } from 'svelte';
+    import { page } from '$app/stores';
 
     import Canvas from '$lib/components/Canvas.svelte';
 
@@ -35,7 +36,7 @@
     <Canvas 
         width={width}
         height={height} 
-        showGameOfLife={true}
+        showGameOfLife={$page.url.pathname === '/'}
         speed={$speed}
         showExtra={false}
     />

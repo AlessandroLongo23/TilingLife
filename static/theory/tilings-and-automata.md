@@ -343,7 +343,7 @@ One thing that could cause this is that we are collapsing each rule into just
 2 numbers. This type of statistic doesn't consider many of the behaviors that
 can make cellular automata rules interesting.
 
-One key reason for this disconnect is that we are collapsing each rule’s entire
+One key reason for this disconnect is that we are collapsing each rule's entire
 spatio-temporal evolution into just two scalar statistics. Average density doesn't say
 anything about whether patterns move, oscillate, or interact in a nontrivial
 way, and a single global complexity score cannot distinguish, for example, between a
@@ -367,3 +367,25 @@ This work could take inspiration and combine the work presented in these papers:
 
 - [Evolving Structures in Complex Systems](https://ar5iv.labs.arxiv.org/html/1911.01086)
 - [Learning Graph Cellular Automata](https://proceedings.neurips.cc/paper/2021/file/af87f7cdcda223c41c3f3ef05a3aaeea-Paper.pdf)
+
+## Sound generation
+
+The soundtrack was generated using a combined workflow of generative algorithms with digital music production tools. Four instances of a one-dimensional Game of Life algorithm were implemented in Touchdesigner using Python scripts, with each instance mapped to a set of MIDI notes corresponding to the state of different cells.
+
+![Generation](../theory/images/sound%201.jpg)
+
+Parameters such as cell array length, iteration speed, and musical range were adjusted to suit each instrument's role. MIDI data produced by these scripts was transmitted to Ableton Live via the OSC protocol, where synthesizer tracks-including drums, bass, lead, and pad played according to the state of the running algorithm.
+
+![Instruments](../theory/images/sound%202.jpg)
+
+After experimenting with parameters and selecting the most suitable musical snippets, these were arranged into a two-minute loop, exported, and integrated into the web application. 
+
+Additional sounds were made and linked to the user interactions with the UI: buttons, sliders, tiling and gol rule selection, etc.
+This result in a generative audio-visual unity through the entirety of the application.
+
+#### Project
+
+| Alberto Basaglia | Alessandro Longo | Andras Egressy |
+| :--- | :--- | :--- |
+| s243124 | s243139 | s250729 |
+| • implementing the parallel simulator<br>• loading of the tilings exported from the web interface<br>• plotting the metrics | • implementing tiling generation algorithm and its graph representation<br>• creating and curating the web app interface<br>• implementing the game of life in-app simulations | • implementing 1D cellular automata in Touchdesigner<br>• arranging and producing the soundtrack loop based on their simulations |

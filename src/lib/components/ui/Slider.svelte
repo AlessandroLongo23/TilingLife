@@ -18,7 +18,7 @@
 		if (e.buttons === 1) {
 			const newValue = Number(e.target.value);
 			if (newValue !== lastValue) {
-				sounds.slider(0.10);
+				sounds.slider(0.02);
 				lastValue = newValue;
 			}
 			value = newValue;

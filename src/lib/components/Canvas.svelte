@@ -154,44 +154,58 @@
                         resetGameOfLife = false;
                     }
 
-                    if (frameMod > 1) {
-                        if (p5.frameCount % Math.round(frameMod) == 0) {
-                            tiling.updateGameOfLife();
-                            alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
+                    if (p5.frameCount % Math.round(frameMod) == 0) {
+                        // Store previous states to calculate changes
+                        const prevStates = tiling.nodes.map(node => node.state);
+                        
+                        tiling.updateGameOfLife();
+                        
+                        // Calculate state changes
+                        const changedCells = tiling.nodes.filter((node, index) => node.state !== prevStates[index]).length;
+                        const totalCells = tiling.nodes.length;
+                        const changeRatio = totalCells > 0 ? changedCells / totalCells : 0;
+                        
+                        // Play state change sound with volume proportional to change ratio
+                        // and subtle variations based on simulation state
+                        if (changedCells > 0) {
+                            // Use behavior data to influence sound variation
+                            const bornCells = tiling.nodes.filter((node, index) => 
+                                prevStates[index] === 0 && node.state === 1).length;
+                            const diedCells = tiling.nodes.filter((node, index) => 
+                                prevStates[index] === 1 && node.state === 0).length;
                             
-                            // Update behavior data
-                            const totalNodes = tiling.nodes.length;
-                            const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
-                            const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
-                            const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
+                            // Calculate additional parameters for sound variation
+                            const bornRatio = totalCells > 0 ? bornCells / totalCells : 0;
+                            const diedRatio = totalCells > 0 ? diedCells / totalCells : 0;
+                            const activityLevel = Math.min(1.0, (bornRatio + diedRatio) * 2);
                             
-                            behaviorData = {
-                                increasing: (increasingNodes / totalNodes) * 100,
-                                chaotic: (chaoticNodes / totalNodes) * 100,
-                                decreasing: (decreasingNodes / totalNodes) * 100
-                            };
+                            // Adjust volume based on change ratio but ensure it's audible
+                            const volume = changeRatio / 5;
                             
-                            iterationCount++;
+                            // Pass simulation parameters to the sound function
+                            sounds.stateChange(volume, {
+                                bornRatio,
+                                diedRatio,
+                                activityLevel,
+                                iteration: iterationCount
+                            });
                         }
-                    } else {
-                        for (let s = 0; s < Math.round(1 / frameMod); s++) {
-                            tiling.updateGameOfLife();
-                            alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
-                            
-                            // Update behavior data
-                            const totalNodes = tiling.nodes.length;
-                            const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
-                            const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
-                            const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
-                            
-                            behaviorData = {
-                                increasing: (increasingNodes / totalNodes) * 100,
-                                chaotic: (chaoticNodes / totalNodes) * 100,
-                                decreasing: (decreasingNodes / totalNodes) * 100
-                            };
-                            
-                            iterationCount++;
-                        }
+                        
+                        alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
+                        
+                        // Update behavior data
+                        const totalNodes = tiling.nodes.length;
+                        const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
+                        const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
+                        const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
+                        
+                        behaviorData = {
+                            increasing: (increasingNodes / totalNodes) * 100,
+                            chaotic: (chaoticNodes / totalNodes) * 100,
+                            decreasing: (decreasingNodes / totalNodes) * 100
+                        };
+                        
+                        iterationCount++;
                     }
 
                     tiling.drawGameOfLife(p5);
