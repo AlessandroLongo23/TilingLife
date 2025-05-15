@@ -361,7 +361,7 @@ Future work will be to run the simulations using more sofisticated metrics.
 
 An approach that would be interesting to try is to use Neural Networks to
 classify and distinguish those rules that present interesting behaviors
-for the ones that don't.
+from the ones that don't.
 
 This work could take inspiration and combine the work presented in these papers:
 
