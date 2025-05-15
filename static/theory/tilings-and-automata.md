@@ -197,6 +197,12 @@ adjacent cells. Instead of counting only the eight nearest neighbors, these
 rules consider all cells within a specified radius *r* on the grid, with
 distinct birth and survival intervals defined over that neighborhood.
 
+For our implementation, to be able to make it work for non-square tilings,
+instead of a radius we use the distance between the cells (nodes of a graph)
+calculated by walking neighbors with a DFS.
+
+![ltl](../theory/video/ltl.gif)
+
 #### Non-square grids
 
 The underlying grid can be replaced by arbitrary tilings or graphs, allowing
@@ -270,10 +276,10 @@ to be ran sequentially.
 
 The strategy that we employed to run the simulation is to parallelize it as much
 as possible. In order to do this, we used the Taichi framework running on a machine
-using a GPU card.
+with a GPU.
 
 The cellular state array is stored as a field on the GPU, and all the update rules
-and metric computations as expressed as Taichi kernels, that are then ran in
+and metric computations are expressed as Taichi kernels, that are then ran in
 parallel.
 
 More practically, what happens is this:
@@ -309,7 +315,7 @@ The tilings that were used are the following:
 The plot for the Density and complexity for the triangular tiling is the following:
 ![t1-dvc](../theory/plots/t1_dvc.png)
 
-It is possible to see that some clusters emerge. We can Zoom in into the Game-of-Life
+It is possible to see that some clusters emerge. We can zoom in into the Game-of-Life
 rule, to see some rules that should be similar:
 ![t1-gol](../theory/plots/t1_gol.png)
 
@@ -333,9 +339,31 @@ It is very interesting to see that cluster emerge from the used metrics. Unfortu
 even the rules that are close to Game-of-Life, don't present any life-like behavior,
 and most of the times die immediately or fill the grid with living cells.
 
-> What could cause this?
+One thing that could cause this is that we are collapsing each rule into just
+2 numbers. This type of statistic doesn't consider many of the behaviors that
+can make cellular automata rules interesting.
+
+One key reason for this disconnect is that we are collapsing each rule’s entire
+spatio-temporal evolution into just two scalar statistics. Average density doesn't say
+anything about whether patterns move, oscillate, or interact in a nontrivial
+way, and a single global complexity score cannot distinguish, for example, between a
+chaotic burst and a fleet of slowly drifting gliders.
+
+A lot of interesting behaviors, like localized structures that travel indefinitely, stable
+oscillators, and complex interactions
+simply vanish when we average or aggregate over the full grid.
+
+To truly capture life-like dynamics, we will need richer, more targeted metrics.
 
 #### Future work
 
-> More metrics, (CNN, GNN etc..)
+Future work will be to run the simulations using more sofisticated metrics.
 
+An approach that would be interesting to try is to use Neural Networks to
+classify and distinguish those rules that present interesting behaviors
+for the ones that don't.
+
+This work could take inspiration and combine the work presented in these papers:
+
+- [Evolving Structures in Complex Systems](https://ar5iv.labs.arxiv.org/html/1911.01086)
+- [Learning Graph Cellular Automata](https://proceedings.neurips.cc/paper/2021/file/af87f7cdcda223c41c3f3ef05a3aaeea-Paper.pdf)
