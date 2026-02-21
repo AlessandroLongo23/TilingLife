@@ -1,5 +1,4 @@
-import { Polygon } from './Polygon.svelte';
-import { Vector } from '../Vector.svelte';
+import { Polygon, Vector } from '$classes';
 import { map } from '$utils';
 
 export class GeneralPolygon extends Polygon {

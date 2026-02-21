@@ -1,7 +1,6 @@
 import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic } from '$stores';
-import { Vector } from '../Vector.svelte';
+import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
-import { Behavior, State } from '../GameOfLifeRule.svelte';
 
 export class Polygon {
     n: number;

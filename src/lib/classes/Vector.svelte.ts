@@ -1,4 +1,4 @@
-import { tolerance } from "$stores";
+import { tolerance } from "$stores/constants";
 
 export class Vector {
     x: number;

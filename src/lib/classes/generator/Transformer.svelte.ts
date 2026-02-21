@@ -1,9 +1,6 @@
 import { tolerance, debugView, offsets, debugManager } from '$stores';
 import { sortPointsByAngleAndDistance, getSpatialKey, isWithinTolerance } from '$utils';
-import { Polygon } from '../polygons/Polygon.svelte';
-import { Vector } from '../Vector.svelte';
-import { Tiling } from '../Tiling.svelte';
-import { RelativeToType, Transform } from '../Transform';
+import { Polygon, Vector, Tiling, RelativeToType, type Transform } from '$classes';
 
 export class Transformer {
     private _transforms: Transform[];

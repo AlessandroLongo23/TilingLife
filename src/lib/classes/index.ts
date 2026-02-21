@@ -5,6 +5,7 @@ export type { Transform, RelativeTo } from "./Transform";
 export { TransformType, RelativeToType } from "./Transform";
 export { Tiling } from "./Tiling.svelte";
 export type { GameOfLifeRule } from "./GameOfLifeRule.svelte";
+export { GOLNeighborhood, GOLRuleType } from "./GameOfLifeRule.svelte";
 export { Behavior, State } from "./GameOfLifeRule.svelte";
 
 // Polygons
@@ -23,6 +24,8 @@ export type { ShapeSeed } from "./polygons/ShapeSeed.svelte";
 // Algorithm
 export { VertexConfiguration } from "./algorithm/VertexConfiguration.svelte";
 export { VCGenerator } from "./algorithm/VCGenerator.svelte";
+export type { GeneratorParameters } from "./algorithm/types";
+export { PolygonCategory } from "./algorithm/types";
 
 // Generator
 export { TilingGenerator } from "./generator/TilingGenerator.svelte";

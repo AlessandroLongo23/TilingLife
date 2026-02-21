@@ -1,5 +1,5 @@
-import { tolerance } from '../stores/configuration';
-import { Vector } from '../classes/Vector.svelte';
+import { tolerance } from '$stores';
+import { Vector } from '$classes';
 
 export const sortPointsByAngleAndDistance = (points) => {
     return points.sort((a, b) => {

@@ -1,8 +1,6 @@
 import { parameter, possibleSides, possibleAngles } from '$stores';
-import { RelativeTo, RelativeToType, Transform, TransformType } from '../Transform';
 import { toRadians } from '$utils';
-import { GameOfLifeRule, GOLNeighborhood } from '../GameOfLifeRule.svelte';
-import { PolygonType, type ShapeSeed } from '../polygons';
+import { PolygonType, type ShapeSeed, type GameOfLifeRule, GOLNeighborhood, type RelativeTo, type RelativeToType, type Transform, TransformType } from '$classes';
 
 export class Parser {
     dual: boolean;

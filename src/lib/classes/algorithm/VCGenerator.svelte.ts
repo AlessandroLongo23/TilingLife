@@ -1,15 +1,4 @@
-import { Polygon, RegularPolygon, StarRegularPolygon, StarParametricPolygon, VertexConfiguration } from '$classes';
-
-export enum PolygonCategory {
-    REGULAR = 'regular',
-    STAR_REGULAR = 'star_regular',
-    STAR_PARAMETRIC = 'star_parametric',
-}
-
-export interface generatorParameters {
-    angle: number;
-    max_n: number;
-}
+import { Polygon, RegularPolygon, StarRegularPolygon, StarParametricPolygon, PolygonCategory, type GeneratorParameters, VertexConfiguration } from '$classes';
 
 const toDegrees = (radians: number): number => {
     let degrees = radians * 180 / Math.PI;
@@ -22,17 +11,17 @@ export class VCGenerator {
     vertexConfigurations: VertexConfiguration[] = [];
     tolerance: number;
 
-    constructor(categories: PolygonCategory[], parameters: generatorParameters) {
+    constructor(parameters: GeneratorParameters) {
         this.tolerance = 1e-6;
         this.availablePolygons = [];
-        if (categories.includes(PolygonCategory.REGULAR)) {
-            for (let n = 3; n <= parameters.max_n; n++) {
+        if (parameters.categories.includes(PolygonCategory.REGULAR)) {
+            for (let n = 3; n <= parameters.n_max; n++) {
                 this.availablePolygons.push(new RegularPolygon(n));
             }
         }
 
-        if (categories.includes(PolygonCategory.STAR_REGULAR)) {
-            for (let n = 3; n <= parameters.max_n; n++) {
+        if (parameters.categories.includes(PolygonCategory.STAR_REGULAR)) {
+            for (let n = 3; n <= parameters.n_max; n++) {
                 for (let d = 2; d <= Math.floor(n / 2); d++) {
                     let a = Math.PI * (1 - 2 * d / n)
                     let b = Math.PI * (1 + 2 * (d - 1) / n)
@@ -43,8 +32,8 @@ export class VCGenerator {
             }
         }
 
-        if (categories.includes(PolygonCategory.STAR_PARAMETRIC)) {
-            for (let n = 3; n <= parameters.max_n; n++) {
+        if (parameters.categories.includes(PolygonCategory.STAR_PARAMETRIC)) {
+            for (let n = 3; n <= parameters.n_max; n++) {
                 let alpha = parameters.angle
                 let max_alpha = Math.PI * (n - 2) / n
                 while (alpha < max_alpha) {

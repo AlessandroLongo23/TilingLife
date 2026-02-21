@@ -1,6 +1,5 @@
-import { Polygon } from './Polygon.svelte';
+import { Polygon, Vector } from '$classes';
 import { map } from '$utils';
-import { Vector } from '../Vector.svelte';
 
 export class RegularPolygon extends Polygon {
     internal_angle: number;

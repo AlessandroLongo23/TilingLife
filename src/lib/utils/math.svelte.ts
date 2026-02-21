@@ -1,5 +1,5 @@
-import { tolerance } from '../stores/configuration';
-import { Vector } from '../classes/Vector.svelte';
+import { tolerance } from '$stores';
+import { Vector } from '$classes';
 
 export const map = (value: number, start1: number, stop1: number, start2: number, stop2: number): number => {
     return start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1));

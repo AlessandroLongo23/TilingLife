@@ -1,5 +1,4 @@
-import { GeneralPolygon } from './GeneralPolygon.svelte';
-import { Vector } from '../Vector.svelte';
+import { GeneralPolygon, Vector } from '$classes';
 
 export class IsohedralPolygon extends GeneralPolygon {
     constructor(n: number) {

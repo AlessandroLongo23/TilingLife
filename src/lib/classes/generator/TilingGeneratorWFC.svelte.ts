@@ -1,21 +1,7 @@
 // import { tolerance, debugView, transformSteps, offsets } from '$stores';
 
-// import { RegularPolygon } from '../polygons/RegularPolygon.svelte.ts';
-// // import { IsotoxalPolygon } from './polygons/IsotoxalPolygon.svelte.ts';
-// // import { StarPolygon } from './polygons/StarPolygon.svelte.ts';
-// // import { DualPolygon } from './polygons/DualPolygon.svelte.ts';
-// // import { GeneralPolygon } from './polygons/GeneralPolygon.svelte.ts';
-
-// import { Parser } from './Parser.svelte.ts';
-// import { Transformer } from './Transformer.svelte.ts';
-
-// import { TilingChecker } from '../../classes/TilingChecker.svelte';
-// import { isWithinTolerance } from '../../utils/math.svelte.ts';
-// import { Vector } from '../../classes/Vector.svelte';
-// import { Tiling } from '../../classes/Tiling.svelte';
-// import { TilingGenerator } from './TilingGenerator.svelte.ts';
-
-// // const availablePolygons = [3, 4, 6, /*8,*/ 12];
+// import { Vector, Tiling, TilingGenerator, Parser, Transformer, TilingChecker, RegularPolygon } from '$classes';
+// import { isWithinTolerance } from '$utils';
 
 // export class TilingGeneratorWFC extends TilingGenerator {
 //     tiling: Tiling;

@@ -1,4 +1,4 @@
-import { Polygon } from '../polygons/Polygon.svelte';
+import { Polygon } from '$classes';
 
 export class VertexConfiguration {
     name: string;

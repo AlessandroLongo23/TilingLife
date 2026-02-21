@@ -1,5 +1,4 @@
-import { Vector } from '../Vector.svelte';
-import { StarPolygon } from './StarPolygon.svelte';
+import { Vector, StarPolygon } from '$classes';
 
 export class StarParametricPolygon extends StarPolygon {
     constructor(n: number, alpha: number) {

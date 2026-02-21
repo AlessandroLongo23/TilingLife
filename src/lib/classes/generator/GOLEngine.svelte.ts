@@ -1,9 +1,6 @@
 import { tolerance, debugView, offsets, debugManager, updateDebugStore } from '$stores';
 import { isWithinTolerance, getSpatialKey } from '$utils';
-import { Tiling } from '../Tiling.svelte';
-import { Parser } from './Parser.svelte';
-import { Polygon } from '../polygons/Polygon.svelte';
-import { GOLNeighborhood, GOLRuleType } from '../GameOfLifeRule.svelte';
+import { Tiling, Parser, Polygon, GOLNeighborhood, GOLRuleType } from '$classes';
 
 export class GOLEngine {
     tiling: Tiling;

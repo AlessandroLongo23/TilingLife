@@ -1,10 +1,7 @@
 import { tolerance, debugView, offsets, debugManager, updateDebugStore } from '$stores';
 import { angleBetween, isWithinTolerance, getSpatialKey } from '$utils';
 import { vertexConfigurations } from '$lib/const';
-import { DualPolygon, Polygon } from '../polygons';
-import { Vector } from '../Vector.svelte';
-import { Tiling } from '../Tiling.svelte';
-import { GOLEngine } from './GOLEngine.svelte';
+import { DualPolygon, Polygon, Vector, Tiling, GOLEngine } from '$classes';
 
 export class TilingGenerator {
     tiling: Tiling;

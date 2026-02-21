@@ -1,12 +1,22 @@
 import { tolerance, debugView, transformSteps, offsets, debugManager } from '$stores';
 import { getClockwiseAngle, getSpatialKey, isWithinTolerance } from '$utils';
-import { PolygonType, RegularPolygon, StarRegularPolygon, StarParametricPolygon, IsotoxalPolygon, IsohedralPolygon, GeneralPolygon, Polygon, type ShapeSeed } from '../polygons';
-import { Vector } from '../Vector.svelte';
-import { TilingGenerator } from './TilingGenerator.svelte';
-import { Transformer } from './Transformer.svelte';
-import { Parser } from './Parser.svelte';
-import { TransformType } from '../Transform';
-import { Tiling } from '../Tiling.svelte';
+import { 
+    PolygonType, 
+    RegularPolygon, 
+    StarRegularPolygon, 
+    StarParametricPolygon, 
+    IsotoxalPolygon, 
+    IsohedralPolygon, 
+    GeneralPolygon, 
+    type Polygon, 
+    type ShapeSeed, 
+    TilingGenerator, 
+    Tiling, 
+    Vector, 
+    Transformer, 
+    Parser, 
+    TransformType 
+} from '$classes';
 
 export class TilingGeneratorFromRule extends TilingGenerator {
     parser: Parser;

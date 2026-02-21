@@ -1,4 +1,4 @@
-import { supabase } from '$lib/supabase';
+import { supabase } from '$services/supabase.js';
 
 let tilingGroups: TilingGroup[] = $state([]);
 let tilings: Tiling[] = $state([]);

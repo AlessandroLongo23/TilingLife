@@ -1,5 +1,4 @@
-import { Polygon } from './Polygon.svelte';
-import { Vector } from '../Vector.svelte';
+import { Polygon, Vector } from '$classes';
 import { map, findIntersection } from '$utils';
 import { get } from 'svelte/store';
 import { controls, lineWidth, islamicAngle } from '$stores';
