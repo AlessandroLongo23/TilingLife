@@ -1,99 +1,97 @@
-import { Polygon, RegularPolygon, StarRegularPolygon, StarParametricPolygon, PolygonCategory, type GeneratorParameters, VertexConfiguration } from '$classes';
-
-const toDegrees = (radians: number): number => {
-    let degrees = radians * 180 / Math.PI;
-    degrees = Math.round(degrees * 10000) / 10000;
-    return degrees;
-}
+import { type GeneratorParameters, VertexConfiguration } from '$classes';
+import { compareArrays, toDegrees } from '$utils';
+import { PolygonsGenerator } from './PolygonsGenerator.svelte';
 
 export class VCGenerator {
-    availablePolygons: Polygon[] = [];
+    polygonsGenerator: PolygonsGenerator;
     vertexConfigurations: VertexConfiguration[] = [];
-    tolerance: number;
 
     constructor(parameters: GeneratorParameters) {
-        this.tolerance = 1e-6;
-        this.availablePolygons = [];
-        if (parameters.categories.includes(PolygonCategory.REGULAR)) {
-            for (let n = 3; n <= parameters.n_max; n++) {
-                this.availablePolygons.push(new RegularPolygon(n));
-            }
-        }
-
-        if (parameters.categories.includes(PolygonCategory.STAR_REGULAR)) {
-            for (let n = 3; n <= parameters.n_max; n++) {
-                for (let d = 2; d <= Math.floor(n / 2); d++) {
-                    let a = Math.PI * (1 - 2 * d / n)
-                    let b = Math.PI * (1 + 2 * (d - 1) / n)
-                    if (this.isMultiple(a, parameters.angle) && this.isMultiple(b, parameters.angle)) {
-                        this.availablePolygons.push(new StarRegularPolygon(n, d));
-                    }
-                }
-            }
-        }
-
-        if (parameters.categories.includes(PolygonCategory.STAR_PARAMETRIC)) {
-            for (let n = 3; n <= parameters.n_max; n++) {
-                let alpha = parameters.angle
-                let max_alpha = Math.PI * (n - 2) / n
-                while (alpha < max_alpha) {
-                    let b = 2 * Math.PI * (1 - 1 / n) - alpha
-                    if (this.isMultiple(b, parameters.angle)) {
-                        this.availablePolygons.push(new StarParametricPolygon(n, alpha));
-                    }
-                    alpha += parameters.angle
-                }
-            }
-        }
-    }
-
-    isMultiple = (value: number, divisor: number): boolean => {
-        let rem = value % divisor;
-        return Math.abs(rem) < this.tolerance || Math.abs(rem - divisor) < this.tolerance;
+        this.polygonsGenerator = new PolygonsGenerator(parameters);
     }
 
     generateVertexConfigurations = (): VertexConfiguration[] => {
         this.vertexConfigurations = [];
 
-        let root = new VCNode(null, [], 0);
+        let root = new VCNode(null, new VertexConfiguration([]));
         let stack: VCNode[] = [root];
         while (stack.length > 0) {
             let current: VCNode = stack.pop() as VCNode;
-            if (toDegrees(current.angle) < 360) {
-                for (let polygon of this.availablePolygons) {
+            if (toDegrees(current.vertexConfiguration.angle) < 360) {
+                for (let polygonData of this.polygonsGenerator.polygons) {
                     let newNode = current.clone();
-                    newNode.addPolygon(polygon);
-                    newNode.angle += polygon.angle;
-                    stack.push(newNode);
+                    newNode.parent = current;
+                    newNode.vertexConfiguration.addPolygon(polygonData);
+                    if (newNode.vertexConfiguration.valid) {
+                        current.children.push(newNode);
+                        stack.unshift(newNode);
+                    }
                 }
-            } else if (toDegrees(current.angle) === 360) {
-                this.vertexConfigurations.push(new VertexConfiguration(current.polygons, current.angle));
+            } else if (toDegrees(current.vertexConfiguration.angle) === 360) {
+                this.vertexConfigurations.push(current.vertexConfiguration.clone());
             }
         }
 
-        return this.vertexConfigurations;
+        const uniqueVertexConfigurations = this.vertexConfigurations.filter(vc => {
+            const smallest_name = cycleToMinimumLexicographicalOrder(vc.polygons.map(p => p.name)).join(',');
+            return isEqual(vc.name.split(','), smallest_name.split(','));
+        });
+
+        return uniqueVertexConfigurations;
     }
+}
+
+const isEqual = (array1: string[], array2: string[]): boolean => {
+    if (array1.length !== array2.length) return false;
+    for (let i = 0; i < array1.length; i++)
+        if (array1[i] !== array2[i]) return false;
+    return true;
+}
+
+const cycleToMinimumLexicographicalOrder = (array: string[]): string[] => {
+    let min = array.slice(0);
+    for (let i = 0; i < array.length; i++) {
+        let rotated = array.slice(i).concat(array.slice(0, i));
+        if (compareArrays(rotated, min) < 0) {
+            min = rotated;
+        }
+    }
+
+    return min;
+}
+
+const cycleToMinimumChiralLexicographicalOrder = (array: string[]): string[] => {
+    let min = array.slice(0);
+    for (let i = 0; i < array.length; i++) {
+        let rotated = array.slice(i).concat(array.slice(0, i));
+        if (compareArrays(rotated, min) < 0) {
+            min = rotated;
+        }
+    }
+
+    let reversed = array.slice().reverse();
+    for (let i = 0; i < array.length; i++) {
+        let rotated = reversed.slice(i).concat(reversed.slice(0, i));
+        if (compareArrays(rotated, min) < 0) {
+            min = rotated;
+        }
+    }
+
+    return min;
 }
 
 export class VCNode {
     parent: VCNode | null;
     children: VCNode[];
-    polygons: Polygon[];
-    angle: number;
+    vertexConfiguration: VertexConfiguration;
 
-    constructor(parent: VCNode | null, polygons: Polygon[], angle: number) {
+    constructor(parent: VCNode | null, vertexConfiguration: VertexConfiguration) {
         this.parent = parent;
         this.children = [];
-        this.polygons = polygons;
-        this.angle = angle;
-    }
-
-    addPolygon = (polygon: Polygon) => {
-        this.polygons.push(polygon);
-        this.angle += polygon.angle;
+        this.vertexConfiguration = vertexConfiguration;
     }
 
     clone = (): VCNode => {
-        return new VCNode(this.parent, [...this.polygons], this.angle);
+        return new VCNode(this.parent, this.vertexConfiguration.clone());
     }
 }

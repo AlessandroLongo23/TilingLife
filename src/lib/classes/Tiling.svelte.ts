@@ -1,9 +1,7 @@
 import { lineWidth, showDualConnections, controls } from '$stores';
 import { sortPointsByAngleAndDistance, isWithinTolerance } from '$utils';
 import { get } from 'svelte/store';
-import { Vector } from './Vector.svelte';
-import { Polygon } from './polygons/Polygon.svelte';
-import { GameOfLifeRule, GOLRuleType, Behavior, State } from './GameOfLifeRule.svelte';
+import { type GameOfLifeRule, GOLRuleType, Behavior, State, Polygon, Vector } from '$classes';
 
 export class Tiling {
     nodes: Polygon[];

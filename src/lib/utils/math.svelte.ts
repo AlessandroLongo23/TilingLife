@@ -14,11 +14,3 @@ export const isWithinTolerance = (a: number | Vector, b: number | Vector): boole
         return false;
     }
 }
-
-export const toRadians = (angle: number, possibleAngles?: number[], defaultAngle: number = 180): number => {
-    if (possibleAngles && !possibleAngles.includes(angle)) {
-        console.error('Invalid angle', angle);
-        angle = defaultAngle as number;
-    }
-    return angle * Math.PI / 180;
-}

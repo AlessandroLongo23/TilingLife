@@ -1,35 +1,31 @@
 // Core
-export { Vector } from "./Vector.svelte";
-export { Cr } from "./Cr.svelte";
-export type { Transform, RelativeTo } from "./Transform";
-export { TransformType, RelativeToType } from "./Transform";
-export { Tiling } from "./Tiling.svelte";
-export type { GameOfLifeRule } from "./GameOfLifeRule.svelte";
-export { GOLNeighborhood, GOLRuleType } from "./GameOfLifeRule.svelte";
-export { Behavior, State } from "./GameOfLifeRule.svelte";
-
+export * from "./Vector.svelte";
+export * from "./Cr.svelte";
+export * from "./Transform";
+export * from "./Transform";
+export * from "./Tiling.svelte";
+export * from "./GameOfLifeRule.svelte";
 // Polygons
-export { Polygon } from "./polygons/Polygon.svelte";
-export { RegularPolygon } from "./polygons/RegularPolygon.svelte";
-export { StarPolygon } from "./polygons/StarPolygon.svelte";
-export { StarRegularPolygon } from "./polygons/StarRegularPolygon.svelte";
-export { StarParametricPolygon } from "./polygons/StarParametricPolygon.svelte";
-export { DualPolygon } from "./polygons/DualPolygon.svelte";
-export { GeneralPolygon } from "./polygons/GeneralPolygon.svelte";
-export { IsotoxalPolygon } from "./polygons/IsotoxalPolygon.svelte";
-export { IsohedralPolygon } from "./polygons/IsohedralPolygon.svelte";
-export { PolygonType } from "./polygons/PolygonType.svelte";
-export type { ShapeSeed } from "./polygons/ShapeSeed.svelte";
+export * from "./polygons/Polygon.svelte";
+export * from "./polygons/RegularPolygon.svelte";
+export * from "./polygons/StarPolygon.svelte";
+export * from "./polygons/StarRegularPolygon.svelte";
+export * from "./polygons/StarParametricPolygon.svelte";
+export * from "./polygons/DualPolygon.svelte";
+export * from "./polygons/GeneralPolygon.svelte";
+export * from "./polygons/IsotoxalPolygon.svelte";
+export * from "./polygons/IsohedralPolygon.svelte";
+export * from "./polygons/PolygonType.svelte";
+export * from "./polygons/ShapeSeed.svelte";
 
 // Algorithm
-export { VertexConfiguration } from "./algorithm/VertexConfiguration.svelte";
-export { VCGenerator } from "./algorithm/VCGenerator.svelte";
-export type { GeneratorParameters } from "./algorithm/types";
-export { PolygonCategory } from "./algorithm/types";
+export * from "./algorithm/VertexConfiguration.svelte";
+export * from "./algorithm/VCGenerator.svelte";
+export * from "./algorithm/types";
 
 // Generator
-export { TilingGenerator } from "./generator/TilingGenerator.svelte";
-export { TilingGeneratorFromRule } from "./generator/TilingGeneratorFromRule.svelte";
-export { Transformer } from "./generator/Transformer.svelte";
-export { Parser } from "./generator/Parser.svelte";
-export { GOLEngine } from "./generator/GOLEngine.svelte";
+export * from "./generator/TilingGenerator.svelte";
+export * from "./generator/TilingGeneratorFromRule.svelte";
+export * from "./generator/Transformer.svelte";
+export * from "./generator/Parser.svelte";
+export * from "./generator/GOLEngine.svelte";

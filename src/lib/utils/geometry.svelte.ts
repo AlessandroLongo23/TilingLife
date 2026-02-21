@@ -146,3 +146,17 @@ export const findIntersection = (p1: Vector, v1: Vector, p2: Vector, v2: Vector)
 
     return Vector.add(p1, Vector.scale(v1, t));
 }
+
+export const toRadians = (angle: number, possibleAngles?: number[], defaultAngle: number = 180): number => {
+    if (possibleAngles && !possibleAngles.includes(angle)) {
+        console.error('Invalid angle', angle);
+        angle = defaultAngle as number;
+    }
+    return angle * Math.PI / 180;
+}
+
+export const toDegrees = (radians: number): number => {
+    let degrees = radians * 180 / Math.PI;
+    degrees = Math.round(degrees * 10000) / 10000;
+    return degrees;
+}

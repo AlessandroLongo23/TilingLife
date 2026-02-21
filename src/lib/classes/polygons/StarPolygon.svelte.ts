@@ -3,29 +3,35 @@ import { map, findIntersection } from '$utils';
 import { get } from 'svelte/store';
 import { controls, lineWidth, islamicAngle } from '$stores';
 
+export enum StarRegularVertexTypes {
+    INNER = 'inner',
+    OUTER = 'outer',
+}
+
 export class StarPolygon extends Polygon {
     alpha: number;
     beta: number;
     innerRadius: number;
     outerRadius: number;
+    startsWith: StarRegularVertexTypes;
 
-    constructor(n: number) {
+    constructor(n: number, startsWith: StarRegularVertexTypes = StarRegularVertexTypes.OUTER) {
         super(n);
 
-        this.alpha
+        this.startsWith = startsWith;
     }
 
-    calculateVerticesFromAnchorAndDir = () => {
+    calculateVerticesFromAnchorAndDir = (startsWith: StarRegularVertexTypes = StarRegularVertexTypes.OUTER) => {
         this.vertices = [new Vector(this.anchor.x, this.anchor.y)];
+
+        let angles = [this.alpha, this.beta];
+        if (startsWith === StarRegularVertexTypes.INNER)
+            angles.reverse();
+
         for (let i = 1; i < this.n * 2; i++) {
             let prev_vertex: Vector = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), this.dir.copy()));
-            
-            if (i % 2 === 0) {
-                this.dir.rotate(-(Math.PI - this.beta));
-            } else {
-                this.dir.rotate(-(Math.PI - this.alpha));
-            }
+            this.dir.rotate(-(Math.PI - angles[i % 2]));
         }
     }
 

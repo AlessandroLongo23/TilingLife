@@ -1,9 +1,11 @@
-import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic } from '$stores';
+import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic, tolerance } from '$stores';
 import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
+import { isWithinTolerance } from '$lib/utils';
 
 export class Polygon {
     n: number;
+    name: string;
     neighbors: Polygon[];
     state: State;
     nextState: number;
@@ -17,6 +19,7 @@ export class Polygon {
     behavior: Behavior;
     golNeighbors?: Polygon[];
     alive_neighbors: number;
+    interior_angle: number;
 
     constructor(n: number = 3) {
         this.n = n;
@@ -118,20 +121,44 @@ export class Polygon {
 
     containsPoint = (point: Vector): boolean => {
         let inside = false;
-        
         for (let i = 0, j = this.vertices.length - 1; i < this.vertices.length; j = i++) {
-            const xi = this.vertices[i].x + get(controls).offset.x / get(controls).zoom;
-            const yi = this.vertices[i].y - get(controls).offset.y / get(controls).zoom;
-            const xj = this.vertices[j].x + get(controls).offset.x / get(controls).zoom;
-            const yj = this.vertices[j].y - get(controls).offset.y / get(controls).zoom;
+            const xi = this.vertices[i].x;
+            const yi = this.vertices[i].y;
+            const xj = this.vertices[j].x;
+            const yj = this.vertices[j].y;
+            const l2 = (xj - xi) ** 2 + (yj - yi) ** 2;
             
+            let distToSegment = 0;
+
+            if (l2 === 0) {
+                distToSegment = Math.sqrt((point.x - xi) ** 2 + (point.y - yi) ** 2);
+            } else {
+                let t = ((point.x - xi) * (xj - xi) + (point.y - yi) * (yj - yi)) / l2;
+                t = Math.max(0, Math.min(1, t));
+                const projX = xi + t * (xj - xi);
+                const projY = yi + t * (yj - yi);
+                distToSegment = Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
+            }
+            
+            if (distToSegment <= tolerance) return false;
+
             const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-            
-            if (intersect) 
+            if (intersect) {
                 inside = !inside;
+            }
         }
-        
         return inside;
+    }
+
+    getAngleAtVertex = (coordinate: Vector): number => {
+        const vertex = this.vertices.find(v => isWithinTolerance(v, coordinate));
+        if (vertex) {
+            const index = this.vertices.indexOf(vertex);
+            const dir1 = Vector.sub(vertex, this.vertices[(index - 1 + this.vertices.length) % this.vertices.length]);
+            const dir2 = Vector.sub(this.vertices[(index + 1) % this.vertices.length], vertex);
+            return (dir2.heading() - dir1.heading() + 5 * Math.PI) % (2 * Math.PI);
+        }
+        return 0;
     }
 
     show = (ctx, showPolygonPoints, customColor = null, opacity = 0.80) => {

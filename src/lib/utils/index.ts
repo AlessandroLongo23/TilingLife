@@ -1,11 +1,5 @@
-export {
-	sortPointsByAngleAndDistance,
-	getClockwiseAngle,
-	apothem,
-	findIntersection,
-	angleBetween,
-} from "./geometry.svelte";
-export { map, isWithinTolerance, toRadians } from "./math.svelte";
-export { compareArrays } from "./utils.svelte";
-export { getSpatialKey } from "./optimizing.svelte";
-export { sounds } from "./sounds.svelte.js";
+export * from "./geometry.svelte";
+export * from "./math.svelte";
+export * from "./utils.svelte";
+export * from "./optimizing.svelte";
+export * from "./sounds.svelte.js";

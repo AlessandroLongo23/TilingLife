@@ -2,10 +2,10 @@ import { Polygon, Vector } from '$classes';
 import { map } from '$utils';
 
 export class RegularPolygon extends Polygon {
-    internal_angle: number;
-
     constructor(n: number) {
         super(n);
+        this.interior_angle = Math.PI * (n - 2) / n;
+        this.name = n.toString();
     }
 
     static fromCentroidAndAngle = (n: number, centroid: Vector, angle: number): RegularPolygon => {
@@ -26,7 +26,6 @@ export class RegularPolygon extends Polygon {
         
         polygon.anchor = anchor;
         polygon.dir = dir;
-        polygon.internal_angle = Math.PI * (n - 2) / n;
         
         polygon.calculateVerticesFromAnchorAndDir();
         polygon.calculateHalfways();
@@ -56,7 +55,7 @@ export class RegularPolygon extends Polygon {
         for (let i = 1; i < this.n; i++) {
             const prev_vertex = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.copy()));
-            current_dir.rotate(-(Math.PI - this.internal_angle));
+            current_dir.rotate(-(Math.PI - this.interior_angle));
 
             this.vertices[i].snapToGrid();
         }
