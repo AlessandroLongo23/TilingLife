@@ -185,7 +185,7 @@
 	</div>
 </div>
 
-<style>
+<style lang="postcss">
 	:global(.markdown-content h2) {
 		@apply text-4xl font-bold text-white mb-10 mt-24 pb-4 border-b border-green-400/80;
 		scroll-margin-top: 1rem;

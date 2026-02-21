@@ -2,18 +2,18 @@
 
 ## Big changes
 
-- [ ] generate tilings from the k-uniform-solver output instead of using the GomJau-Hogg notation
-- [ ] add fractalization operation
-- [ ] add rectification operation
-- [ ] add truncation operation
-- [ ] add islamic tilings
-- [ ] add aperiodic tilings
+- [x] add islamic tilings
+- [ ] add rigorous tilings classification to catalogue and theory
 - [ ] add procedurally generated aperiodic tilings
+- [ ] add database for tilings and gol rules, with users tiling findings
+- [ ] add operations (fractalization , rectification, truncation)
+- [ ] generate tilings from the k-uniform-solver output instead of using the GomJau-Hogg notation
 
 ## Algorithm
 
 - [x] expand notation to allow rotations of a certain angle around a point
-- [ ] Figure out a way to detect the vertices types molteplicity automatically
+- [ ] implement automatic vertices types molteplicity detection, by using rotations, simmetries and translations (and automatic R&C notation)
+- [ ] implement automatic holes/overlap checks to ensure tiling validity
 
 ## Optimizations
 
@@ -22,7 +22,7 @@
 
 ## Features
 
-- [x] add R&C notation to all tilings and fix visualization
+- [x] add R&C notation
 - [x] add R&C filtering and sorting in the catalogue
 - [x] add zoom and movement with the mouse instead of the slider
 - [ ] add R&C for face types (dual polygons)
@@ -42,10 +42,10 @@
 
 - [x] fix adjustable angle tilings
 - [x] fix screenshot delay
-- [ ] fix polygon angles in some tilings
-- [ ] fix missing tiling (with overlapping between polygons)
-- [ ] add missing R&C notations and fix checks on same vertices
+- [x] fix polygon angles in some tilings
+- [x] fix missing tiling (with overlapping between polygons)
 - [ ] fix text size based on zoom
+- [ ] fix sounds and vertex types graphic visualization
 
 ## Ideas
 

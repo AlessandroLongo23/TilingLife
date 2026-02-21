@@ -1,6 +1,6 @@
 <script>
 	import { createEventDispatcher } from 'svelte';
-	import { contentService } from '$lib/services/contentService';
+	import { contentService } from '$services/contentService';
 	import { ChevronDown } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	

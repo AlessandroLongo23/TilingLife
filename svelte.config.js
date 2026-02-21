@@ -5,10 +5,15 @@ import mdsvexConfig from './mdsvex.config.js';
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
-		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
-		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-		adapter: adapter()
+		adapter: adapter(),
+		alias: {
+			$lib: 'src/lib',
+			$components: 'src/lib/components',
+			$classes: 'src/lib/classes',
+			$stores: 'src/lib/stores',
+			$utils: 'src/lib/utils',
+			$services: 'src/lib/services',
+		}
 	},
 	extensions: ['.svelte', '.md', '.svx'],
 	preprocess: [

@@ -116,6 +116,49 @@ def remove_all_png_files(directory):
     
     print(f"Removed {len(png_files)} PNG files")
 
+def rename_tiling_images(directory, replacements):
+    """
+    Rename image files by replacing strings in their filenames.
+    
+    Args:
+        directory: The directory to search for images
+        replacements: List of dictionaries with 'before' and 'after' keys
+    """
+    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
+    renamed_count = 0
+    
+    for root, _, files in os.walk(directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_ext = Path(file).suffix.lower()
+            
+            if file_ext in image_extensions:
+                # Check if filename contains any patterns to replace
+                file_name = Path(file).stem
+                new_name = file_name
+                
+                for replacement in replacements:
+                    if replacement['before'] in new_name:
+                        new_name = new_name.replace(replacement['before'], replacement['after'])
+                
+                # Only rename if the name has changed
+                if new_name != file_name:
+                    new_path = os.path.join(root, f"{new_name}{file_ext}")
+                    
+                    # Check if target file already exists
+                    if os.path.exists(new_path):
+                        print(f"Cannot rename {file_path} to {new_path} - target file already exists")
+                        continue
+                    
+                    try:
+                        os.rename(file_path, new_path)
+                        print(f"Renamed: {file_path} → {new_path}")
+                        renamed_count += 1
+                    except Exception as e:
+                        print(f"Error renaming {file_path}: {e}")
+    
+    print(f"Renamed {renamed_count} image files")
+
 if __name__ == "__main__":
     # Get the script's directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -129,6 +172,24 @@ if __name__ == "__main__":
         sys.exit(1)
     
     print(f"Processing images in: {tilings_dir}")
+    
+    # Rename tiling images with the specified pattern replacements
+    # pattern_replacements = [
+    #     {"before": "6(60)", "after": "{6.2}"},
+    #     {"before": "8(90)", "after": "{8.2}"},
+    #     {"before": "8(45)", "after": "{8.3}"},
+    #     {"before": "12(120)", "after": "{12.2}"},
+    #     {"before": "12(90)", "after": "{12.3}"},
+    #     {"before": "12(60)", "after": "{12.4}"},
+    #     {"before": "12(30)", "after": "{12.5}"},
+    # ]
+
+    pattern_replacements = [
+        {"before": "/m(c", "after": "/r(c"},
+        {"before": "/m(v", "after": "/r(v"},
+    ]
+    
+    rename_tiling_images(tilings_dir, pattern_replacements)
     
     # Set target parameters
     target_size = (300, 300)

@@ -1,5 +1,5 @@
 <script>
-	import { colorParams } from '$lib/stores/configuration.js';
+	import { colorParams } from '$stores';
 	import { onMount } from 'svelte';
 
 	const MIN_A = 1;

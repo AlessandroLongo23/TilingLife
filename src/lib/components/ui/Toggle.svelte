@@ -1,5 +1,5 @@
 <script>
-	import { sounds } from '$lib/utils/sounds.js';
+	import { sounds } from '$utils';
 	
 	let { 
 		id = null,

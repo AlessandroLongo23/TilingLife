@@ -1,6 +1,9 @@
 <script>
 	import '../app.css';
-	import AudioPlayer from '$lib/components/AudioPlayer.svelte';
+	import '../lib/prototypes.js';
+
+	import AudioPlayer from '$components/AudioPlayer.svelte';
+
 	let { children } = $props();
 </script>
 

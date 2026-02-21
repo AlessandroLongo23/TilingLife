@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import Chart from 'chart.js/auto';
-	import { debugStore, updateDebugStore } from '$lib/stores/debug';
+	import { debugStore, updateDebugStore } from '$stores';
 
 	let chartElement;
 	let chart;

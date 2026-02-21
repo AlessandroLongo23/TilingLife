@@ -1,14 +1,19 @@
 <script>
-    import { tilingRules } from '$lib/stores/tilingRules.js';
-    import { selectedTiling } from '$lib/stores/configuration.js';
-    import { tilingModalOpen, tilingFilters } from '$lib/stores/modalState.js';
-    import { Grid, Funnel } from 'lucide-svelte';
+    import { tilingStore, tilingRules, selectedTiling, tilingModalOpen, tilingFilters } from '$stores';
+    import { Grid, Funnel, Loader2 } from 'lucide-svelte';
     
-    import Modal from '$lib/components/ui/Modal.svelte';
-    import TilingCard from '$lib/components/TilingCard.svelte';
-    import TilingFilterBar from '$lib/components/TilingFilterBar.svelte';
+    import Modal from '$components/ui/Modal.svelte';
+    import TilingCard from '$components/TilingCard.svelte';
+    import TilingFilterBar from '$components/TilingFilterBar.svelte';
     
     let showFilters = $state(true);
+    
+    // Use Supabase data if available, otherwise fallback to static data
+    let activeTilingRules = $derived(
+        tilingStore.initialized && tilingStore.tilingRules.length > 0 
+            ? tilingStore.tilingRules 
+            : tilingRules
+    );
     
     const toggleFilters = () => {
         showFilters = !showFilters;
@@ -48,9 +53,9 @@
     };
     
     const getTypeId = (title) => {
-        for (let i = 0; i < tilingRules.length; i++) {
-            if (tilingRules[i].title === title) {
-                return tilingRules[i].id;
+        for (let i = 0; i < activeTilingRules.length; i++) {
+            if (activeTilingRules[i].title === title) {
+                return activeTilingRules[i].id;
             }
         }
         return "";
@@ -91,7 +96,7 @@
     let filteredTilings = $derived.by(() => {
         let result = [];
         
-        tilingRules.forEach(group => {
+        activeTilingRules.forEach(group => {
             const typeId = getTypeId(group.title);
             
             if (selectedTypes.length > 0 && !selectedTypes.includes(typeId)) {
@@ -111,6 +116,9 @@
                     ...rule,
                     group: group.title,
                     groupId: group.id,
+                    // Include Supabase image URLs if available
+                    imageUrl: rule.imageUrl,
+                    dualImageUrl: rule.dualImageUrl
                 });
                 if (showDual && group.dual) {
                     result.push({
@@ -119,6 +127,9 @@
                         rulestring: rule.rulestring.concat('*'),
                         group: group.title,
                         groupId: group.id,
+                        // Use dual image URL for dual tilings
+                        imageUrl: rule.dualImageUrl || rule.imageUrl,
+                        dualImageUrl: rule.dualImageUrl
                     });
                 }
             });
@@ -214,7 +225,12 @@
         </div>
         
         <div class="catalog-container p-4 {showFilters ? 'with-filters' : 'without-filters'}">
-            {#if filteredTilings.length === 0}
+            {#if tilingStore.loading}
+                <div class="py-8 text-center text-zinc-400">
+                    <Loader2 size={48} class="mx-auto mb-4 opacity-40 animate-spin" />
+                    <p>Loading tilings...</p>
+                </div>
+            {:else if filteredTilings.length === 0}
                 <div class="py-8 text-center text-zinc-400">
                     <Grid size={48} class="mx-auto mb-4 opacity-40" />
                     <p>No tilings match your filters</p>
@@ -244,6 +260,8 @@
                                 rulestring={tiling.rulestring}
                                 groupId={tiling.groupId}
                                 onClick={loadTiling}
+                                imageUrl={tiling.imageUrl}
+                                dualImageUrl={tiling.dualImageUrl}
                             />
                         </div>
                     {/each}

@@ -1,8 +1,8 @@
 <script>
 	import { createEventDispatcher } from 'svelte';
-	import { contentService } from '$lib/services/contentService';
+	import { contentService } from '$services/contentService';
 	
-	import MarkdownRenderer from '$lib/components/MarkdownRenderer.svelte';
+	import MarkdownRenderer from '$components/MarkdownRenderer.svelte';
 	
 	let { targetSection = '' } = $props();
 	

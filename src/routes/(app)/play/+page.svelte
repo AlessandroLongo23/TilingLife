@@ -1,29 +1,38 @@
 <script>
-    import { speed, activeTab } from '$lib/stores/configuration.js';
+    import { speed, activeTab } from '$stores';
     import { onMount } from 'svelte';
-    import { contentService } from '$lib/services/contentService';
+    import { contentService } from '$services/contentService';
 
-    import Sidebar from '$lib/components/Sidebar.svelte';
-    import Canvas from '$lib/components/Canvas.svelte';
-    import TheoryContent from '$lib/components/TheoryContent.svelte';
-    import TilingModalContent from '$lib/components/TilingModalContent.svelte';
+    import Sidebar from '$components/Sidebar.svelte';
+    import Canvas from '$components/Canvas.svelte';
+    import TheoryContent from '$components/TheoryContent.svelte';
+    import TilingModalContent from '$components/TilingModalContent.svelte';
 
     let sidebarElement = $state('');
-    let sidebarWidth = $state(320);
     let isSidebarOpen = $state(true);
-    let prevSidebarState = $state(true);
     
-    let width = $state(600);
-    let height = $state(600);
-    let isResizing = $state(false);
     let targetTheorySection = $state('');
     let activeTheorySection = $state('');
+    
+    const SIDEBAR_WIDTH = 384;
+    
+    let windowWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 1200);
+    let windowHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 800);
+    
+    let canvasOffset = $derived(isSidebarOpen ? SIDEBAR_WIDTH / 2 : 0);
 
     onMount(() => {
-        updateDimensions();
-        window.addEventListener('resize', handleResize);
-        
         contentService.loadContent('/theory/tilings-and-automata.md');
+        
+        windowWidth = window.innerWidth;
+        windowHeight = window.innerHeight;
+        
+        const handleResize = () => {
+            windowWidth = window.innerWidth;
+            windowHeight = window.innerHeight;
+        };
+        
+        window.addEventListener('resize', handleResize);
         
         return () => {
             window.removeEventListener('resize', handleResize);
@@ -41,57 +50,20 @@
     const handleActiveSectionChange = (e) => {
         activeTheorySection = e.detail.sectionId;
     };
-
-    $effect(() => {
-        if (prevSidebarState !== isSidebarOpen) {
-            prevSidebarState = isSidebarOpen;
-            
-            const delay = isSidebarOpen ? 300 : 10;
-            
-            setTimeout(() => {
-                updateDimensions();
-            }, delay);
-        }
-    });
-    
-    const handleResize = () => {
-        if (!isResizing) {
-            isResizing = true;
-            setTimeout(() => {
-                updateDimensions();
-                isResizing = false;
-            }, 100);
-        }
-    }
-    
-    const updateDimensions = () => {
-        if (!sidebarElement) return;
-        
-        sidebarWidth = isSidebarOpen ? sidebarElement.clientWidth : 48;
-        
-        width = window.innerWidth - sidebarWidth;
-        height = window.innerHeight;
-    }
 </script>
 
-<div class="flex h-screen w-full bg-zinc-900 overflow-hidden">
-    <Sidebar 
-        bind:sidebarElement={sidebarElement} 
-        bind:isSidebarOpen={isSidebarOpen}
-        onSectionSelect={handleSectionSelect}
-        activeTheorySection={activeTheorySection}
-    />
-        
+<div class="h-screen w-full bg-zinc-900 overflow-hidden relative">
     <div
-        class="absolute top-0 right-0 bottom-0 transition-all duration-300 z-0 bg-zinc-900 overflow-hidden"
-        style="left: {sidebarWidth}px;"
+        class="absolute inset-0 z-0 transition-transform duration-300 ease-in-out"
+        style="transform: translateX({canvasOffset}px);"
     >
         {#if showCanvas}
-            <Canvas 
-                width={width}
-                height={height} 
+            <Canvas
+                width={windowWidth}
+                height={windowHeight} 
                 showGameOfLife={showGameOfLife}
                 speed={$speed}
+                isSidebarOpen={isSidebarOpen}
             />
         {:else if showTheory}
             <TheoryContent 
@@ -100,6 +72,13 @@
             />
         {/if}
     </div>
+    
+    <Sidebar 
+        bind:sidebarElement={sidebarElement} 
+        bind:isSidebarOpen={isSidebarOpen}
+        onSectionSelect={handleSectionSelect}
+        activeTheorySection={activeTheorySection}
+    />
     
     <TilingModalContent />
 </div>

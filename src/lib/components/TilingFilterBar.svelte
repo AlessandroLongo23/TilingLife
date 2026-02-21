@@ -1,10 +1,9 @@
 <script>
-    import { tilingRules } from '$lib/stores/tilingRules';
+    import { tilingStore, tilingRules, vertexTypes } from '$stores';
     import { ChevronUp, ChevronDown } from 'lucide-svelte';
-    import { vertexTypes } from '$lib/stores/vertexTypes';
 
-    import Toggle from '$lib/components/ui/Toggle.svelte';
-    import VertexTypeCard from '$lib/components/VertexTypeCard.svelte';
+    import Toggle from '$components/ui/Toggle.svelte';
+    import VertexTypeCard from '$components/VertexTypeCard.svelte';
     
     let {
         selectedTypes = $bindable([]),
@@ -14,6 +13,13 @@
         polygonFilterMode = $bindable('exact'),
         vertexTypeFilterMode = $bindable('exact')
     } = $props();
+
+    // Use Supabase data if available, otherwise fallback to static data
+    let activeTilingRules = $derived(
+        tilingStore.initialized && tilingStore.tilingRules.length > 0 
+            ? tilingStore.tilingRules 
+            : tilingRules
+    );
 
     let typesSectionExpanded = $state(true);
     let polygonSectionExpanded = $state(true);
@@ -29,10 +35,10 @@
 
     const types = $derived.by(() => {
         let types = [];
-        for (let i = 0; i < tilingRules.length; i++) {
+        for (let i = 0; i < activeTilingRules.length; i++) {
             types.push({
-                id: tilingRules[i].id,
-                label: tilingRules[i].title
+                id: activeTilingRules[i].id,
+                label: activeTilingRules[i].title
             })
         }
         return types;

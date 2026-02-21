@@ -1,24 +1,28 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, islamicAngle } from '$lib/stores/configuration.js';
-	import { gameOfLifeRules } from '$lib/stores/gameOfLifeRules.js';
+	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, islamicAngle, isIslamic, gameOfLifeRules, tilingModalOpen, tilingRules, tilingStore } from '$stores';
+
+	// Use Supabase data when available, otherwise fallback to static tilingRules
+	let activeTilingRules = $derived(
+		tilingStore.initialized && tilingStore.tilingRules.length > 0
+			? tilingStore.tilingRules
+			: tilingRules
+	);
 	import { contentService } from '$lib/services/contentService';
-	import { tilingModalOpen } from '$lib/stores/modalState.js';
-	import { tilingRules } from '$lib/stores/tilingRules.js';
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { slide, fade } from 'svelte/transition';
 	import * as ls from 'lucide-svelte';
-	import { sounds } from '$lib/utils/sounds.js';
+	import { sounds } from '$utils';
 
-	import TheorySidebar from '$lib/components/TheorySidebar.svelte';
-	import GolRuleCard from '$lib/components/GolRuleCard.svelte';
-	import TilingCard from '$lib/components/TilingCard.svelte';
-	import Checkbox from '$lib/components/ui/Checkbox.svelte';
-	import ShapeIcon from '$lib/components/ShapeIcon.svelte';
-	import Slider from '$lib/components/ui/Slider.svelte';
-	import Toggle from '$lib/components/ui/Toggle.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
-	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import TheorySidebar from '$components/TheorySidebar.svelte';
+	import GolRuleCard from '$components/GolRuleCard.svelte';
+	import TilingCard from '$components/TilingCard.svelte';
+	import Checkbox from '$components/ui/Checkbox.svelte';
+	import ShapeIcon from '$components/ShapeIcon.svelte';
+	import Slider from '$components/ui/Slider.svelte';
+	import Toggle from '$components/ui/Toggle.svelte';
+	import Button from '$components/ui/Button.svelte';
+	import Input from '$components/ui/Input.svelte';
+	import Tabs from '$components/ui/Tabs.svelte';
 
 	let { 
 		isSidebarOpen = $bindable(true),
@@ -32,7 +36,7 @@
 	$effect(() => {
 		if (Object.keys(expandedGroups).length === 0) {
 			let initialState = {};
-			tilingRules.forEach(group => {
+			activeTilingRules.forEach(group => {
 				initialState[group.title] = true;
 			});
 			expandedGroups = initialState;
@@ -81,27 +85,23 @@
     }
 
 	const expandAll = () => {
-		expandedGroups = tilingRules.reduce((acc, curr) => {
+		expandedGroups = activeTilingRules.reduce((acc, curr) => {
 			acc[curr.title] = true;
 			return acc;
 		}, {});
-		// We need to refresh observers after groups expand
 		setTimeout(setupObservers, 300);
 	}
 
 	const collapseAll = () => {
-		expandedGroups = tilingRules.reduce((acc, curr) => {
+		expandedGroups = activeTilingRules.reduce((acc, curr) => {
 			acc[curr.title] = false;
 			return acc;
 		}, {});
-		// We need to refresh observers after groups collapse
 		setTimeout(setupObservers, 300);
 	}
 
 	let isParametrized = $derived($selectedTiling.rulestring.includes('a'));
-	let isIslamic = $derived($selectedTiling.rulestring.includes('i'));
 	
-	// Track current visible folder
 	let catalogContainer;
 	let currentVisibleGroup = $state("");
 	let previousVisibleGroup = $state("");
@@ -110,9 +110,7 @@
 	let observer;
 	let observerNeedsRefresh = $state(false);
 	
-	// Use $effect to replace afterUpdate
 	$effect(() => {
-		// If we just expanded or collapsed a group, we need to refresh the observers
 		if (catalogContainer && observerNeedsRefresh) {
 			const groupElements = catalogContainer.querySelectorAll('.tiling-group');
 			if (groupElements.length > 0 && (!observer || observer.takeRecords().length === 0)) {
@@ -122,11 +120,9 @@
 		}
 	});
 	
-	// Function to setup or refresh IntersectionObserver
 	const setupObservers = () => {
 		if (!catalogContainer) return;
 		
-		// Clear previous observers
 		if (observer) {
 			observer.disconnect();
 		}
@@ -150,18 +146,15 @@
 				});
 			}, options);
 			
-			// Observe all groups
 			const groupElements = catalogContainer.querySelectorAll('.tiling-group');
 			groupElements.forEach(element => {
 				observer.observe(element);
 			});
 			
-			// Mark that observers have been refreshed
 			observerNeedsRefresh = false;
 		}
 	};
 	
-	// Setup IntersectionObserver for better scroll detection
 	onMount(() => {
 		setupObservers();
 		
@@ -172,14 +165,11 @@
 		};
 	});
 	
-	// Handle traditional scroll detection as fallback
 	const updateVisibleGroup = () => {
-		// Only use this method if IntersectionObserver is not available
 		if (observer) return;
 		
 		if (!catalogContainer) return;
 		
-		// Set scrolling state
 		isScrolling = true;
 		clearTimeout(scrollingTimer);
 		scrollingTimer = setTimeout(() => {
@@ -205,7 +195,6 @@
 		}
 	};
 	
-	// Track scrolling state for visual effects
 	const handleScroll = () => {
 		isScrolling = true;
 		clearTimeout(scrollingTimer);
@@ -213,7 +202,6 @@
 			isScrolling = false;
 		}, 100);
 		
-		// Fallback for browsers without IntersectionObserver
 		if (!observer) {
 			updateVisibleGroup();
 		}
@@ -227,16 +215,13 @@
 		}
 	};
 	
-	// Watch for changes that should trigger observer refresh
 	$effect(() => {
-		// Create a dependency on expandedGroups to refresh when it changes
 		const expandedGroupsState = JSON.stringify(expandedGroups);
 		if (Object.keys(expandedGroups).length > 0) {
 			observerNeedsRefresh = true;
 		}
 	});
 
-	// For theory content
 	let theoryActiveSection = $state('');
 	
 	const handleTheorySectionSelect = (e) => {
@@ -244,7 +229,6 @@
 	};
 
 	$effect(() => {
-		// Trigger content loading when Theory tab is active
 		if ($activeTab === "Theory") {
 			contentService.loadContent('/theory/tilings-and-automata.md');
 		}
@@ -255,27 +239,34 @@
 	});
 </script>
 
-<div id="sidebar" class="h-full fixed left-0 top-0 transition-all duration-300 flex flex-col shadow-2xl {isSidebarOpen ? 'w-96' : 'w-12'}" bind:this={sidebarElement}>
-	<div class="bg-zinc-800/90 backdrop-blur-sm text-white h-full overflow-hidden flex flex-col border-r border-zinc-700/50">
+{#if !isSidebarOpen}
+	<button
+		onclick={toggleSidebar}
+		class="fixed top-3 left-3 z-50 p-2 rounded-md bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100 shadow-lg"
+		aria-label="Expand sidebar"
+	>
+		<ls.ChevronRight size={18} />
+	</button>
+{/if}
+
+<div 
+	id="sidebar" 
+	class="h-full fixed top-0 left-0 w-96 transition-transform duration-300 ease-in-out flex flex-col z-40"
+	style="transform: translateX({isSidebarOpen ? '0' : '-100%'});"
+	bind:this={sidebarElement}
+>
+	<div class="bg-zinc-800 backdrop-blur-sm text-white h-full overflow-hidden flex flex-col border-r border-zinc-700/50">
 		<div class="p-3 flex items-center justify-between border-b border-zinc-700/50 flex-shrink-0 bg-zinc-900/30">
-			{#if isSidebarOpen}
-				<h2 class="text-sm font-medium text-white/90 uppercase tracking-wider">Controls</h2>
-			{/if}
+			<h2 class="text-sm font-medium text-white/90 uppercase tracking-wider">Controls</h2>
 
 			<button
 				onclick={toggleSidebar}
 				class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100"
-				aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+				aria-label="Collapse sidebar"
 			>
-				{#if isSidebarOpen}
-					<ls.ChevronLeft size={18} />
-				{:else}
-					<ls.ChevronRight size={18} />
-				{/if}
+				<ls.ChevronLeft size={18} />
 			</button>
 		</div>
-		
-		{#if isSidebarOpen}
 			<div class="flex-1 overflow-hidden">
 				<Tabs tabs={["Tilings", "Game of Life", "Theory"]}>
 					<div slot="tab-0" class="h-full flex flex-col">
@@ -324,7 +315,14 @@
 									/>
 								{/if}
 
-								{#if isIslamic}
+								<Checkbox
+									id="isIslamic"
+									label="Islamic"
+									position="right"
+									bind:checked={$isIslamic}
+								/>
+
+								{#if $isIslamic}
 									<Slider
 										id="islamicAngle"
 										label="Islamic Angle"
@@ -337,13 +335,13 @@
 								{/if}
 
 								<div class="space-y-2 pt-1">
-									<Checkbox 
+									<!-- <Checkbox 
 										id="showConstructionPoints"
 										label="Show Construction Points"
 										position="right"
 										bind:checked={$showConstructionPoints}
 									/>
-									
+									 -->
 									<Checkbox 
 										id="showPolygonPoints"
 										label="Show Polygon Points"
@@ -411,10 +409,17 @@
 								<!-- Sticky header with main title -->
 								<div class="sticky-header p-3 bg-zinc-800 {isScrolling ? 'scrolling' : ''}">
 									<div class="flex items-center justify-between">
-										<h3 class="font-medium text-xs text-white/90 uppercase tracking-wider">Tiling Patterns <span class="ml-1 text-green-400/90 font-medium rounded-full px-1.5 py-0.5 text-xs bg-green-400/10">{tilingRules.reduce((acc, curr) => acc + curr.rules.length, 0)}</span></h3>
+										<h3 class="font-medium text-xs text-white/90 uppercase tracking-wider">
+											Tiling Patterns
+											{#if tilingStore.loading}
+												<span class="ml-1 text-zinc-500 text-xs">(loading…)</span>
+											{:else}
+												<span class="ml-1 text-green-400/90 font-medium rounded-full px-1.5 py-0.5 text-xs bg-green-400/10">{activeTilingRules.reduce((acc, curr) => acc + curr.rules.length, 0)}</span>
+											{/if}
+										</h3>
 										
 										<div class="flex flex-row gap-1.5">
-											{#if Object.keys(expandedGroups).reduce((acc, curr) => acc + expandedGroups[curr], 0) == tilingRules.length}
+											{#if Object.keys(expandedGroups).reduce((acc, curr) => acc + expandedGroups[curr], 0) == activeTilingRules.length}
 												<button
 													class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100"
 													onclick={collapseAll}
@@ -479,7 +484,7 @@
 								</div>
 								
 								<div class="p-3">
-									{#each tilingRules as tilingGroup}
+									{#each activeTilingRules as tilingGroup}
 										<div class="mb-2 tiling-group" data-group-title={tilingGroup.title}>
 											<button 
 												class="tiling-group-button font-medium text-zinc-300 hover:text-white focus:outline-none"
@@ -505,6 +510,8 @@
 															cr={tiling.cr}
 															rulestring={tiling.rulestring}
 															golRules={tiling.golRules}
+															imageUrl={tiling.imageUrl}
+															dualImageUrl={tiling.dualImageUrl}
 															onClick={loadTiling}
 														/>
 
@@ -515,6 +522,8 @@
 																cr={tiling.cr}
 																rulestring={tiling.rulestring.concat('*')}
 																golRules={tiling.golRules}
+																imageUrl={tiling.imageUrl}
+																dualImageUrl={tiling.dualImageUrl}
 																onClick={loadTiling}
 															/>
 														{/if}
@@ -653,7 +662,6 @@
 					</div>
 				</Tabs>
 			</div>
-		{/if}
 	</div>
 </div> 
 

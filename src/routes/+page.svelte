@@ -1,12 +1,11 @@
 <script>
-    import { speed, selectedTiling } from '$lib/stores/configuration.js';
-    import { tilingRules } from '$lib/stores/tilingRules.js';
+    import { speed, selectedTiling, tilingRules } from '$stores';
     import { fade, fly } from 'svelte/transition';
     import { browser } from '$app/environment';
     import { onMount } from 'svelte';
     import { page } from '$app/stores';
 
-    import Canvas from '$lib/components/Canvas.svelte';
+    import Canvas from '$components/Canvas.svelte';
 
     let ready = $state(false);
     let width = $state();

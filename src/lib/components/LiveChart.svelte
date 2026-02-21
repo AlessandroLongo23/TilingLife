@@ -1,5 +1,5 @@
 <script>
-    import { liveChartMode } from '$lib/stores/configuration.js';
+    import { liveChartMode } from '$stores';
     import { onMount } from 'svelte';
 
     import Chart from 'chart.js/auto';
