@@ -180,6 +180,9 @@ export class VertexConfiguration {
 
         // THIRD CHECK: for each neighboring vertex, check if the other vcs can be inserted there without conflicts
         // TODO: implement this check
+        for (let i = 0; i < this.neighboringVertices.length; i++) {
+            
+        }
 
         return true;
     }
