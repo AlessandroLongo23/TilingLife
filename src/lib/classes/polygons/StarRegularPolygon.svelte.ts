@@ -19,7 +19,7 @@ export class StarRegularPolygon extends StarPolygon {
         let polygon: StarRegularPolygon = new StarRegularPolygon(n, d, startsWith);
 
         polygon.anchor = anchor;
-        polygon.dir = dir;
+        polygon.dir = dir.copy();
         polygon.interior_angle = startsWith === StarRegularVertexTypes.OUTER ? polygon.alpha : polygon.beta;
 
         polygon.calculateVerticesFromAnchorAndDir(startsWith);

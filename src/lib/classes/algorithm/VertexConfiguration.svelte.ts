@@ -1,6 +1,6 @@
-import { Polygon, PolygonType, RegularPolygon, StarParametricPolygon, StarRegularPolygon, StarRegularVertexTypes, Vector } from '$classes';
-import { PolygonSignature } from './PolygonSignature.svelte';
-import { isWithinTolerance, toDegrees, toRadians } from '$utils';
+import { Polygon, PolygonType, PolygonSignature, RegularPolygon, StarParametricPolygon, StarRegularPolygon, StarRegularVertexTypes, Vector } from '$classes';
+import { isWithinTolerance, segmentsIntersect, toDegrees, toRadians } from '$utils';
+import { tolerance } from '$stores';
 
 const dotStarRegex = /\{(\d+)\.(\d+)(o|i)?\}/;
 const pipeStarRegex = /\{(\d+)\|(\d+)(o|i)?\}/;
@@ -74,44 +74,46 @@ export class VertexConfiguration {
         this.polygons.push(polygon);
         this.angle += polygon.interior_angle;
 
-        // check the vertex configuration validity by:
-        // 1. find the adjacent vertex to the origin vertex which is shared by the two last polygons
-        // if (this.polygons.length > 1) {
-        //     const lastPolygon = this.polygons[this.polygons.length - 1];
-        //     const secondLastPolygon = this.polygons[this.polygons.length - 2];
-        //     const adjacentVertex = lastPolygon.vertices
-        //         .filter(v1 => secondLastPolygon.vertices
-        //             .find(v2 => isWithinTolerance(v1, v2)))
-        //         .find(v => isWithinTolerance(v.distance(new Vector(0, 0)), 1));
-
-        //     // 2. check if the sum of the interior angles of the two last polygons on that vertex is less than 360°
-        //     const angleA = lastPolygon.getAngleAtVertex(adjacentVertex);
-        //     const angleB = secondLastPolygon.getAngleAtVertex(adjacentVertex);
-        //     console.log(lastPolygon.name, secondLastPolygon.name, toDegrees(angleA), toDegrees(angleB));
-        //     const sum = angleA + angleB;
-        //     if (!isWithinTolerance(sum, 2 * Math.PI) && !(sum < 2 * Math.PI)) {
-        //         this.valid = false;
-        //     }
-        // }
-
-        if (this.polygons.length > 2) {
-            const newPolygon = this.polygons[this.polygons.length - 1];
-
+        // FIRST CHECK: check if any polygon intersects with any other polygon
+        if (this.polygons.length > 1) {
+            const lastPolygon = this.polygons[this.polygons.length - 1];
+            
             for (let i = 0; i < this.polygons.length - 1; i++) {
-                const oldPolygon = this.polygons[i];
-                for (let j = 0; j < newPolygon.vertices.length; j++) {
-                    if (oldPolygon.containsPoint(newPolygon.vertices[j])) {
-                        this.valid = false;
-                        return;
-                    }
+                const prevPolygon = this.polygons[i];
+                if (lastPolygon.intersects(prevPolygon)) {
+                    this.valid = false;
+                    return;
                 }
+            }
+        }
 
-                for (let j = 0; j < oldPolygon.vertices.length; j++) {
-                    if (newPolygon.containsPoint(oldPolygon.vertices[j])) {
-                        this.valid = false;
-                        return;
-                    }
-                }
+        // SECOND CHECK: check the vertex configuration validity by checking the sum of the interior angles of the two last polygons on the adjacent vertex
+        if (this.polygons.length > 1) {
+            const lastPolygon = this.polygons[this.polygons.length - 1];
+            const secondLastPolygon = this.polygons[this.polygons.length - 2];
+            
+            const adjacentVertex = this.current_dir.copy();
+
+            const angleA = lastPolygon.getAngleAtVertex(adjacentVertex);
+            const angleB = secondLastPolygon.getAngleAtVertex(adjacentVertex);
+            const sum = angleA + angleB;
+            if (sum > 2 * Math.PI + tolerance) {
+                this.valid = false;
+                return;
+            }
+        }
+
+        if (isWithinTolerance(this.angle, 2 * Math.PI)) {
+            const firstPolygon = this.polygons[0];
+            const lastPolygon = this.polygons[this.polygons.length - 1];
+            const adjacentVertex = new Vector(1, 0);
+
+            const angleA = lastPolygon.getAngleAtVertex(adjacentVertex);
+            const angleB = firstPolygon.getAngleAtVertex(adjacentVertex);
+            const sum = angleA + angleB;
+            if (sum > 2 * Math.PI + tolerance) {
+                this.valid = false;
+                return;
             }
         }
 

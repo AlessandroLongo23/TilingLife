@@ -1,5 +1,6 @@
 import { tolerance } from '$stores';
 import { Vector } from '$classes';
+import { isWithinTolerance } from './math.svelte';
 
 export const sortPointsByAngleAndDistance = (points) => {
     return points.sort((a, b) => {
@@ -159,4 +160,25 @@ export const toDegrees = (radians: number): number => {
     let degrees = radians * 180 / Math.PI;
     degrees = Math.round(degrees * 10000) / 10000;
     return degrees;
+}
+
+
+export const segmentsIntersect = (p1: Vector, p2: Vector, p3: Vector, p4: Vector): boolean => {
+    if (isWithinTolerance(p1, p3) || isWithinTolerance(p1, p4) || isWithinTolerance(p2, p3) || isWithinTolerance(p2, p4)) {
+        return false;
+    }
+    
+    const denom = (p4.y - p3.y) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.y - p1.y);
+    if (Math.abs(denom) < tolerance) {
+        return false;
+    }
+    
+    const numT = (p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x);
+    const numU = (p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x);
+    const t = numT / denom;
+    const u = numU / denom;
+    if (t > -tolerance && t < 1 + tolerance && u > -tolerance && u < 1 + tolerance) {
+        return true;
+    }
+    return false;
 }

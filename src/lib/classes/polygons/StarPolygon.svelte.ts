@@ -28,10 +28,13 @@ export class StarPolygon extends Polygon {
         if (startsWith === StarRegularVertexTypes.INNER)
             angles.reverse();
 
+        let current_dir: Vector = this.dir.copy();
+
         for (let i = 1; i < this.n * 2; i++) {
             let prev_vertex: Vector = this.vertices[this.vertices.length - 1];
-            this.vertices.push(Vector.add(prev_vertex.copy(), this.dir.copy()));
-            this.dir.rotate(-(Math.PI - angles[i % 2]));
+            this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.copy()));
+            
+            current_dir.rotate(-(Math.PI - angles[i % 2]));
         }
     }
 

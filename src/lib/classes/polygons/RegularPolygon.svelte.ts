@@ -25,7 +25,7 @@ export class RegularPolygon extends Polygon {
         const polygon: RegularPolygon = new RegularPolygon(n);
         
         polygon.anchor = anchor;
-        polygon.dir = dir;
+        polygon.dir = dir.copy();
         
         polygon.calculateVerticesFromAnchorAndDir();
         polygon.calculateHalfways();

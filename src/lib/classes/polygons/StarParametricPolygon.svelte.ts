@@ -17,7 +17,7 @@ export class StarParametricPolygon extends StarPolygon {
         const polygon: StarParametricPolygon = new StarParametricPolygon(n, alpha, startsWith);
 
         polygon.anchor = anchor;
-        polygon.dir = dir;
+        polygon.dir = dir.copy();
         polygon.interior_angle = startsWith === StarRegularVertexTypes.OUTER ? polygon.alpha : polygon.beta;
 
         polygon.calculateVerticesFromAnchorAndDir(startsWith);

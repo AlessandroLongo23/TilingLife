@@ -11,10 +11,9 @@ describe('VCGenerator', () => {
                 PolygonCategory.STAR_PARAMETRIC,
             ],
             angle: Math.PI / 6,
-            n_max: 24
+            n_max: 42
         };
         const vcGenerator = new VCGenerator(parameters);
-        console.log(vcGenerator.polygonsGenerator.polygons.map(p => p.name));
 
         const vertexConfigurations = vcGenerator.generateVertexConfigurations();
         const filePath = 'src/lib/classes/algorithm/vcs.json';

@@ -21,6 +21,7 @@ export * from "./polygons/ShapeSeed.svelte";
 // Algorithm
 export * from "./algorithm/VertexConfiguration.svelte";
 export * from "./algorithm/VCGenerator.svelte";
+export * from "./algorithm/PolygonSignature.svelte";
 export * from "./algorithm/types";
 
 // Generator

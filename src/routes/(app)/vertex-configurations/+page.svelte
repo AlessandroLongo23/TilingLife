@@ -140,7 +140,7 @@
 
         ctx.save();
         ctx.translate(size / 2, size / 2);
-        ctx.scale(scale, -scale);
+        ctx.scale(scale, scale);
         ctx.translate(-centerX, -centerY);
         
         for (const polygon of vc.polygons) {
@@ -217,7 +217,7 @@
             {#each displayedVCs as { name, vc }, i (name + i)}
                 <div class="flex flex-col items-center bg-zinc-800/40 rounded-lg overflow-hidden border border-zinc-700/30 hover:border-zinc-500/50 transition-colors group">
                     <p class="w-full text-zinc-300 group-hover:text-white text-xs font-mono px-3 py-2 text-center truncate bg-zinc-800/50 border-b border-zinc-700/30 transition-colors" title={name}>
-                        {name}
+                        {i + 1}. {name}
                     </p>
                     {#if vc}
                         <canvas

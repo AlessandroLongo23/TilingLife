@@ -1,7 +1,7 @@
 import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic, tolerance } from '$stores';
+import { isWithinTolerance, segmentsIntersect } from '$lib/utils';
 import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
-import { isWithinTolerance } from '$lib/utils';
 
 export class Polygon {
     n: number;
@@ -148,6 +148,27 @@ export class Polygon {
             }
         }
         return inside;
+    }
+
+    intersects(other: Polygon): boolean {
+        if (this.centroid && other.centroid && this.centroid.distance(other.centroid) < tolerance) {
+            return true;
+        }
+
+        for (let i = 0; i < this.vertices.length; i++) {
+            const p1 = this.vertices[i];
+            const p2 = this.vertices[(i + 1) % this.vertices.length];
+            
+            for (let j = 0; j < other.vertices.length; j++) {
+                const p3 = other.vertices[j];
+                const p4 = other.vertices[(j + 1) % other.vertices.length];
+                
+                if (segmentsIntersect(p1, p2, p3, p4)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     getAngleAtVertex = (coordinate: Vector): number => {
