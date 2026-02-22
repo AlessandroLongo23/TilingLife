@@ -1,9 +1,7 @@
 import { Polygon, PolygonType, PolygonSignature, RegularPolygon, StarParametricPolygon, StarRegularPolygon, StarRegularVertexTypes, Vector } from '$classes';
-import { isWithinTolerance, segmentsIntersect, toDegrees, toRadians } from '$utils';
+import { isWithinTolerance, toRadians } from '$utils';
 import { tolerance } from '$stores';
-
-const dotStarRegex = /\{(\d+)\.(\d+)(o|i)?\}/;
-const pipeStarRegex = /\{(\d+)\|(\d+)(o|i)?\}/;
+import { regularStarRegex, parametricStarRegex } from './regex';
 
 export class VertexConfiguration {
     polygons: Polygon[];
@@ -11,12 +9,14 @@ export class VertexConfiguration {
     name: string;
     current_dir: Vector;
     valid: boolean = true;
+    neighboringVertices: Vector[];
 
     constructor(polygons: Polygon[], angle: number | null = null, name: string | null = null, current_dir: Vector | null = null) {
         this.polygons = polygons;
         this.angle = angle || this.computeAngle();
         this.name = name || this.computeName();
         this.current_dir = current_dir || new Vector(1, 0);
+        this.neighboringVertices = [];
     }
 
     static fromName = (name: string): VertexConfiguration => {
@@ -28,15 +28,15 @@ export class VertexConfiguration {
             let polygon: Polygon | null = null;
 
             if (p.startsWith('{')) {
-                const dotMatch = p.match(dotStarRegex);
-                if (dotMatch) {
-                    const [, n, d, suffix] = dotMatch;
+                const regularStarMatch = p.match(regularStarRegex);
+                if (regularStarMatch) {
+                    const [, n, d, suffix] = regularStarMatch;
                     const startsWith = suffix === 'i' ? StarRegularVertexTypes.INNER : StarRegularVertexTypes.OUTER;
                     polygon = StarRegularPolygon.fromAnchorAndDir(parseInt(n), new Vector(0, 0), current_dir.copy(), parseInt(d), startsWith);
                 } else {
-                    const pipeMatch = p.match(pipeStarRegex);
-                    if (pipeMatch) {
-                        const [, n, value, suffix] = pipeMatch;
+                    const parametricStarMatch = p.match(parametricStarRegex);
+                    if (parametricStarMatch) {
+                        const [, n, value, suffix] = parametricStarMatch;
                         const startsWith = suffix === 'i' ? StarRegularVertexTypes.INNER : StarRegularVertexTypes.OUTER;
                         if (suffix) {
                             polygon = StarParametricPolygon.fromAnchorAndDir(parseInt(n), new Vector(0, 0), current_dir.copy(), toRadians(parseInt(value)), startsWith);
@@ -115,10 +115,16 @@ export class VertexConfiguration {
                 this.valid = false;
                 return;
             }
+
+            this.computeNeighboringVertices();
         }
 
         this.current_dir.rotate(-polygon.interior_angle);
         this.name = this.computeName();
+    }
+
+    computeNeighboringVertices = (): void => {
+        this.neighboringVertices = this.polygons.map(p => p.vertices[1]);
     }
 
     computeAngle = (): number => {
@@ -143,6 +149,39 @@ export class VertexConfiguration {
             name += ',' + this.polygons[i].name;
         }
         return name;
+    }
+
+    isCompatible = (other: VertexConfiguration): boolean => {
+        // FIRST CHECK: filter out vcs that do not share at least two polygons
+        const thisNames = this.polygons.map(p => p.name);
+        const otherNames = other.polygons.map(p => p.name);
+        const sharedNames = thisNames.filter(name => otherNames.includes(name));
+        if (sharedNames.length < 2) {
+            return false;
+        }
+
+        // SECOND CHECK: filter out vcs that don't share an inverted pair of cyclically consecutive polygons, e.g. {a, b, c} and {a, e, b}
+        let found = false;
+        const len1 = thisNames.length;
+        const len2 = otherNames.length;
+        for (let i = 0; i < len1; i++) {
+            const thisA = thisNames[i];
+            const thisB = thisNames[(i + 1) % len1];
+            for (let j = 0; j < len2; j++) {
+                const otherA = otherNames[j];
+                const otherB = otherNames[(j + 1) % len2];
+                if (thisA === otherB && thisB === otherA) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) return false;
+
+        // THIRD CHECK: for each neighboring vertex, check if the other vcs can be inserted there without conflicts
+        // TODO: implement this check
+
+        return true;
     }
 
     clone = (): VertexConfiguration => {

@@ -13,10 +13,10 @@ export class VCGenerator {
     generateVertexConfigurations = (): VertexConfiguration[] => {
         this.vertexConfigurations = [];
 
-        let root = new VCNode(null, new VertexConfiguration([]));
-        let stack: VCNode[] = [root];
+        let root = new VCTreeNode(null, new VertexConfiguration([]));
+        let stack: VCTreeNode[] = [root];
         while (stack.length > 0) {
-            let current: VCNode = stack.pop() as VCNode;
+            let current: VCTreeNode = stack.pop() as VCTreeNode;
             if (toDegrees(current.vertexConfiguration.angle) < 360) {
                 for (let polygonData of this.polygonsGenerator.polygons) {
                     let newNode = current.clone();
@@ -80,18 +80,18 @@ const cycleToMinimumChiralLexicographicalOrder = (array: string[]): string[] => 
     return min;
 }
 
-export class VCNode {
-    parent: VCNode | null;
-    children: VCNode[];
+export class VCTreeNode {
+    parent: VCTreeNode | null;
+    children: VCTreeNode[];
     vertexConfiguration: VertexConfiguration;
 
-    constructor(parent: VCNode | null, vertexConfiguration: VertexConfiguration) {
+    constructor(parent: VCTreeNode | null, vertexConfiguration: VertexConfiguration) {
         this.parent = parent;
         this.children = [];
         this.vertexConfiguration = vertexConfiguration;
     }
 
-    clone = (): VCNode => {
-        return new VCNode(this.parent, this.vertexConfiguration.clone());
+    clone = (): VCTreeNode => {
+        return new VCTreeNode(this.parent, this.vertexConfiguration.clone());
     }
 }

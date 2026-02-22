@@ -2,10 +2,9 @@
     import { VertexConfiguration } from '$classes/algorithm';
     import { browser } from '$app/environment';
     import allVCNames from '$lib/classes/algorithm/vcs.json';
+    import { regularStarRegex, parametricStarRegex } from '$classes/algorithm';
 
     const CANVAS_SIZE = 220;
-    const dotStarRegex = /\{(\d+)\.(\d+)(o|i)?\}/;
-    const pipeStarRegex = /\{(\d+)\|(\d+)(o|i)?\}/;
     
     let selectedTypes = $state({
         Regular: true,
@@ -43,20 +42,20 @@
                 if (/^\d+$/.test(p)) {
                     if (!selectedTypes.Regular) return false;
                 } else {
-                    const dotMatch = p.match(dotStarRegex);
-                    if (dotMatch) {
+                    const regularStarMatch = p.match(regularStarRegex);
+                    if (regularStarMatch) {
                         if (!selectedTypes.StarRegular) return false;
-                        const n = parseInt(dotMatch[1]);
-                        const d = parseInt(dotMatch[2]);
+                        const n = parseInt(regularStarMatch[1]);
+                        const d = parseInt(regularStarMatch[2]);
                         const a = 180 * (1 - 2 * d / n);
                         const b = 180 * (1 + 2 * (d - 1) / n);
                         if (filterAngleEnabled && (!isValidMultiple(a, filterAngle) || !isValidMultiple(b, filterAngle))) return false;
                     } else {
-                        const pipeMatch = p.match(pipeStarRegex);
-                        if (pipeMatch) {
+                        const parametricStarMatch = p.match(parametricStarRegex);
+                        if (parametricStarMatch) {
                             if (!selectedTypes.StarParametric) return false;
-                            const n = parseInt(pipeMatch[1]);
-                            const alpha = parseInt(pipeMatch[2]);
+                            const n = parseInt(parametricStarMatch[1]);
+                            const alpha = parseInt(parametricStarMatch[2]);
                             const b = 360 * (1 - 1 / n) - alpha;
                             if (filterAngleEnabled && (!isValidMultiple(alpha, filterAngle) || !isValidMultiple(b, filterAngle))) return false;
                         } else {
