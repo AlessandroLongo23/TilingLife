@@ -12,17 +12,20 @@ export * from "./polygons/StarPolygon.svelte";
 export * from "./polygons/StarRegularPolygon.svelte";
 export * from "./polygons/StarParametricPolygon.svelte";
 export * from "./polygons/DualPolygon.svelte";
-export * from "./polygons/GeneralPolygon.svelte";
-export * from "./polygons/IsotoxalPolygon.svelte";
+export * from "./polygons/GenericPolygon.svelte";
+export * from "./polygons/EquilateralPolygon.svelte";
 export * from "./polygons/IsohedralPolygon.svelte";
 export * from "./polygons/PolygonType.svelte";
 export * from "./polygons/ShapeSeed.svelte";
 
 // Algorithm
-export * from "./algorithm/VertexConfiguration.svelte";
+export * from "./algorithm/PolygonsGenerator.svelte";
 export * from "./algorithm/VCGenerator.svelte";
+export * from "./algorithm/VertexConfiguration.svelte";
 export * from "./algorithm/CompatibilityGraph.svelte";
 export * from "./algorithm/PolygonSignature.svelte";
+export * from "./algorithm/SeedConfiguration.svelte";
+export * from "./algorithm/regex";
 export * from "./algorithm/types";
 
 // Generator

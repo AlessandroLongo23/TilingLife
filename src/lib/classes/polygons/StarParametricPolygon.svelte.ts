@@ -1,24 +1,24 @@
-import { Vector, StarPolygon, StarRegularVertexTypes } from '$classes';
+import { Vector, StarPolygon, StarVertexTypes } from '$classes';
 import { toDegrees } from '$utils';
 
 export class StarParametricPolygon extends StarPolygon {
-    constructor(n: number, alpha: number, startsWith: StarRegularVertexTypes = StarRegularVertexTypes.OUTER) {
+    constructor(n: number, alpha: number, startsWith: StarVertexTypes = StarVertexTypes.OUTER) {
         super(n, startsWith);
 
         this.alpha = alpha;
-        this.name = '{' + n.toString() + '|' + toDegrees(alpha).toString() + (startsWith === StarRegularVertexTypes.OUTER ? 'o' : 'i') + '}';
+        this.name = '{' + n.toString() + '|' + toDegrees(alpha).toString() + (startsWith === StarVertexTypes.OUTER ? 'o' : 'i') + '}';
         this.beta = 2 * Math.PI * (1 - 1 / n) - alpha;
 
         this.outerRadius = Math.sin(this.beta / 2) / Math.sin(Math.PI / n);
         this.innerRadius = Math.sin(this.alpha / 2) / Math.sin(Math.PI / n);
     }
 
-    static fromAnchorAndDir = (n: number, anchor: Vector, dir: Vector, alpha: number, startsWith: StarRegularVertexTypes = StarRegularVertexTypes.OUTER): StarParametricPolygon => {
+    static fromAnchorAndDir = (n: number, anchor: Vector, dir: Vector, alpha: number, startsWith: StarVertexTypes = StarVertexTypes.OUTER): StarParametricPolygon => {
         const polygon: StarParametricPolygon = new StarParametricPolygon(n, alpha, startsWith);
 
         polygon.anchor = anchor;
         polygon.dir = dir.copy();
-        polygon.interior_angle = startsWith === StarRegularVertexTypes.OUTER ? polygon.alpha : polygon.beta;
+        polygon.interior_angle = startsWith === StarVertexTypes.OUTER ? polygon.alpha : polygon.beta;
 
         polygon.calculateVerticesFromAnchorAndDir(startsWith);
         polygon.calculateHalfways();
@@ -43,6 +43,6 @@ export class StarParametricPolygon extends StarPolygon {
     }
 
     clone = (): StarParametricPolygon => {
-        return StarParametricPolygon.fromCentroidAndAngle(this.n, this.alpha, this.centroid.copy(), this.angle);
+        return StarParametricPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy(), this.alpha, this.startsWith);
     }
 }

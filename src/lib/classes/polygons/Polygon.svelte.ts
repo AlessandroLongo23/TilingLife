@@ -155,6 +155,10 @@ export class Polygon {
             return true;
         }
 
+        if (this.containsPoint(other.centroid) || other.containsPoint(this.centroid)) {
+            return true;
+        }
+
         for (let i = 0; i < this.vertices.length; i++) {
             const p1 = this.vertices[i];
             const p2 = this.vertices[(i + 1) % this.vertices.length];
@@ -286,6 +290,10 @@ export class Polygon {
         }
         ctx.endShape(ctx.CLOSE);
         ctx.pop();
+    }
+
+    getName = (coordinate: Vector | null = null): string => {
+        throw new Error('Abstract method called');
     }
 
     clone = (): Polygon => {

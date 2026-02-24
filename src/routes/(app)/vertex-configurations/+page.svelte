@@ -1,11 +1,13 @@
 <script>
     import { VertexConfiguration } from '$classes/algorithm';
     import { browser } from '$app/environment';
-    import { regularStarRegex, parametricStarRegex } from '$classes/algorithm';
-    import { Search, X, ArrowLeft, Minus, Plus } from 'lucide-svelte';
+    import { regularStarRegex, parametricStarRegex, regularPolygonRegex, equilateralPolygonRegex, PolygonType } from '$classes';
+    import { Search, Minus, Plus, Hexagon, Network, GitFork } from 'lucide-svelte';
+    import { isValidMultiple } from '$utils/filterHelpers';
 
     import MultiSelect from '$components/ui/MultiSelect.svelte';
-    import Checkbox from '$components/ui/Checkbox.svelte';
+    import SearchInput from '$components/ui/SearchInput.svelte';
+    import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
 
     import allVCNames from '$lib/classes/algorithm/vcs.json';
@@ -18,83 +20,57 @@
     let currentPage = $state(1);
 
     const categoryOptions = [
-        { id: 'Regular', label: 'Regular' },
-        { id: 'StarRegular', label: 'Star Regular' },
-        { id: 'StarParametric', label: 'Star Parametric' },
+        { id: PolygonType.REGULAR, label: 'Regular' },
+        { id: PolygonType.STAR_REGULAR, label: 'Star Regular' },
+        { id: PolygonType.STAR_PARAMETRIC, label: 'Star Parametric' },
+        { id: PolygonType.EQUILATERAL, label: 'Equilateral' },
     ];
 
-    let selectedCategories = $state(['Regular', 'StarRegular', 'StarParametric']);
+    let selectedCategories = $state([PolygonType.REGULAR, PolygonType.STAR_REGULAR, PolygonType.STAR_PARAMETRIC, PolygonType.EQUILATERAL]);
 
-    let filterAngleEnabled = $state(true);
-    let filterAngle = $state(30);
-    let angleInputValue = $state(30);
-    let debounceTimer = null;
-
-    let searchQuery = $state('');
-    let searchDebounceTimer = null;
     let activeSearch = $state('');
-
-    function handleAngleInput(event) {
-        angleInputValue = event.target.value;
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            filterAngle = Number(angleInputValue);
-        }, 300);
-    }
-
-    function handleSearchInput(event) {
-        searchQuery = event.target.value;
-        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(() => {
-            activeSearch = searchQuery.trim().toLowerCase();
-        }, 200);
-    }
-
-    function clearSearch() {
-        searchQuery = '';
-        activeSearch = '';
-    }
-
-    function isValidMultiple(val, divisor) {
-        if (!divisor || divisor <= 0) return true;
-        let rem = val % divisor;
-        return Math.abs(rem) < 1e-4 || Math.abs(rem - divisor) < 1e-4;
-    }
+    let filterAngleEnabled = $state(false);
+    let filterAngle = $state(30);
 
     const vcCache = new Map();
 
     let filteredNames = $derived.by(() => {
         return allVCNames.filter(name => {
             if (activeSearch && !name.toLowerCase().includes(activeSearch)) return false;
-
             const parts = name.split(',');
+
             for (const p of parts) {
-                if (/^\d+$/.test(p)) {
-                    if (!selectedCategories.includes('Regular')) return false;
-                } else {
+                if (p.match(regularPolygonRegex) && selectedCategories.includes(PolygonType.REGULAR)) {
+                    return true;
+                }
+                
+                if (p.match(regularStarRegex) && selectedCategories.includes(PolygonType.STAR_REGULAR)) {
                     const regularStarMatch = p.match(regularStarRegex);
-                    if (regularStarMatch) {
-                        if (!selectedCategories.includes('StarRegular')) return false;
-                        const n = parseInt(regularStarMatch[1]);
-                        const d = parseInt(regularStarMatch[2]);
-                        const a = 180 * (1 - 2 * d / n);
-                        const b = 180 * (1 + 2 * (d - 1) / n);
-                        if (filterAngleEnabled && (!isValidMultiple(a, filterAngle) || !isValidMultiple(b, filterAngle))) return false;
-                    } else {
-                        const parametricStarMatch = p.match(parametricStarRegex);
-                        if (parametricStarMatch) {
-                            if (!selectedCategories.includes('StarParametric')) return false;
-                            const n = parseInt(parametricStarMatch[1]);
-                            const alpha = parseInt(parametricStarMatch[2]);
-                            const b = 360 * (1 - 1 / n) - alpha;
-                            if (filterAngleEnabled && (!isValidMultiple(alpha, filterAngle) || !isValidMultiple(b, filterAngle))) return false;
-                        } else {
-                            return false;
-                        }
-                    }
+                    const n = parseInt(regularStarMatch[1]);
+                    const d = parseInt(regularStarMatch[2]);
+                    const a = 180 * (1 - 2 * d / n);
+                    const b = 180 * (1 + 2 * (d - 1) / n);
+                    if (!filterAngleEnabled || (isValidMultiple(a, filterAngle) && isValidMultiple(b, filterAngle))) 
+                        return true;
+                } 
+            
+                if (p.match(parametricStarRegex) && selectedCategories.includes(PolygonType.STAR_PARAMETRIC)) {
+                    const parametricStarMatch = p.match(parametricStarRegex);
+                    const n = parseInt(parametricStarMatch[1]);
+                    const alpha = parseInt(parametricStarMatch[2]);
+                    const b = 360 * (1 - 1 / n) - alpha;
+                    if (!filterAngleEnabled || (isValidMultiple(alpha, filterAngle) && isValidMultiple(b, filterAngle))) 
+                        return true;
+                } 
+                
+                if (p.match(equilateralPolygonRegex) && selectedCategories.includes(PolygonType.EQUILATERAL)) {
+                    const equilateralPolygonMatch = p.match(equilateralPolygonRegex);
+                    const angles = equilateralPolygonMatch[2].split(';').map(a => parseInt(a));
+                    if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
+                        return true;
                 }
             }
-            return true;
+            return false;
         });
     });
 
@@ -216,16 +192,25 @@
     <!-- Header -->
     <div class="border-b border-zinc-800 bg-zinc-900 backdrop-blur-sm sticky top-0 z-20">
         <div class="max-w-[1600px] mx-auto px-6 py-4">
-            <div class="flex items-center gap-3">
-                <a
-                    href="/play"
-                    class="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
-                    aria-label="Back to Play"
-                >
-                    <ArrowLeft size={18} />
-                </a>
-                <h1 class="text-lg font-semibold text-white/90">Vertex Configurations</h1>
-                <span class="count-badge ml-1">{filteredNames.length}</span>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-lg font-semibold text-white/90">Vertex Configurations</h1>
+                    <span class="count-badge">{filteredNames.length}</span>
+                </div>
+                <nav class="flex items-center gap-1">
+                    <a href="/polygons-collection" class="nav-link">
+                        <Hexagon size={14} />
+                        <span>Polygons</span>
+                    </a>
+                    <a href="/vertex-configurations" class="nav-link nav-link-active">
+                        <Network size={14} />
+                        <span>Vertex Configs</span>
+                    </a>
+                    <a href="/compatibility-graph" class="nav-link">
+                        <GitFork size={14} />
+                        <span>Compat. Graph</span>
+                    </a>
+                </nav>
             </div>
         </div>
     </div>
@@ -234,29 +219,7 @@
         <!-- Sidebar filters -->
         <aside class="w-full lg:w-72 xl:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-900/50">
             <div class="p-5 flex flex-col gap-6 lg:sticky lg:top-[65px] lg:max-h-[calc(100vh-65px)] lg:overflow-y-auto">
-                <!-- Search -->
-                <div class="flex flex-col gap-2">
-                    <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Search</span>
-                    <div class="relative">
-                        <Search size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            oninput={handleSearchInput}
-                            placeholder="Filter by name..."
-                            class="w-full h-9 rounded-md border border-zinc-700/50 bg-zinc-800/90 pl-9 pr-8 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-500/40 focus-visible:border-green-500/70 transition-all"
-                        />
-                        {#if searchQuery}
-                            <button
-                                class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
-                                onclick={clearSearch}
-                                aria-label="Clear search"
-                            >
-                                <X size={14} />
-                            </button>
-                        {/if}
-                    </div>
-                </div>
+                <SearchInput bind:activeSearch />
 
                 <!-- Category filter -->
                 <div class="border-t border-zinc-800 pt-5">
@@ -268,33 +231,11 @@
                 </div>
 
                 <!-- Angle filter -->
-                <div class="border-t border-zinc-800 pt-5">
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Angle Modulo</span>
-                        </div>
-
-                        <Checkbox
-                            id="angleEnabled"
-                            label="Enable angle filter"
-                            bind:checked={filterAngleEnabled}
-                        />
-
-                        <div class="relative">
-                            <input
-                                type="number"
-                                id="angleFilter"
-                                value={angleInputValue}
-                                oninput={handleAngleInput}
-                                disabled={!filterAngleEnabled}
-                                min="1"
-                                max="180"
-                                class="w-full h-9 rounded-md border border-zinc-700/50 bg-zinc-800/90 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-500/40 focus-visible:border-green-500/70 transition-all disabled:opacity-40 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 pointer-events-none">deg</span>
-                        </div>
+                {#if selectedCategories.includes(PolygonType.STAR_REGULAR) || selectedCategories.includes(PolygonType.STAR_PARAMETRIC) || selectedCategories.includes(PolygonType.EQUILATERAL)}
+                    <div class="border-t border-zinc-800 pt-5">
+                        <AngleFilterBlock bind:enabled={filterAngleEnabled} bind:angle={filterAngle} />
                     </div>
-                </div>
+                {/if}
 
                 <!-- Per Row -->
                 <div class="border-t border-zinc-800 pt-5">
@@ -404,6 +345,35 @@
         border-radius: 1rem;
         background-color: rgba(74, 222, 128, 0.1);
         font-weight: 500;
+    }
+
+    .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: rgba(161, 161, 170, 1);
+        transition: all 0.15s ease;
+        border: 1px solid transparent;
+    }
+
+    .nav-link:hover {
+        color: rgba(228, 228, 231, 1);
+        background-color: rgba(63, 63, 70, 0.3);
+    }
+
+    .nav-link-active {
+        color: rgba(74, 222, 128, 0.9);
+        background-color: rgba(74, 222, 128, 0.08);
+        border-color: rgba(74, 222, 128, 0.15);
+    }
+
+    .nav-link-active:hover {
+        color: rgba(74, 222, 128, 1);
+        background-color: rgba(74, 222, 128, 0.12);
     }
 
     .vc-card {

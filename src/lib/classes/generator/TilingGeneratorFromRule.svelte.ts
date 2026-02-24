@@ -5,9 +5,9 @@ import {
     RegularPolygon, 
     StarRegularPolygon, 
     StarParametricPolygon, 
-    IsotoxalPolygon, 
     IsohedralPolygon, 
-    GeneralPolygon, 
+    EquilateralPolygon,
+    GenericPolygon, 
     type Polygon, 
     type ShapeSeed, 
     TilingGenerator, 
@@ -86,14 +86,14 @@ export class TilingGeneratorFromRule extends TilingGenerator {
                     case PolygonType.STAR_PARAMETRIC:
                         newNode = StarParametricPolygon.fromAnchorAndDir(shapeSeed.n, anchor, dir, shapeSeed.alpha || 0);
                         break;
-                    case PolygonType.ISOTOXAL:
-                        newNode = IsotoxalPolygon.fromAnchorAndDir(shapeSeed.n, anchor, dir, shapeSeed.angles || []);
+                    case PolygonType.EQUILATERAL:
+                        newNode = EquilateralPolygon.fromAnchorAndDir(shapeSeed.n, anchor, dir, shapeSeed.angles || []);
                         break;
                     case PolygonType.ISOHEDRAL:
                         newNode = IsohedralPolygon.fromAnchorAndDir(shapeSeed.n, anchor, dir, shapeSeed.sides || []);
                         break;
-                    case PolygonType.GENERAL:
-                        newNode = GeneralPolygon.fromAnchorAndDir(shapeSeed.n, anchor, dir, shapeSeed.sides || [], shapeSeed.angles || []);
+                    case PolygonType.GENERIC:
+                        newNode = GenericPolygon.fromAnchorAndDir(shapeSeed.n, anchor, dir, shapeSeed.sides || [], shapeSeed.angles || []);
                         break;
                     default:
                         throw new Error('Invalid shape seed type');
@@ -133,14 +133,14 @@ export class TilingGeneratorFromRule extends TilingGenerator {
             case PolygonType.STAR_PARAMETRIC:
                 this.tiling.coreNode = StarParametricPolygon.fromCentroidAndAngle(coreNode.n, coreNode.alpha || 0, new Vector(), 0);
                 break;
-            case PolygonType.ISOTOXAL:
-                this.tiling.coreNode = IsotoxalPolygon.fromAnchorAndDir(coreNode.n, new Vector(), new Vector(0, 1), coreNode.angles || []);
+            case PolygonType.EQUILATERAL:
+                this.tiling.coreNode = EquilateralPolygon.fromAnchorAndDir(coreNode.n, new Vector(), new Vector(0, 1), coreNode.angles || []);
                 break;
             case PolygonType.ISOHEDRAL:
                 this.tiling.coreNode = IsohedralPolygon.fromAnchorAndDir(coreNode.n, new Vector(), new Vector(0, 1), coreNode.sides || []);
                 break;
-            case PolygonType.GENERAL:
-                this.tiling.coreNode = GeneralPolygon.fromAnchorAndDir(coreNode.n, new Vector(), new Vector(0, 1), coreNode.sides || [], coreNode.angles || []);
+            case PolygonType.GENERIC:
+                this.tiling.coreNode = GenericPolygon.fromAnchorAndDir(coreNode.n, new Vector(), new Vector(0, 1), coreNode.sides || [], coreNode.angles || []);
                 break;
             default:
                 throw new Error('Invalid core node type');

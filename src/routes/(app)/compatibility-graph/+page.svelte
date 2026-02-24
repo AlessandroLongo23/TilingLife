@@ -1,47 +1,39 @@
 <script lang="ts">
-    import { VertexConfiguration, CompatibilityGraph } from '$classes/algorithm';
+    import { VertexConfiguration, CompatibilityGraph, regularPolygonRegex, regularStarRegex, parametricStarRegex, equilateralPolygonRegex, PolygonType } from '$classes';
     import { browser } from '$app/environment';
     import { Vector } from '$classes/Vector.svelte';
     import { onMount } from 'svelte';
-    import { regularStarRegex, parametricStarRegex } from '$classes/algorithm';
+    import { Hexagon, Network, GitFork } from 'lucide-svelte';
+    import { isValidMultiple } from '$utils/filterHelpers';
+    import MultiSelect from '$components/ui/MultiSelect.svelte';
+    import SearchInput from '$components/ui/SearchInput.svelte';
+    import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
 
     import allVCNames from '$lib/classes/algorithm/vcs.json';
 
-    let selectedTypes = $state({
-        Regular: true,
-        StarRegular: false,
-        StarParametric: false
-    });
+    const categoryOptions = [
+        { id: PolygonType.REGULAR, label: 'Regular' },
+        { id: PolygonType.STAR_REGULAR, label: 'Star Regular' },
+        { id: PolygonType.STAR_PARAMETRIC, label: 'Star Parametric' },
+        { id: PolygonType.EQUILATERAL, label: 'Equilateral' },
+    ];
 
-    let filterAngleEnabled = $state(true);
+    let selectedCategories = $state([PolygonType.REGULAR]);
+    let activeSearch = $state('');
+    let filterAngleEnabled = $state(false);
     let filterAngle = $state(30);
-    let inputValue = $state(30);
-    let debounceTimer = null;
-
-    function handleInput(event) {
-        inputValue = event.target.value;
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            filterAngle = Number(inputValue);
-        }, 300);
-    }
-
-    function isValidMultiple(val, divisor) {
-        if (!divisor || divisor <= 0) return true;
-        const rem = val % divisor;
-        return Math.abs(rem) < 1e-4 || Math.abs(rem - divisor) < 1e-4;
-    }
 
     let filteredNames = $derived.by(() => {
         return allVCNames.filter(name => {
+            if (activeSearch && !name.toLowerCase().includes(activeSearch)) return false;
             const parts = name.split(',');
             for (const p of parts) {
-                if (/^\d+$/.test(p)) {
-                    if (!selectedTypes.Regular) return false;
+                if (p.match(regularPolygonRegex)) {
+                    if (!selectedCategories.includes(PolygonType.REGULAR)) return false;
                 } else {
                     const regularStarMatch = p.match(regularStarRegex);
                     if (regularStarMatch) {
-                        if (!selectedTypes.StarRegular) return false;
+                        if (!selectedCategories.includes(PolygonType.STAR_REGULAR)) return false;
                         const n = parseInt(regularStarMatch[1]);
                         const d = parseInt(regularStarMatch[2]);
                         const a = 180 * (1 - 2 * d / n);
@@ -50,13 +42,20 @@
                     } else {
                         const parametricStarMatch = p.match(parametricStarRegex);
                         if (parametricStarMatch) {
-                            if (!selectedTypes.StarParametric) return false;
+                            if (!selectedCategories.includes(PolygonType.STAR_PARAMETRIC)) return false;
                             const n = parseInt(parametricStarMatch[1]);
                             const alpha = parseInt(parametricStarMatch[2]);
                             const bb = 360 * (1 - 1 / n) - alpha;
                             if (filterAngleEnabled && (!isValidMultiple(alpha, filterAngle) || !isValidMultiple(bb, filterAngle))) return false;
                         } else {
-                            return false;
+                            const equilateralMatch = p.match(equilateralPolygonRegex);
+                            if (equilateralMatch) {
+                                if (!selectedCategories.includes(PolygonType.EQUILATERAL)) return false;
+                                const angles = equilateralMatch[2].split(';').map(a => parseInt(a));
+                                if (filterAngleEnabled && angles.some(a => !isValidMultiple(a, filterAngle))) return false;
+                            } else {
+                                return false;
+                            }
                         }
                     }
                 }
@@ -321,16 +320,16 @@
             ctx.restore();
 
             // Label with clamped screen-size
-            // if (!dim) {
-            //     const minScreenPx = 8;
-            //     const worldSize = 10;
-            //     const fs = Math.max(worldSize, minScreenPx / zoom);
-            //     ctx.font = `${fs}px ui-monospace, monospace`;
-            //     ctx.fillStyle = isHov ? '#ffffff' : '#a1a1aa';
-            //     ctx.textAlign = 'center';
-            //     ctx.textBaseline = 'top';
-            //     ctx.fillText(node.vertexConfiguration.name, node.pos.x, node.pos.y + node.radius + 4 / zoom);
-            // }
+            if (!dim) {
+                const minScreenPx = 8;
+                const worldSize = 10;
+                const fs = Math.max(worldSize, minScreenPx / zoom);
+                ctx.font = `${fs}px ui-monospace, monospace`;
+                ctx.fillStyle = isHov ? '#ffffff' : '#a1a1aa';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(node.vertexConfiguration.name, node.pos.x, node.pos.y + node.radius + 4 / zoom);
+            }
         }
 
         ctx.restore();
@@ -463,69 +462,128 @@
 </script>
 
 <div class="h-screen flex flex-col bg-zinc-900 text-white overflow-hidden">
-    <div class="shrink-0 px-6 pt-5 pb-4">
-        <div class="flex flex-col xl:flex-row xl:items-end gap-4">
-            <div class="shrink-0">
-                <div class="flex gap-4">
-                    <a href="/play" class="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">&larr; Back to Play</a>
-                    <a href="/vertex-configurations" class="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">Vertex Configurations &rarr;</a>
-                </div>
-                <h1 class="text-2xl md:text-3xl font-bold text-white mt-1">Compatibility Graph</h1>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-4 xl:ml-auto bg-zinc-800/50 p-4 rounded-lg border border-zinc-700/50">
-                <div class="flex items-center gap-4 border-r border-zinc-700 pr-4">
-                    <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer hover:text-white transition-colors">
-                        <input type="checkbox" bind:checked={selectedTypes.Regular} class="rounded border-zinc-600 bg-zinc-700 text-green-500 focus:ring-green-500 focus:ring-offset-zinc-800">
-                        Regular
-                    </label>
-                    <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer hover:text-white transition-colors">
-                        <input type="checkbox" bind:checked={selectedTypes.StarRegular} class="rounded border-zinc-600 bg-zinc-700 text-green-500 focus:ring-green-500 focus:ring-offset-zinc-800">
-                        Star Regular
-                    </label>
-                    <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer hover:text-white transition-colors">
-                        <input type="checkbox" bind:checked={selectedTypes.StarParametric} class="rounded border-zinc-600 bg-zinc-700 text-green-500 focus:ring-green-500 focus:ring-offset-zinc-800">
-                        Star Parametric
-                    </label>
-                </div>
-
+    <!-- Header -->
+    <div class="border-b border-zinc-800 bg-zinc-900 backdrop-blur-sm sticky top-0 z-20 shrink-0">
+        <div class="max-w-[1600px] mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer hover:text-white transition-colors">
-                        <input type="checkbox" bind:checked={filterAngleEnabled} class="rounded border-zinc-600 bg-zinc-700 text-green-500 focus:ring-green-500 focus:ring-offset-zinc-800">
-                        Angle Modulo (°):
-                    </label>
-                    <input
-                        type="number"
-                        value={inputValue}
-                        oninput={handleInput}
-                        disabled={!filterAngleEnabled}
-                        min="1"
-                        max="180"
-                        class="w-20 bg-zinc-900 text-zinc-200 border border-zinc-600 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                    <h1 class="text-lg font-semibold text-white/90">Compatibility Graph</h1>
+                    <span class="count-badge">{nodeCount} nodes · {edgeCount} edges</span>
                 </div>
-
-                <div class="flex items-center gap-3 ml-auto pl-4 border-l border-zinc-700">
-                    <span class="text-sm font-medium text-green-400">{nodeCount} <span class="text-zinc-500 font-normal">nodes</span></span>
-                    <span class="text-zinc-600">·</span>
-                    <span class="text-sm font-medium text-green-400">{edgeCount} <span class="text-zinc-500 font-normal">edges</span></span>
-                </div>
+                <nav class="flex items-center gap-1">
+                    <a href="/polygons-collection" class="nav-link">
+                        <Hexagon size={14} />
+                        <span>Polygons</span>
+                    </a>
+                    <a href="/vertex-configurations" class="nav-link">
+                        <Network size={14} />
+                        <span>Vertex Configs</span>
+                    </a>
+                    <a href="/compatibility-graph" class="nav-link nav-link-active">
+                        <GitFork size={14} />
+                        <span>Compat. Graph</span>
+                    </a>
+                </nav>
             </div>
+            <p class="mt-1.5 text-xs text-zinc-600">
+                Scroll to zoom · Drag to pan · Right-click to reset · Drag nodes to reposition
+            </p>
         </div>
-
-        <p class="mt-2 text-xs text-zinc-600">
-            Scroll to zoom · Drag to pan · Right-click to reset · Drag nodes to reposition
-        </p>
     </div>
 
-    <div class="flex-1 relative" bind:this={containerEl}>
-        <canvas
-            bind:this={canvasEl}
-            onmousedown={handleMouseDown}
-            onmousemove={handleMouseMove}
-            onmouseup={handleMouseUp}
-            onmouseleave={handleMouseUp}
-            oncontextmenu={(e) => e.preventDefault()}
-        ></canvas>
+    <div class="flex-1 flex min-h-0 max-w-[1600px] w-full mx-auto">
+        <!-- Sidebar -->
+        <aside class="w-full lg:w-72 xl:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-900/50 flex flex-col">
+            <div class="p-5 flex flex-col gap-6 lg:overflow-y-auto">
+                <SearchInput bind:activeSearch placeholder="Filter by name..." />
+
+                <div class="border-t border-zinc-800 pt-5">
+                    <MultiSelect
+                        label="Category"
+                        options={categoryOptions}
+                        bind:selected={selectedCategories}
+                    />
+                </div>
+
+                {#if selectedCategories.includes(PolygonType.STAR_REGULAR) || selectedCategories.includes(PolygonType.STAR_PARAMETRIC) || selectedCategories.includes(PolygonType.EQUILATERAL)}
+                    <div class="border-t border-zinc-800 pt-5">
+                        <AngleFilterBlock bind:enabled={filterAngleEnabled} bind:angle={filterAngle} />
+                    </div>
+                {/if}
+
+                <div class="border-t border-zinc-800 pt-5">
+                    <div class="flex flex-col gap-1.5 text-xs text-zinc-500">
+                        <div class="flex justify-between">
+                            <span>Total in dataset</span>
+                            <span class="text-zinc-400">{allVCNames.length}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Matching filters</span>
+                            <span class="text-green-400 font-medium">{filteredNames.length}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Nodes</span>
+                            <span class="text-green-400 font-medium">{nodeCount}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Edges</span>
+                            <span class="text-green-400 font-medium">{edgeCount}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Graph canvas -->
+        <main class="flex-1 min-w-0 relative" bind:this={containerEl}>
+            <canvas
+                bind:this={canvasEl}
+                onmousedown={handleMouseDown}
+                onmousemove={handleMouseMove}
+                onmouseup={handleMouseUp}
+                onmouseleave={handleMouseUp}
+                oncontextmenu={(e) => e.preventDefault()}
+            ></canvas>
+        </main>
     </div>
 </div>
+
+<style>
+    .count-badge {
+        font-size: 0.7rem;
+        color: rgba(74, 222, 128, 0.9);
+        padding: 0.1rem 0.5rem;
+        border-radius: 1rem;
+        background-color: rgba(74, 222, 128, 0.1);
+        font-weight: 500;
+    }
+
+    .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: rgba(161, 161, 170, 1);
+        transition: all 0.15s ease;
+        border: 1px solid transparent;
+    }
+
+    .nav-link:hover {
+        color: rgba(228, 228, 231, 1);
+        background-color: rgba(63, 63, 70, 0.3);
+    }
+
+    .nav-link-active {
+        color: rgba(74, 222, 128, 0.9);
+        background-color: rgba(74, 222, 128, 0.08);
+        border-color: rgba(74, 222, 128, 0.15);
+    }
+
+    .nav-link-active:hover {
+        color: rgba(74, 222, 128, 1);
+        background-color: rgba(74, 222, 128, 0.12);
+    }
+</style>

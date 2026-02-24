@@ -74,7 +74,7 @@ export class Parser {
 
                 const n: number = parseInt(shapeSeedLayer[j][0]);
 
-                // general
+                // equilateral
                 if (shapeSeedLayer[j].includes('(') && shapeSeedLayer[j].includes('[')) {
                     let sides: number[] = shapeSeedLayer[j].split('[')[1].split(']')[0].split(';').map(Number);
                     if (n % sides.length != 0) {
@@ -89,7 +89,7 @@ export class Parser {
                         angles = Array(n / angles.length).fill(angles).flat();
                     }
                     this.shapeSeed[i][j] = {
-                        type: PolygonType.GENERAL,
+                        type: PolygonType.EQUILATERAL,
                         n: n,
                         sides: sides,
                         angles: angles.map(angle => toRadians(angle))

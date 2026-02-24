@@ -1,5 +1,5 @@
 import { Polygon, Vector } from '$classes';
-import { map } from '$utils';
+import { isWithinTolerance, map } from '$utils';
 
 export class RegularPolygon extends Polygon {
     constructor(n: number) {
@@ -17,6 +17,9 @@ export class RegularPolygon extends Polygon {
         polygon.calculateVerticesFromCentroidAndAngle();
         polygon.calculateHalfways();
         polygon.calculateHue();
+
+        polygon.anchor = polygon.vertices[0].copy();
+        polygon.dir = Vector.sub(polygon.vertices[1], polygon.vertices[0]);
 
         return polygon;
     }
@@ -41,8 +44,8 @@ export class RegularPolygon extends Polygon {
         let radius = 0.5 / Math.sin(Math.PI / this.n);
         for (let i = 0; i < this.n; i++) {
             this.vertices.push(new Vector(
-                this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle),
-                this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle)
+                this.centroid.x + radius * Math.cos(-i * 2 * Math.PI / this.n + this.angle),
+                this.centroid.y + radius * Math.sin(-i * 2 * Math.PI / this.n + this.angle)
             ));
 
             this.vertices[i].snapToGrid();
@@ -50,13 +53,12 @@ export class RegularPolygon extends Polygon {
     }
 
     calculateVerticesFromAnchorAndDir = () => {
-        this.vertices = [new Vector(this.anchor.x, this.anchor.y)];
+        this.vertices = [this.anchor.copy()];
         let current_dir: Vector = this.dir.copy();
         for (let i = 1; i < this.n; i++) {
             const prev_vertex = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.copy()));
             current_dir.rotate(-(Math.PI - this.interior_angle));
-
             this.vertices[i].snapToGrid();
         }
     }
@@ -65,7 +67,19 @@ export class RegularPolygon extends Polygon {
         this.hue = map(Math.log(this.vertices.length), Math.log(3), Math.log(40), 0, 300);
     }
 
+    getName = (coordinate: Vector | null = null): string => {
+        if (!coordinate) return this.name;
+        
+        const vertex = this.vertices.find(v => isWithinTolerance(v, coordinate));
+        if (!vertex) {
+            console.error('Vertex not found');
+            return '';
+        }
+    
+        return this.name;
+    }
+
     clone = (): RegularPolygon => {
-        return RegularPolygon.fromCentroidAndAngle(this.n, this.centroid.copy(), this.angle);
+        return RegularPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy());
     }
 }

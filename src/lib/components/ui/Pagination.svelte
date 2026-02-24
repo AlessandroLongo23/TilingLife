@@ -50,6 +50,23 @@
 
 	let startItem = $derived((currentPage - 1) * pageSize + 1);
 	let endItem = $derived(Math.min(currentPage * pageSize, totalItems));
+
+	let focused = $state(false);
+	let inputValue = $state('');
+
+	function submitPage() {
+		const page = parseInt(inputValue, 10);
+		if (!Number.isNaN(page)) goto(page);
+		inputValue = '';
+	}
+
+	function handleKeydown(e) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			submitPage();
+			e.currentTarget?.blur();
+		}
+	}
 </script>
 
 {#if totalPages > 1}
@@ -75,6 +92,24 @@
 			>
 				<ChevronLeft size={14} />
 			</button>
+
+			<span class="pg-page-of">
+				<label for="pagination-page-input" class="sr-only">Page number</label>
+				<input
+					id="pagination-page-input"
+					type="number"
+					min={1}
+					max={totalPages}
+					class="pg-input"
+					value={focused ? inputValue : currentPage}
+					onfocus={() => { focused = true; inputValue = String(currentPage); }}
+					onblur={() => { submitPage(); focused = false; }}
+					oninput={(e) => { inputValue = e.currentTarget.value; }}
+					onkeydown={handleKeydown}
+					aria-label="Current page"
+				/>
+				<span class="pg-of">of {totalPages}</span>
+			</span>
 
 			{#each visiblePages as p}
 				{#if p === null}
@@ -176,5 +211,66 @@
 		color: rgba(113, 113, 122, 0.6);
 		font-size: 0.75rem;
 		pointer-events: none;
+	}
+
+	.pg-page-of {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		margin: 0 0.25rem;
+	}
+
+	.pg-input {
+		width: 2.5rem;
+		height: 1.75rem;
+		padding: 0 0.25rem;
+		border-radius: 0.375rem;
+		border: 1px solid rgba(63, 63, 70, 0.4);
+		background-color: rgba(39, 39, 42, 0.5);
+		color: rgba(228, 228, 231, 1);
+		font-size: 0.75rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		text-align: center;
+		transition: border-color 0.15s ease, background-color 0.15s ease;
+	}
+
+	.pg-input:hover {
+		background-color: rgba(63, 63, 70, 0.5);
+	}
+
+	.pg-input:focus {
+		outline: none;
+		border-color: rgba(74, 222, 128, 0.4);
+		background-color: rgba(39, 39, 42, 0.8);
+	}
+
+	.pg-input::-webkit-outer-spin-button,
+	.pg-input::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+
+	.pg-input[type='number'] {
+		-moz-appearance: textfield;
+		appearance: textfield;
+	}
+
+	.pg-of {
+		color: rgba(113, 113, 122, 0.8);
+		font-size: 0.75rem;
+		white-space: nowrap;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

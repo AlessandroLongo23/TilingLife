@@ -2,8 +2,8 @@ export enum PolygonType {
     REGULAR = 'regular',
     STAR_REGULAR = 'star_regular',
     STAR_PARAMETRIC = 'star_parametric',
-    ISOTOXAL = 'isotoxal',
+    EQUILATERAL = 'equilateral',
     ISOHEDRAL = 'isohedral',
-    GENERAL = 'general',
+    GENERIC = 'generic',
     DUAL = 'dual',
 }

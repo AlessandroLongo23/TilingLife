@@ -14,3 +14,9 @@ export const compareArrays = (a: any[], b: any[]): number => {
     return 0;
 }
 
+export const cyclicallyInclude = (a: string[], b: string[]): boolean => {
+    const aString = a.concat(a).join(',');
+    const bString = b.join(',');
+    return aString.includes(bString);
+}
+

@@ -1,9 +1,9 @@
 import { Polygon, Vector } from '$classes';
-import { map, findIntersection } from '$utils';
+import { map, findIntersection, isWithinTolerance } from '$utils';
 import { get } from 'svelte/store';
 import { controls, lineWidth, islamicAngle } from '$stores';
 
-export enum StarRegularVertexTypes {
+export enum StarVertexTypes {
     INNER = 'inner',
     OUTER = 'outer',
 }
@@ -13,28 +13,26 @@ export class StarPolygon extends Polygon {
     beta: number;
     innerRadius: number;
     outerRadius: number;
-    startsWith: StarRegularVertexTypes;
+    startsWith: StarVertexTypes;
 
-    constructor(n: number, startsWith: StarRegularVertexTypes = StarRegularVertexTypes.OUTER) {
+    constructor(n: number, startsWith: StarVertexTypes = StarVertexTypes.OUTER) {
         super(n);
 
         this.startsWith = startsWith;
     }
 
-    calculateVerticesFromAnchorAndDir = (startsWith: StarRegularVertexTypes = StarRegularVertexTypes.OUTER) => {
-        this.vertices = [new Vector(this.anchor.x, this.anchor.y)];
-
+    calculateVerticesFromAnchorAndDir = (startsWith: StarVertexTypes = StarVertexTypes.OUTER) => {
         let angles = [this.alpha, this.beta];
-        if (startsWith === StarRegularVertexTypes.INNER)
+        if (startsWith === StarVertexTypes.INNER)
             angles.reverse();
 
+        this.vertices = [new Vector(this.anchor.x, this.anchor.y)];
         let current_dir: Vector = this.dir.copy();
-
         for (let i = 1; i < this.n * 2; i++) {
-            let prev_vertex: Vector = this.vertices[this.vertices.length - 1];
+            const prev_vertex: Vector = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.copy()));
-            
             current_dir.rotate(-(Math.PI - angles[i % 2]));
+            this.vertices[i].snapToGrid();
         }
     }
 
@@ -86,6 +84,25 @@ export class StarPolygon extends Polygon {
 
             ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[i].x + dir1.x * dist1, this.halfways[i].y + dir1.y * dist1);
             ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[i].x + dir2.x * dist2, this.halfways[i].y + dir2.y * dist2);
+        }
+    }
+
+    getName = (coordinate: Vector | null = null): string => {
+        if (!coordinate) return this.name.replace('o', '').replace('i', '');
+
+        const vertex = this.vertices.find(v => isWithinTolerance(v, coordinate));
+        if (!vertex) {
+            console.error('Vertex not found');
+            return '';
+        }
+
+        if (this.centroid.distance(coordinate) === this.outerRadius) {
+            return this.name.replace('i', 'o')
+        } else if (this.centroid.distance(coordinate) === this.innerRadius) {
+            return this.name.replace('o', 'i')
+        } else {
+            console.error('Name could not be determined from vertex');
+            return '';
         }
     }
 }

@@ -1,11 +1,27 @@
-export enum PolygonCategory {
-    REGULAR = 'regular',
-    STAR_REGULAR = 'star_regular',
-    STAR_PARAMETRIC = 'star_parametric',
-}
+import { Polygon, PolygonType, Vector } from '$classes';
 
 export interface GeneratorParameters {
-    categories: PolygonCategory[];
-    angle: number;
-    n_max: number;
+    [PolygonType.REGULAR]?: {
+        n_max: number;
+    },
+    [PolygonType.STAR_REGULAR]?: {
+        n_max: number;
+        angle: number;
+    },
+    [PolygonType.STAR_PARAMETRIC]?: {
+        n_max: number;
+        angle: number;
+    },
+    [PolygonType.EQUILATERAL]?: {
+        n_max: number;
+        angle: number;
+    },
 }
+
+export type PartialConfiguration = {
+    name: string,
+    fullVertex: Vector
+    partialVertex: Vector,
+}
+
+export type SurroundingPolygon = { polygon: Polygon, prevDir: number, nextDir: number };

@@ -3,5 +3,6 @@ export * from './PolygonsGenerator.svelte';
 export * from './VertexConfiguration.svelte';
 export * from './VCGenerator.svelte';
 export * from './CompatibilityGraph.svelte';
+export * from './SeedConfiguration.svelte';
 export * from './types';
 export * from './regex';

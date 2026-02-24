@@ -1,13 +1,13 @@
-import { StarPolygon, Vector, StarRegularVertexTypes } from '$classes';
+import { StarPolygon, Vector, StarVertexTypes } from '$classes';
 
 export class StarRegularPolygon extends StarPolygon {
     d: number;
 
-    constructor(n: number, d: number, startsWith: StarRegularVertexTypes = StarRegularVertexTypes.OUTER) {
+    constructor(n: number, d: number, startsWith: StarVertexTypes = StarVertexTypes.OUTER) {
         super(n, startsWith);
 
         this.d = d;
-        this.name = '{' + n.toString() + '.' + d.toString() + (startsWith === StarRegularVertexTypes.OUTER ? 'o' : 'i') + '}';
+        this.name = '{' + n.toString() + '.' + d.toString() + (startsWith === StarVertexTypes.OUTER ? 'o' : 'i') + '}';
         this.alpha = Math.PI * (1 - 2 * d / n);
         this.beta = Math.PI * (1 + 2 * (d - 1) / n);
 
@@ -15,12 +15,12 @@ export class StarRegularPolygon extends StarPolygon {
         this.innerRadius = Math.sin(this.alpha / 2) / Math.sin(Math.PI / n);
     }
 
-    static fromAnchorAndDir = (n: number, anchor: Vector, dir: Vector, d: number, startsWith: StarRegularVertexTypes = StarRegularVertexTypes.OUTER): StarRegularPolygon => {
+    static fromAnchorAndDir = (n: number, anchor: Vector, dir: Vector, d: number, startsWith: StarVertexTypes = StarVertexTypes.OUTER): StarRegularPolygon => {
         let polygon: StarRegularPolygon = new StarRegularPolygon(n, d, startsWith);
 
         polygon.anchor = anchor;
         polygon.dir = dir.copy();
-        polygon.interior_angle = startsWith === StarRegularVertexTypes.OUTER ? polygon.alpha : polygon.beta;
+        polygon.interior_angle = startsWith === StarVertexTypes.OUTER ? polygon.alpha : polygon.beta;
 
         polygon.calculateVerticesFromAnchorAndDir(startsWith);
         polygon.calculateHalfways();
@@ -46,6 +46,6 @@ export class StarRegularPolygon extends StarPolygon {
     }
 
     clone = (): StarRegularPolygon => {
-        return StarRegularPolygon.fromCentroidAndAngle(this.n, this.d, this.centroid.copy(), this.angle);
+        return StarRegularPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy(), this.d, this.startsWith);
     }
 }

@@ -1,97 +1,95 @@
-import { type GeneratorParameters, VertexConfiguration } from '$classes';
-import { compareArrays, toDegrees } from '$utils';
-import { PolygonsGenerator } from './PolygonsGenerator.svelte';
+import { Polygon, PolygonSignature, StarParametricPolygon, StarRegularPolygon, VertexConfiguration } from '$classes';
+import { compareArrays, isWithinAngularTolerance } from '$utils';
+import { tolerance } from '$stores';
 
 export class VCGenerator {
-    polygonsGenerator: PolygonsGenerator;
     vertexConfigurations: VertexConfiguration[] = [];
+    polygons: PolygonSignature[] = [];
 
-    constructor(parameters: GeneratorParameters) {
-        this.polygonsGenerator = new PolygonsGenerator(parameters);
+    constructor(polygons: PolygonSignature[] = []) {
+        this.polygons = polygons;
     }
 
     generateVertexConfigurations = (): VertexConfiguration[] => {
         this.vertexConfigurations = [];
+        const seen = new Set<string>();
+        const minAngle = this.polygons.length > 0
+            ? Math.min(...this.polygons.map(p => p.interior_angle))
+            : Infinity;
 
-        let root = new VCTreeNode(null, new VertexConfiguration([]));
-        let stack: VCTreeNode[] = [root];
-        while (stack.length > 0) {
-            let current: VCTreeNode = stack.pop() as VCTreeNode;
-            if (toDegrees(current.vertexConfiguration.angle) < 360) {
-                for (let polygonData of this.polygonsGenerator.polygons) {
-                    let newNode = current.clone();
-                    newNode.parent = current;
-                    newNode.vertexConfiguration.addPolygon(polygonData);
-                    if (newNode.vertexConfiguration.valid) {
-                        current.children.push(newNode);
-                        stack.unshift(newNode);
-                    }
+        const vc = new VertexConfiguration([]);
+
+        const dfs = () => {
+            if (vc.polygons.length > 0 && isWithinAngularTolerance(vc.angle, 2 * Math.PI)) {
+                const names = vc.polygons.map(p => p.name);
+                const canonical = canonicalCyclicForm(names);
+                if (!seen.has(canonical)) {
+                    seen.add(canonical);
+                    this.vertexConfigurations.push(vc.clone());
                 }
-            } else if (toDegrees(current.vertexConfiguration.angle) === 360) {
-                this.vertexConfigurations.push(current.vertexConfiguration.clone());
+                return;
             }
-        }
 
-        const uniqueVertexConfigurations = this.vertexConfigurations.filter(vc => {
-            const smallest_name = cycleToMinimumLexicographicalOrder(vc.polygons.map(p => p.name)).join(',');
-            return isEqual(vc.name.split(','), smallest_name.split(','));
-        });
+            if (2 * Math.PI - vc.angle < minAngle - tolerance) return;
 
-        return uniqueVertexConfigurations;
+            for (const polygonData of this.polygons) {
+                if (vc.polygons.length > 0 &&
+                    polygonData.name.localeCompare(vc.polygons[0].name) < 0) {
+                    continue;
+                }
+
+                if (vc.polygons.length > 0 &&
+                    !canBeAdjacent(vc.polygons[vc.polygons.length - 1], polygonData)) {
+                    continue;
+                }
+
+                const prevAngle = vc.angle;
+                const prevDir = vc.current_dir.copy();
+                const prevName = vc.name;
+                const prevValid = vc.valid;
+                const prevLen = vc.polygons.length;
+
+                vc.addPolygon(polygonData);
+
+                if (vc.valid) {
+                    dfs();
+                }
+
+                vc.polygons.length = prevLen;
+                vc.angle = prevAngle;
+                vc.current_dir = prevDir;
+                vc.name = prevName;
+                vc.valid = prevValid;
+            }
+        };
+
+        dfs();
+        return this.vertexConfigurations;
     }
 }
 
-const isEqual = (array1: string[], array2: string[]): boolean => {
-    if (array1.length !== array2.length) return false;
-    for (let i = 0; i < array1.length; i++)
-        if (array1[i] !== array2[i]) return false;
+const canBeAdjacent = (polygon1: Polygon, polygon2: PolygonSignature): boolean => {
+    if (
+        (polygon1 instanceof StarRegularPolygon || polygon1 instanceof StarParametricPolygon) && 
+        (polygon2 instanceof StarRegularPolygon || polygon2 instanceof StarParametricPolygon) &&
+        polygon1.startsWith === polygon2.startsWith
+    ) {
+        return false;
+    }
     return true;
 }
 
-const cycleToMinimumLexicographicalOrder = (array: string[]): string[] => {
-    let min = array.slice(0);
-    for (let i = 0; i < array.length; i++) {
-        let rotated = array.slice(i).concat(array.slice(0, i));
-        if (compareArrays(rotated, min) < 0) {
-            min = rotated;
+const canonicalCyclicForm = (names: string[]): string => {
+    let minStart = 0;
+    const n = names.length;
+    for (let i = 1; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+            const cmp = names[(i + j) % n].localeCompare(names[(minStart + j) % n]);
+            if (cmp < 0) { minStart = i; break; }
+            if (cmp > 0) break;
         }
     }
-
-    return min;
-}
-
-const cycleToMinimumChiralLexicographicalOrder = (array: string[]): string[] => {
-    let min = array.slice(0);
-    for (let i = 0; i < array.length; i++) {
-        let rotated = array.slice(i).concat(array.slice(0, i));
-        if (compareArrays(rotated, min) < 0) {
-            min = rotated;
-        }
-    }
-
-    let reversed = array.slice().reverse();
-    for (let i = 0; i < array.length; i++) {
-        let rotated = reversed.slice(i).concat(reversed.slice(0, i));
-        if (compareArrays(rotated, min) < 0) {
-            min = rotated;
-        }
-    }
-
-    return min;
-}
-
-export class VCTreeNode {
-    parent: VCTreeNode | null;
-    children: VCTreeNode[];
-    vertexConfiguration: VertexConfiguration;
-
-    constructor(parent: VCTreeNode | null, vertexConfiguration: VertexConfiguration) {
-        this.parent = parent;
-        this.children = [];
-        this.vertexConfiguration = vertexConfiguration;
-    }
-
-    clone = (): VCTreeNode => {
-        return new VCTreeNode(this.parent, this.vertexConfiguration.clone());
-    }
+    const result: string[] = new Array(n);
+    for (let j = 0; j < n; j++) result[j] = names[(minStart + j) % n];
+    return result.join(',');
 }
