@@ -114,10 +114,10 @@
 	</button>
 </div>
 
-<audio 
+<!-- <audio 
 	bind:this={audio} 
 	src="/sound/soundtrack.mp3"
 	preload="auto"
 >
 	<track kind="captions" />
-</audio> 
+</audio>  -->
