@@ -1,6 +1,5 @@
-import { PolygonsGenerator, VCGenerator, PolygonType, type GeneratorParameters, PolygonSignature, CompatibilityGraph } from '$classes';
+import { PolygonsGenerator, VCGenerator, PolygonType, type GeneratorParameters, PolygonSignature, CompatibilityGraph, SeedSetExtractor } from '$classes';
 import { describe, it } from 'vitest';
-import { toRadians } from '$utils';
 import fs from 'fs';
 
 describe('VCGenerator', () => {
@@ -9,10 +8,10 @@ describe('VCGenerator', () => {
             [PolygonType.REGULAR]: {
                 n_max: 42
             },
-            [PolygonType.STAR_REGULAR]: {
-                n_max: 12,
-                angle: toRadians(30)
-            },
+            // [PolygonType.STAR_REGULAR]: {
+            //     n_max: 12,
+            //     angle: toRadians(30)
+            // },
             // [PolygonType.STAR_PARAMETRIC]: {
             //     n_max: 6,
             //     angle: toRadians(30)
@@ -94,5 +93,39 @@ describe('VCGenerator', () => {
         }
 
         fs.writeFileSync(cgFilePath, JSON.stringify(adjacencyList));
+
+        // STEP 4: extract seed sets from the compatibility graph
+        // save in different folders for each k and different files for each m, where m is the number of unique vcs in the seed set
+        const compatibilityGraph = CompatibilityGraph.fromAdjacencyList(adjacencyList, vertexConfigurations);
+        const extractor = new SeedSetExtractor(compatibilityGraph);
+
+        for (let k = 2; k <= 10; k++) {
+            const folderPath = `src/lib/classes/algorithm/seedSets/k=${k}`;
+            if (!fs.existsSync(folderPath)) {
+                fs.mkdirSync(folderPath, { recursive: true });
+            }
+            const start: number = performance.now();
+            const seedSets = extractor.findSeedSets(k);
+            const end: number = performance.now();
+            console.log(`\nk=${k}: ${seedSets.length} (${(end - start).toFixed(0)}ms)`);
+
+            // divide seed sets based on the number of unique vcs in the seed set
+            const seedSetsByM = new Map<number, string[][]>();
+            for (const seedSet of seedSets) {
+                const m = new Set(seedSet).size;
+                if (!seedSetsByM.has(m)) {
+                    seedSetsByM.set(m, []);
+                }
+                seedSetsByM.get(m)?.push(seedSet);
+            }
+
+            for (const [m, seedSets] of seedSetsByM.entries()) {
+                console.log(` - m=${m}: ${seedSets.length}`);
+                const filePath = `${folderPath}/m=${m}.json`;
+                if (!fs.existsSync(filePath)) {
+                    fs.writeFileSync(filePath, JSON.stringify(seedSets, null, 4));
+                }
+            }
+        }
     }, 120 * 1000);
 });
