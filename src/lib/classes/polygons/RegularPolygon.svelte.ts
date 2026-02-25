@@ -1,4 +1,4 @@
-import { Polygon, Vector } from '$classes';
+import { Polygon, PolygonType, Vector } from '$classes';
 import { isWithinTolerance, map } from '$utils';
 
 export class RegularPolygon extends Polygon {
@@ -37,6 +37,12 @@ export class RegularPolygon extends Polygon {
         polygon.calculateHue();
 
         return polygon;
+    }
+
+    static fromVertices = (vertices: Vector[]): RegularPolygon => {
+        const anchor = vertices[0].copy();
+        const dir = Vector.sub(vertices[1], vertices[0]).copy();
+        return RegularPolygon.fromAnchorAndDir(vertices.length, anchor, dir);
     }
 
     /**
@@ -89,5 +95,13 @@ export class RegularPolygon extends Polygon {
 
     clone = (): RegularPolygon => {
         return RegularPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]));
+    }
+
+    encode = (): Object => {
+        return {
+            type: PolygonType.REGULAR,
+            n: this.n,
+            vertices: this.vertices.map(v => v.encode()),
+        };
     }
 }

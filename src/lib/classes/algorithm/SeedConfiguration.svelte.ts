@@ -1,10 +1,26 @@
-import type { Polygon } from "../polygons/Polygon.svelte";
+import { Vector, type Polygon } from "$classes";
 
 export class SeedConfiguration {
     polygons: Polygon[];
 
     constructor(polygons: Polygon[]) {
         this.polygons = polygons;
+    }
+
+    static merge = (seedA: SeedConfiguration, seedB: SeedConfiguration): SeedConfiguration => {
+        return new SeedConfiguration([...seedA.polygons, ...seedB.polygons]);
+    }
+
+    rotate = (origin: Vector, angle: number): SeedConfiguration => {
+        return new SeedConfiguration(this.polygons.map(p => p.rotate(origin, angle)));
+    }
+
+    translate = (vector: Vector): SeedConfiguration => {
+        return new SeedConfiguration(this.polygons.map(p => p.translate(vector)));
+    }
+
+    mirror = (point: Vector, dir: Vector): SeedConfiguration => {
+        return new SeedConfiguration(this.polygons.map(p => p.mirror(point, dir)));
     }
 
     isValid = (): boolean => {
@@ -20,5 +36,15 @@ export class SeedConfiguration {
         }
 
         return true;
+    }
+
+    encode = (): Object => {
+        return {
+            polygons: this.polygons.map(p => p.encode()),
+        };
+    }
+
+    clone = (): SeedConfiguration => {
+        return new SeedConfiguration(this.polygons.map(p => p.clone()));
     }
 }

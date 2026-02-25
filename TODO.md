@@ -4,7 +4,7 @@
 - [x] generate polygons
 - [x] compute vertex configuration
 - [x] create compatibility graph
-- [ ] extract all seed sets
+- [x] extract all seed sets
 - [ ] build the seeds
 - [ ] apply wallpaper groups
 - [ ] perform final checks

@@ -2,7 +2,7 @@
     import { VertexConfiguration } from '$classes/algorithm';
     import { browser } from '$app/environment';
     import { regularStarRegex, parametricStarRegex, regularPolygonRegex, equilateralPolygonRegex, PolygonType } from '$classes';
-    import { Search, Minus, Plus, Hexagon, Network, GitFork } from 'lucide-svelte';
+    import { Search, Minus, Plus, Hexagon, Network, GitFork, Puzzle } from 'lucide-svelte';
     import { isValidMultiple } from '$utils/filterHelpers';
 
     import MultiSelect from '$components/ui/MultiSelect.svelte';
@@ -210,6 +210,10 @@
                     <a href="/compatibility-graph" class="nav-link">
                         <GitFork size={14} />
                         <span>Compat. Graph</span>
+                    </a>
+                    <a href="/seed-configurations" class="nav-link">
+                        <Puzzle size={14} />
+                        <span>Seed Configs</span>
                     </a>
                 </nav>
             </div>

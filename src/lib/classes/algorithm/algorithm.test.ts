@@ -1,4 +1,4 @@
-import { PolygonsGenerator, VCGenerator, PolygonType, type GeneratorParameters, PolygonSignature, CompatibilityGraph, SeedSetExtractor, VertexConfiguration } from '$classes';
+import { PolygonsGenerator, VCGenerator, PolygonType, type GeneratorParameters, PolygonSignature, CompatibilityGraph, SeedSetExtractor, VertexConfiguration, SeedBuilder } from '$classes';
 import { describe, it } from 'vitest';
 import { comparePolygonNames, compareVertexConfigurationNames, toRadians } from '$utils';
 import fs from 'fs';
@@ -10,14 +10,14 @@ describe('VCGenerator', () => {
             [PolygonType.REGULAR]: {
                 n_max: 42
             },
-            [PolygonType.STAR_REGULAR]: {
-                n_max: 12,
-                // angle: toRadians(30)
-            },
-            [PolygonType.STAR_PARAMETRIC]: {
-                n_max: 12,
-                angle: toRadians(30)
-            },
+            // [PolygonType.STAR_REGULAR]: {
+            //     n_max: 12,
+            //     // angle: toRadians(30)
+            // },
+            // [PolygonType.STAR_PARAMETRIC]: {
+            //     n_max: 12,
+            //     angle: toRadians(30)
+            // },
             // [PolygonType.EQUILATERAL]: {
             //     n_max: 6,
             //     angle: toRadians(30)
@@ -28,7 +28,8 @@ describe('VCGenerator', () => {
         const polygonSignatures = polygonGeneration(parameters, additionalPolygons);
         const vertexConfigurations = vertexConfigurationGeneration(polygonSignatures);
         const adjacencyList = compatibilityGraphGeneration(vertexConfigurations);
-        // seedSetExtraction(adjacencyList, vertexConfigurations, maxK);
+        seedSetExtraction(adjacencyList, vertexConfigurations, maxK);
+        seedsGeneration(3, 3);
     }, 120 * 1000);
 });
 
@@ -148,4 +149,15 @@ const seedSetExtraction = (adjacencyList: Record<string, string[]>, vertexConfig
             }
         }
     }
+}
+
+// STEP 5: generate seeds from the seed sets
+const seedsGeneration = (k: number | null = null, m: number | null = null): void => {
+    const seedBuilder = new SeedBuilder();
+    const seedConfigurations = seedBuilder.buildSeeds(k, m);
+    const seedConfigurationsFolderPath = `src/lib/classes/algorithm/seedConfigurations/k=${k}/m=${m}`;
+    if (!fs.existsSync(seedConfigurationsFolderPath)) {
+        fs.mkdirSync(seedConfigurationsFolderPath, { recursive: true });
+    }
+    fs.writeFileSync(`${seedConfigurationsFolderPath}/seedConfigurations.json`, JSON.stringify(seedConfigurations.map(sc => sc.encode()), null, 4));
 }

@@ -5,5 +5,6 @@ export * from './VCGenerator.svelte';
 export * from './CompatibilityGraph.svelte';
 export * from './SeedConfiguration.svelte';
 export * from './SeedSetExtractor.svelte';
+export * from './wallpaperGroups';
 export * from './types';
 export * from './regex';

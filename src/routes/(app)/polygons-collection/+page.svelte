@@ -8,7 +8,7 @@
     import { toRadians } from '$utils';
     import { isValidMultiple } from '$utils/filterHelpers';
     import { browser } from '$app/environment';
-    import { Search, Minus, Plus, Hexagon, Network, GitFork } from 'lucide-svelte';
+    import { Search, Minus, Plus, Hexagon, Network, GitFork, Puzzle } from 'lucide-svelte';
 
     import MultiSelect from '$components/ui/MultiSelect.svelte';
     import Checkbox from '$components/ui/Checkbox.svelte';
@@ -292,6 +292,10 @@
                     <a href="/compatibility-graph" class="nav-link">
                         <GitFork size={14} />
                         <span>Compat. Graph</span>
+                    </a>
+                    <a href="/seed-configurations" class="nav-link">
+                        <Puzzle size={14} />
+                        <span>Seed Configs</span>
                     </a>
                 </nav>
             </div>

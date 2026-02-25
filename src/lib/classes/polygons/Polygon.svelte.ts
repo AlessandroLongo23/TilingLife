@@ -124,40 +124,6 @@ export class Polygon {
     }
 
     intersects(other: Polygon): boolean {
-        // const isPointEqual = (a: Vector, b: Vector) => Math.abs(a.x - b.x) < tolerance && Math.abs(a.y - b.y) < tolerance;
-        // let unsharedVertexThis: Vector | null = null;
-        // for (const v1 of this.vertices) {
-        //     let shared = false;
-        //     for (const v2 of other.vertices) {
-        //         if (isPointEqual(v1, v2)) {
-        //             shared = true;
-        //             break;
-        //         }
-        //     }
-        //     if (!shared) {
-        //         unsharedVertexThis = v1;
-        //         break;
-        //     }
-        // }
-        // if (!unsharedVertexThis) return true;
-        // if (other.containsPoint(unsharedVertexThis)) return true;
-        // let unsharedVertexOther: Vector | null = null;
-        // for (const v2 of other.vertices) {
-        //     let shared = false;
-        //     for (const v1 of this.vertices) {
-        //         if (isPointEqual(v1, v2)) {
-        //             shared = true;
-        //             break;
-        //         }
-        //     }
-        //     if (!shared) {
-        //         unsharedVertexOther = v2;
-        //         break;
-        //     }
-        // }
-        // if (unsharedVertexOther && this.containsPoint(unsharedVertexOther)) return true;
-        // return false;
-
         if (this.containsPoint(other.centroid)) return true;
         if (other.containsPoint(this.centroid)) return true;
 
@@ -343,6 +309,10 @@ export class Polygon {
     }
 
     calculateVerticesFromCentroidAndAngle = (): void => {
+        throw new Error('Abstract method called');
+    }
+
+    encode = (): Object => {
         throw new Error('Abstract method called');
     }
 }

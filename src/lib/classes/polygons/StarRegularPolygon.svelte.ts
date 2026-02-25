@@ -1,4 +1,4 @@
-import { StarPolygon, Vector, StarVertexTypes } from '$classes';
+import { StarPolygon, Vector, StarVertexTypes, PolygonType } from '$classes';
 
 export class StarRegularPolygon extends StarPolygon {
     d: number;
@@ -45,7 +45,34 @@ export class StarRegularPolygon extends StarPolygon {
         return polygon;
     }
 
+    static fromVertices = (vertices: Vector[]): StarRegularPolygon => {
+        const angle1: number = Vector.angleBetween(vertices[0], vertices[1]);
+        const angle2: number = Vector.angleBetween(vertices[1], vertices[2]);
+        let alpha: number, beta: number;
+        if (angle1 > angle2) {
+            [alpha, beta] = [angle2, angle1];
+        } else {
+            [alpha, beta] = [angle1, angle2];
+        }
+
+        const d = vertices.length / 2 * (1 - alpha / Math.PI);
+        const startsWith = angle1 === alpha ? StarVertexTypes.OUTER : StarVertexTypes.INNER;
+        const anchor = vertices[0].copy();
+        const dir = Vector.sub(vertices[1], vertices[0]).copy();
+        
+        return StarRegularPolygon.fromAnchorAndDir(vertices.length, anchor, dir, d, startsWith);
+    }
+
     clone = (): StarRegularPolygon => {
         return StarRegularPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]), this.d, this.startsWith);
+    }
+
+    encode = (): Object => {
+        return {
+            type: PolygonType.STAR_REGULAR,
+            n: this.n,
+            d: this.d,
+            vertices: this.vertices.map(v => v.encode()),
+        };
     }
 }

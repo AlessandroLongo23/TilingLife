@@ -28,6 +28,15 @@ export class GenericPolygon extends Polygon {
         return polygon;
     }
 
+    static fromVertices = (vertices: Vector[]): GenericPolygon => {
+        const sides = vertices.map(v => Vector.distance(v, vertices[(vertices.indexOf(v) + 1) % vertices.length]));
+        const angles = vertices.map(v => Vector.angleBetween(v, vertices[(vertices.indexOf(v) + 1) % vertices.length]));
+        const anchor = vertices[0].copy();
+        const dir = Vector.sub(vertices[1], vertices[0]).copy();
+
+        return GenericPolygon.fromAnchorAndDir(vertices.length, anchor, dir, sides, angles);
+    }
+
     calculateVerticesFromAnchorAndDir = () => {
         this.vertices = [this.anchor.copy()];
         let current_dir: Vector = this.dir.copy();

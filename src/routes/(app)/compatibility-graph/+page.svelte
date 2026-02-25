@@ -3,7 +3,7 @@
     import { browser } from '$app/environment';
     import { Vector } from '$classes/Vector.svelte';
     import { onMount } from 'svelte';
-    import { Hexagon, Network, GitFork, ChevronRight, SlidersHorizontal } from 'lucide-svelte';
+    import { Hexagon, Network, GitFork, Puzzle, ChevronRight, SlidersHorizontal } from 'lucide-svelte';
     import { isValidMultiple } from '$utils/filterHelpers';
 
     import MultiSelect from '$components/ui/MultiSelect.svelte';
@@ -617,6 +617,10 @@
                     <a href="/compatibility-graph" class="nav-link nav-link-active">
                         <GitFork size={14} />
                         <span>Compat. Graph</span>
+                    </a>
+                    <a href="/seed-configurations" class="nav-link">
+                        <Puzzle size={14} />
+                        <span>Seed Configs</span>
                     </a>
                 </nav>
             </div>

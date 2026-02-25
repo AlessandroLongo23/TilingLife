@@ -156,6 +156,10 @@ export class Vector {
         return Math.sqrt((v1.x - v2.x) ** 2 + (v1.y - v2.y) ** 2);
     }
 
+    static cross(v1: Vector, v2: Vector): number {
+        return v1.x * v2.y - v1.y * v2.x;
+    }
+
     static angleBetween(v1: Vector, v2: Vector): number {
         return Math.atan2(v2.y - v1.y, v2.x - v1.x);
     }
@@ -166,5 +170,12 @@ export class Vector {
 
         if (Math.abs(this.y) < tolerance)
             this.y = 0;
+    }
+
+    encode = (): Object => {
+        return {
+            x: this.x,
+            y: this.y,
+        };
     }
 }

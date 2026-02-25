@@ -1,4 +1,4 @@
-import { GenericPolygon, Vector } from '$classes';
+import { GenericPolygon, PolygonType, Vector } from '$classes';
 import { isWithinTolerance, map, toDegrees } from '$utils';
 
 export class EquilateralPolygon extends GenericPolygon {
@@ -23,6 +23,13 @@ export class EquilateralPolygon extends GenericPolygon {
         polygon.calculateHue();
 
         return polygon;
+    }
+
+    static fromVertices = (vertices: Vector[]): EquilateralPolygon => {
+        const angles = vertices.map(v => Vector.angleBetween(v, vertices[(vertices.indexOf(v) + 1) % vertices.length]));
+        const anchor = vertices[0].copy();
+        const dir = Vector.sub(vertices[1], vertices[0]).copy();
+        return EquilateralPolygon.fromAnchorAndDir(vertices.length, anchor, dir, angles);
     }
 
     calculateHue = () => {
@@ -51,5 +58,14 @@ export class EquilateralPolygon extends GenericPolygon {
 
     clone = (): EquilateralPolygon => {
         return EquilateralPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy(), [...this.angles]);
+    }
+
+    encode = (): Object => {
+        return {
+            type: PolygonType.EQUILATERAL,
+            n: this.n,
+            angles: this.angles.map(a => toDegrees(a)),
+            vertices: this.vertices.map(v => v.encode()),
+        };
     }
 }
