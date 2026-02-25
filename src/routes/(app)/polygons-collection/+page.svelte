@@ -276,6 +276,7 @@
         <div class="max-w-[1600px] mx-auto px-6 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
+                    <Hexagon size={20} />
                     <h1 class="text-lg font-semibold text-white/90">Polygon Collection</h1>
                     <span class="count-badge">{filteredNames.length}</span>
                 </div>

@@ -1,13 +1,15 @@
 <script lang="ts">
-    import { VertexConfiguration, CompatibilityGraph, regularPolygonRegex, regularStarRegex, parametricStarRegex, equilateralPolygonRegex, PolygonType } from '$classes';
+    import { VertexConfiguration, CompatibilityGraph, VCNode, regularPolygonRegex, regularStarRegex, parametricStarRegex, equilateralPolygonRegex, PolygonType } from '$classes';
     import { browser } from '$app/environment';
     import { Vector } from '$classes/Vector.svelte';
     import { onMount } from 'svelte';
-    import { Hexagon, Network, GitFork } from 'lucide-svelte';
+    import { Hexagon, Network, GitFork, ChevronRight, SlidersHorizontal } from 'lucide-svelte';
     import { isValidMultiple } from '$utils/filterHelpers';
+
     import MultiSelect from '$components/ui/MultiSelect.svelte';
     import SearchInput from '$components/ui/SearchInput.svelte';
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
+	import Checkbox from '$components/ui/Checkbox.svelte';
 
     import allVCNames from '$lib/classes/algorithm/vcs.json';
     import adjacencyListData from '$lib/classes/algorithm/compatibilityGraph.json';
@@ -25,6 +27,7 @@
     let activeSearch = $state('');
     let filterAngleEnabled = $state(false);
     let filterAngle = $state(30);
+    let showNames = $state(false);
 
     let filteredNames = $derived.by(() => {
         return allVCNames.filter(name => {
@@ -67,22 +70,55 @@
         });
     });
 
-    // --- Physics constants ---
-    const NODE_RADIUS = 40;
-    const REPULSION = 5000;
-    const ATTRACTION = 0.008;
-    const REST_LENGTH = 200;
-    const DAMPING = 0.85;
-    const CENTER_GRAVITY = 0.003;
-    const MIN_DISTANCE = 30;
+    // --- Physics parameters (tunable) ---
+    let nodeRadius = $state(100);
+    let repulsionExp = $state(0);
+    let attractionExp = $state(-6);
+    let gravityExp = $state(-7);
+    let dampingVal = $state(0.90);
+    let bhTheta = $state(1.0);
+    let physicsOpen = $state(false);
+
+    const REST_LENGTH = 50;
+    const MIN_DISTANCE = 50;
+    const DEFAULT_ZOOM = 0.3;
+
+    let REPULSION = $derived(Math.pow(10, repulsionExp));
+    let ATTRACTION = $derived(Math.pow(10, attractionExp));
+    let CENTER_GRAVITY = $derived(Math.pow(10, gravityExp));
+
+    const getAttractionFactor = (dist: number, numNodes: number): number => {
+        return ATTRACTION * dist;
+    }
+
+    const getRepulsionFactor = (dist: number, degA: number, degB: number, numNodes: number): number => {
+        return -REPULSION * (degA + 1) * (degB + 1) / dist;
+    }
+
+    const getGravityFactor = (dist: number, degree: number): number => {
+        return CENTER_GRAVITY * (degree + 1) * dist;
+    }
+
+    const getRadius = (numNeighbors: number): number => {
+        return nodeRadius * Math.log10(numNeighbors + 2);
+    }
+
+    const getCenterOfMass = (nodes: VCNode[]): Vector => {
+        let center = new Vector(0, 0);
+        for (const node of nodes) {
+            center.add(node.pos);
+        }
+        center.scale(1 / nodes.length);
+        return center;
+    }
 
     // --- Canvas & camera ---
     let canvasEl;
     let containerEl;
     let animationId;
 
-    let zoom = 1;
-    let targetZoom = 1;
+    let zoom = DEFAULT_ZOOM;
+    let targetZoom = DEFAULT_ZOOM;
     let offset = new Vector(0, 0);
     let targetOffset = new Vector(0, 0);
     const CAM_DAMP = 0.15;
@@ -95,7 +131,7 @@
     let hoveredNode = null;
 
     // --- Graph data ---
-    let graph = null;
+    let graph: CompatibilityGraph | null = null;
     let edgeCount = $state(0);
     let nodeCount = $state(0);
     let thumbnailCache = new Map();
@@ -122,11 +158,11 @@
         edgeCount = edges / 2;
         nodeCount = graph.nodes.length;
 
-        const layoutRadius = Math.max(150, graph.nodes.length * 20);
+        const layoutRadius = Math.max(300, graph.nodes.length * 50);
+        const angles = Array.from({ length: graph.nodes.length }, (_, i) => i).sort((a, b) => Math.random() - 0.5)
         for (let i = 0; i < graph.nodes.length; i++) {
-            const angle = (2 * Math.PI * i) / graph.nodes.length;
-            graph.nodes[i].pos = Vector.fromPolar(layoutRadius, angle);
-            graph.nodes[i].radius = NODE_RADIUS;
+            graph.nodes[i].pos = Vector.fromPolar(layoutRadius, angles[i]);
+            graph.nodes[i].radius = getRadius(graph.nodes[i].neighbors.length);
 
             const vcName = graph.nodes[i].vertexConfiguration.name;
             if (!thumbnailCache.has(vcName)) {
@@ -136,7 +172,7 @@
         }
 
         targetOffset.set(0, 0);
-        targetZoom = 1;
+        targetZoom = DEFAULT_ZOOM;
     });
 
     // --- Thumbnail rendering ---
@@ -149,7 +185,7 @@
     }
 
     function renderThumbnail(vc) {
-        const size = NODE_RADIUS * 2;
+        const size = nodeRadius * 2;
         const canvas = document.createElement('canvas');
         const dpr = window.devicePixelRatio || 1;
         canvas.width = size * dpr;
@@ -176,7 +212,7 @@
         }
         if (!isFinite(minX)) return canvas;
 
-        const padding = 6;
+        const padding = nodeRadius / 2.5;
         const avail = size - 2 * padding;
         const dw = maxX - minX || 1;
         const dh = maxY - minY || 1;
@@ -212,47 +248,144 @@
         return canvas;
     }
 
+    // --- Barnes-Hut quadtree ---
+    class BHCell {
+        x: number; y: number; size: number;
+        cx = 0; cy = 0;
+        mass = 0;
+        count = 0;
+        body: VCNode | null = null;
+        children: BHCell[] | null = null;
+
+        constructor(x: number, y: number, size: number) {
+            this.x = x; this.y = y; this.size = size;
+        }
+
+        insert(node: VCNode, depth = 0): void {
+            const m = node.neighbors.length + 1;
+
+            if (this.count === 0) {
+                this.body = node;
+                this.cx = node.pos.x;
+                this.cy = node.pos.y;
+                this.mass = m;
+                this.count = 1;
+                return;
+            }
+
+            const newMass = this.mass + m;
+            this.cx = (this.cx * this.mass + node.pos.x * m) / newMass;
+            this.cy = (this.cy * this.mass + node.pos.y * m) / newMass;
+            this.mass = newMass;
+            this.count++;
+
+            if (depth > 40) return;
+
+            if (this.children === null) {
+                this.children = this._subdivide();
+                this._insertChild(this.body!, depth);
+                this.body = null;
+            }
+
+            this._insertChild(node, depth);
+        }
+
+        _subdivide(): BHCell[] {
+            const hs = this.size / 2;
+            return [
+                new BHCell(this.x,      this.y,      hs),
+                new BHCell(this.x + hs, this.y,      hs),
+                new BHCell(this.x,      this.y + hs, hs),
+                new BHCell(this.x + hs, this.y + hs, hs),
+            ];
+        }
+
+        _insertChild(node: VCNode, depth: number): void {
+            const midX = this.x + this.size / 2;
+            const midY = this.y + this.size / 2;
+            const idx = (node.pos.x >= midX ? 1 : 0) + (node.pos.y >= midY ? 2 : 0);
+            this.children![idx].insert(node, depth + 1);
+        }
+
+        computeForce(node: VCNode, thetaSq: number, repulsion: number): void {
+            if (this.count === 0) return;
+            if (this.count === 1 && this.body === node) return;
+
+            const dx = this.cx - node.pos.x;
+            const dy = this.cy - node.pos.y;
+            const distSq = dx * dx + dy * dy;
+
+            if (this.children === null || this.size * this.size < thetaSq * distSq) {
+                const dist = Math.sqrt(distSq) || 1e-6;
+                const f = -repulsion * (node.neighbors.length + 1) * this.mass / dist;
+                node.force.x += (dx / dist) * f;
+                node.force.y += (dy / dist) * f;
+                return;
+            }
+
+            for (const child of this.children) {
+                child.computeForce(node, thetaSq, repulsion);
+            }
+        }
+    }
+
+    function buildBHTree(nodes: VCNode[]): BHCell {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const n of nodes) {
+            if (n.pos.x < minX) minX = n.pos.x;
+            if (n.pos.y < minY) minY = n.pos.y;
+            if (n.pos.x > maxX) maxX = n.pos.x;
+            if (n.pos.y > maxY) maxY = n.pos.y;
+        }
+        const size = Math.max(maxX - minX, maxY - minY, 1) + 2;
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        const root = new BHCell(cx - size / 2, cy - size / 2, size);
+        for (const n of nodes) root.insert(n);
+        return root;
+    }
+
     // --- Physics simulation ---
     function simulate() {
         if (!graph || graph.nodes.length === 0) return;
         const nodes = graph.nodes;
 
-        for (const n of nodes) { n.resetForce(); }
-
-        // Coulomb repulsion between all pairs
-        for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                const delta = Vector.sub(nodes[j].pos, nodes[i].pos);
-                const dist = Math.max(delta.mag(), MIN_DISTANCE);
-                const force = Vector.scale(delta, REPULSION / (dist * dist * dist));
-                nodes[i].force.sub(force);
-                nodes[j].force.add(force);
-            }
+        for (const n of nodes) {
+            n.radius = getRadius(n.neighbors.length);
+            n.resetForce();
         }
 
-        // Spring attraction along edges
+        // FORCE ATLAS 2
         for (let i = 0; i < nodes.length; i++) {
             for (const nb of nodes[i].neighbors) {
                 if (nb.index <= i) continue;
                 const delta = Vector.sub(nb.pos, nodes[i].pos);
-                const dist = Math.max(delta.mag(), 1);
-                const force = Vector.scale(delta, ATTRACTION * (dist - REST_LENGTH) / dist);
+                const dist = Math.max(delta.mag() - nodes[i].radius - nb.radius, delta.mag());
+                const force = Vector.scale(delta, getAttractionFactor(dist, nodes.length));
                 nodes[i].force.add(force);
                 nb.force.sub(force);
             }
         }
 
+        const tree = buildBHTree(nodes);
+        const thetaSq = bhTheta * bhTheta;
+        for (const n of nodes) {
+            tree.computeForce(n, thetaSq, REPULSION);
+        }
+
         // Gentle pull toward center
         for (const n of nodes) {
-            n.force.sub(Vector.scale(n.pos, CENTER_GRAVITY));
+            n.force.sub(Vector.scale(n.pos, getGravityFactor(n.pos.mag(), n.neighbors.length)));
         }
 
         // Euler integration with damping
         for (const n of nodes) {
             if (n.pinned) continue;
             n.vel.add(n.force);
-            n.vel.scale(DAMPING);
+            n.vel.scale(dampingVal);
             n.pos.add(n.vel);
+
+            n.pos.sub(getCenterOfMass(nodes));
         }
     }
 
@@ -289,7 +422,7 @@
             for (const nb of nodes[i].neighbors) {
                 if (nb.index <= i) continue;
                 const hl = hoveredNode && (hoveredNode === nodes[i] || hoveredNode === nb);
-                ctx.strokeStyle = hl ? 'rgba(74, 222, 128, 0.6)' : 'rgba(74, 222, 128, 0.15)';
+                ctx.strokeStyle = hl ? '#4ade80' : 'rgba(128, 128, 128, 0.15)';
                 ctx.lineWidth = (hl ? 2.5 : 1) / zoom;
                 ctx.beginPath();
                 ctx.moveTo(nodes[i].pos.x, nodes[i].pos.y);
@@ -321,7 +454,7 @@
             ctx.restore();
 
             // Label with clamped screen-size
-            if (!dim) {
+            if (!dim && showNames) {
                 const minScreenPx = 8;
                 const worldSize = 10;
                 const fs = Math.max(worldSize, minScreenPx / zoom);
@@ -382,7 +515,7 @@
         if (e.button === 2) {
             e.preventDefault();
             targetOffset.set(0, 0);
-            targetZoom = 1;
+            targetZoom = DEFAULT_ZOOM;
             return;
         }
 
@@ -468,6 +601,7 @@
         <div class="max-w-[1600px] mx-auto px-6 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
+                    <GitFork size={20} />
                     <h1 class="text-lg font-semibold text-white/90">Compatibility Graph</h1>
                     <span class="count-badge">{nodeCount} nodes · {edgeCount} edges</span>
                 </div>
@@ -511,6 +645,83 @@
                         <AngleFilterBlock bind:enabled={filterAngleEnabled} bind:angle={filterAngle} />
                     </div>
                 {/if}
+
+                <div class="border-t border-zinc-800 pt-5">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Show Names</span>
+                        </div>
+                    
+                        <Checkbox
+                            id="showNames"
+                            label="Show names"
+                            bind:checked={showNames}
+                        />
+                    </div>
+                </div>
+
+                <div class="border-t border-zinc-800 pt-5">
+                    <button
+                        class="flex items-center gap-2 w-full text-left text-xs uppercase text-zinc-400 font-medium tracking-wider hover:text-zinc-300 transition-colors"
+                        onclick={() => physicsOpen = !physicsOpen}
+                    >
+                        <ChevronRight size={12} class="transition-transform duration-200 {physicsOpen ? 'rotate-90' : ''}" />
+                        <SlidersHorizontal size={12} />
+                        Simulation
+                    </button>
+
+                    {#if physicsOpen}
+                        <div class="mt-4 flex flex-col gap-4">
+                            <div class="sim-param">
+                                <div class="sim-param-header">
+                                    <span>Node Radius</span>
+                                    <span class="sim-param-value">{nodeRadius}</span>
+                                </div>
+                                <input type="range" bind:value={nodeRadius} min={10} max={300} step={5} class="sim-slider" />
+                            </div>
+
+                            <div class="sim-param">
+                                <div class="sim-param-header">
+                                    <span>Repulsion</span>
+                                    <span class="sim-param-value">{REPULSION.toExponential(1)}</span>
+                                </div>
+                                <input type="range" bind:value={repulsionExp} min={-5} max={1} step={0.1} class="sim-slider" />
+                            </div>
+
+                            <div class="sim-param">
+                                <div class="sim-param-header">
+                                    <span>Attraction</span>
+                                    <span class="sim-param-value">{ATTRACTION.toExponential(1)}</span>
+                                </div>
+                                <input type="range" bind:value={attractionExp} min={-9} max={-3} step={0.1} class="sim-slider" />
+                            </div>
+
+                            <div class="sim-param">
+                                <div class="sim-param-header">
+                                    <span>Gravity</span>
+                                    <span class="sim-param-value">{CENTER_GRAVITY.toExponential(1)}</span>
+                                </div>
+                                <input type="range" bind:value={gravityExp} min={-10} max={-3} step={0.1} class="sim-slider" />
+                            </div>
+
+                            <div class="sim-param">
+                                <div class="sim-param-header">
+                                    <span>Damping</span>
+                                    <span class="sim-param-value">{dampingVal.toFixed(2)}</span>
+                                </div>
+                                <input type="range" bind:value={dampingVal} min={0.1} max={0.99} step={0.01} class="sim-slider" />
+                            </div>
+
+                            <div class="sim-param">
+                                <div class="sim-param-header">
+                                    <span>BH Theta</span>
+                                    <span class="sim-param-value">{bhTheta.toFixed(1)}</span>
+                                </div>
+                                <input type="range" bind:value={bhTheta} min={0.3} max={3.0} step={0.1} class="sim-slider" />
+                            </div>
+                        </div>
+                    {/if}
+                </div>
 
                 <div class="border-t border-zinc-800 pt-5">
                     <div class="flex flex-col gap-1.5 text-xs text-zinc-500">
@@ -586,5 +797,39 @@
     .nav-link-active:hover {
         color: rgba(74, 222, 128, 1);
         background-color: rgba(74, 222, 128, 0.12);
+    }
+
+    .sim-param {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+    }
+
+    .sim-param-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.75rem;
+        color: rgba(161, 161, 170, 0.8);
+    }
+
+    .sim-param-value {
+        font-family: ui-monospace, monospace;
+        font-size: 0.7rem;
+        color: rgba(74, 222, 128, 0.9);
+    }
+
+    .sim-slider {
+        width: 100%;
+        height: 0.5rem;
+        border-radius: 9999px;
+        appearance: none;
+        cursor: pointer;
+        background-color: rgba(63, 63, 70, 0.7);
+        accent-color: #22c55e;
+    }
+
+    .sim-slider:focus {
+        outline: none;
     }
 </style>

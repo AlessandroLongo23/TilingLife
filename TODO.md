@@ -19,9 +19,11 @@
 - [ ] add toggle for displaying names in graph visualization
 - [ ] add range slider input for number of polygons filter in vertex configuration catalogue
 - [ ] improve text input to support logic operators
+- [ ] add sorting by n, category, or internal_angle
 
 ## QOL
-- [ ] improve graph nodes render quality
+- [x] improve graph nodes render quality
+- [x] add simulation settings to compatibility graph
 - [ ] move sound toggle
 - [ ] add screenshot functionality to each card (polygons, vcs, seeds, tilings)
 

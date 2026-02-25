@@ -6,7 +6,7 @@ export interface GeneratorParameters {
     },
     [PolygonType.STAR_REGULAR]?: {
         n_max: number;
-        angle: number;
+        angle?: number;
     },
     [PolygonType.STAR_PARAMETRIC]?: {
         n_max: number;

@@ -1,5 +1,5 @@
 import { Polygon, PolygonSignature, StarParametricPolygon, StarRegularPolygon, VertexConfiguration } from '$classes';
-import { compareNames, isWithinAngularTolerance } from '$utils';
+import { comparePolygonNames, isWithinAngularTolerance } from '$utils';
 import { tolerance } from '$stores';
 
 export class VCGenerator {
@@ -39,7 +39,7 @@ export class VCGenerator {
                 // if the candidate polygon's name is lexicographically smaller than the first polygon in the vertex configuration, skip it
                 // it would eventually be filtered out for not being the smallest lexicographically
                 if (vc.polygons.length > 0 &&
-                    compareNames(polygonData.name, vc.polygons[0].name) < 0) {
+                    comparePolygonNames(polygonData.name, vc.polygons[0].name) < 0) {
                     continue;
                 }
 

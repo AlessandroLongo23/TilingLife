@@ -1,5 +1,5 @@
 import { type GeneratorParameters, PolygonType, StarVertexTypes, Vector, PolygonSignature } from '$classes';
-import { isWithinTolerance, segmentsIntersect } from '$utils';
+import { isWithinTolerance, segmentsIntersect, toRadians } from '$utils';
 import { tolerance } from '$stores';
 
 class Segment {
@@ -26,14 +26,14 @@ export class PolygonsGenerator {
         }
 
         if (parameters[PolygonType.STAR_REGULAR]) {
-            const n_max = parameters[PolygonType.STAR_REGULAR].n_max;
-            const angle_par = parameters[PolygonType.STAR_REGULAR].angle;
+            const n_max: number = parameters[PolygonType.STAR_REGULAR].n_max;
+            const angle_par: number | null = parameters[PolygonType.STAR_REGULAR].angle ?? null;
 
             for (let n = 3; n <= n_max; n++) {
                 for (let d = 2; d < Math.floor(n / 2); d++) {
                     let a = Math.PI * (1 - 2 * d / n);
                     let b = Math.PI * (1 + 2 * (d - 1) / n);
-                    if (this.isMultiple(a, angle_par) && this.isMultiple(b, angle_par)) {
+                    if (angle_par === null || (this.isMultiple(a, angle_par) && this.isMultiple(b, angle_par))) {
                         this.polygons.push(new PolygonSignature(PolygonType.STAR_REGULAR, n, {d: d, startsWith: StarVertexTypes.OUTER}));
                         this.polygons.push(new PolygonSignature(PolygonType.STAR_REGULAR, n, {d: d, startsWith: StarVertexTypes.INNER}));
                     }

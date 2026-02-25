@@ -200,33 +200,43 @@ export const segmentsIntersect = (p1: Vector, p2: Vector, p3: Vector, p4: Vector
     return false;
 };
 
-export const compareNames = (nameA: string, nameB: string): number => {
-    let nA: number, nB: number;
-    if (nameA.match(regularPolygonRegex)) {
-        nA = parseInt(nameA);
-    } else if (nameA.match(regularStarRegex)) {
-        const [, n, d, suffix] = nameA.match(regularStarRegex);
-        nA = parseInt(n);
-    } else if (nameA.match(parametricStarRegex)) {
-        const [, n, value, suffix] = nameA.match(parametricStarRegex);
-        nA = parseInt(n);
-    } else if (nameA.match(equilateralPolygonRegex)) {
-        const [, n, angles] = nameA.match(equilateralPolygonRegex);
-        nA = parseInt(n);
+export const extractNFromPolygonName = (name: string): number => {
+    let n_sides: number;
+    
+    if (name.match(regularPolygonRegex)) {
+        n_sides = parseInt(name);
+    } else if (name.match(regularStarRegex)) {
+        const [, n, d, suffix] = name.match(regularStarRegex);
+        n_sides = parseInt(n);
+    } else if (name.match(parametricStarRegex)) {
+        const [, n, value, suffix] = name.match(parametricStarRegex);
+        n_sides = parseInt(n);
+    } else if (name.match(equilateralPolygonRegex)) {
+        const [, n, angles] = name.match(equilateralPolygonRegex);
+        n_sides = parseInt(n);
     }
 
-    if (nameB.match(regularPolygonRegex)) {
-        nB = parseInt(nameB);
-    } else if (nameB.match(regularStarRegex)) {
-        const [, n, d, suffix] = nameB.match(regularStarRegex);
-        nB = parseInt(n);
-    } else if (nameB.match(parametricStarRegex)) {
-        const [, n, value, suffix] = nameB.match(parametricStarRegex);
-        nB = parseInt(n);
-    } else if (nameB.match(equilateralPolygonRegex)) {
-        const [, n, angles] = nameB.match(equilateralPolygonRegex);
-        nB = parseInt(n);
-    }
+    return n_sides;
+}
 
+export const comparePolygonNames = (nameA: string, nameB: string): number => {
+    const nA: number = extractNFromPolygonName(nameA);
+    const nB: number = extractNFromPolygonName(nameB);
+    
     return nA - nB;
+}
+
+export const compareVertexConfigurationNames = (nameA: string, nameB: string): number => {
+    const polygonsA: string[] = nameA.split(',');
+    const polygonsB: string[] = nameB.split(',');
+
+    for (let i = 0; i < polygonsA.length; i++) {
+        const polygonA: string = polygonsA[i];
+        const polygonB: string = polygonsB[i];
+        if (!polygonB) return 1;
+        if (!polygonA) return -1;
+        const result = comparePolygonNames(polygonA, polygonB);
+        if (result !== 0) return result;
+    }
+    return 0;
 }
