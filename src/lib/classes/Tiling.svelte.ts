@@ -2,6 +2,7 @@ import { lineWidth, showDualConnections, controls } from '$stores';
 import { sortPointsByAngleAndDistance, isWithinTolerance } from '$utils';
 import { get } from 'svelte/store';
 import { type GameOfLifeRule, GOLRuleType, Behavior, State, Polygon, Vector } from '$classes';
+import { tolerance } from '$stores';
 
 export class Tiling {
     nodes: Polygon[];

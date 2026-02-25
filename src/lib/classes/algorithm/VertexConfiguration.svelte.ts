@@ -65,7 +65,7 @@ export class VertexConfiguration {
 
             if (polygon) {
                 polygons.push(polygon);
-                current_dir.rotate(-polygon.interior_angle);
+                current_dir.rotate(polygon.interior_angle);
             }
         }
         return new VertexConfiguration(polygons, null, name);
@@ -112,7 +112,7 @@ export class VertexConfiguration {
         this.polygons.push(polygon);
         this.angle += polygon.interior_angle;
 
-        // FIRST CHECK: check if any polygon intersects with any other polygon
+        // FIRST CHECK: check if any polygon conflicts with any other polygon
         if (this.polygons.length > 1) {
             const lastPolygon = this.polygons[this.polygons.length - 1];
             
@@ -155,7 +155,7 @@ export class VertexConfiguration {
         }
 
         this.name = this.getName();
-        this.current_dir.rotate(-polygon.interior_angle);
+        this.current_dir.rotate(polygon.interior_angle);
     }
 
     computeNeighboringVertices = (): void => {
@@ -212,6 +212,12 @@ export class VertexConfiguration {
         const vcAPartialConfigurations: PartialConfiguration[] = this.neighboringVertices.map(nv => this.evaluatePartialconfiguration(nv));
         const vcBPartialConfigurations: PartialConfiguration[] = other.neighboringVertices.map(nv => other.evaluatePartialconfiguration(nv));
             
+        const arePartialConfigurationsInvertedCopies = (nameA: string, nameB: string): boolean => {
+            const invertedA = nameA.concat(',').concat(nameA).split(',').reverse().join(',');
+            const invertedB = nameB.concat(',').concat(nameB).split(',').reverse().join(',');
+            return invertedA.includes(nameB) || invertedB.includes(nameA);
+        }
+        
         // 2. list all pairs of vpc that are inverted copies of each other
         const compatiblePartialVertexConfigurations: {
             a: PartialConfiguration,
@@ -219,7 +225,7 @@ export class VertexConfiguration {
         }[] = [];
         for (let i = 0; i < vcAPartialConfigurations.length; i++) {
             for (let j = 0; j < vcBPartialConfigurations.length; j++) {
-                if (vcAPartialConfigurations[i].name.split(',').reverse().join(',') === vcBPartialConfigurations[j].name) {
+                if (arePartialConfigurationsInvertedCopies(vcAPartialConfigurations[i].name, vcBPartialConfigurations[j].name)) {
                     compatiblePartialVertexConfigurations.push({
                         a: vcAPartialConfigurations[i],
                         b: vcBPartialConfigurations[j]
@@ -262,10 +268,11 @@ export class VertexConfiguration {
         for (let j = 0; j < this.polygons.length; j++) {
             const p = this.polygons[j];
             const vertexIndex = p.vertices.findIndex(v => isWithinTolerance(v, vertex));
+            // Note: in the other direction, we consider the next vertex to be the previous vertex and vice versa
             if (vertexIndex !== -1) {
-                const previousVertex = p.vertices[(vertexIndex - 1 + p.vertices.length) % p.vertices.length];
+                const previousVertex = p.vertices[(vertexIndex + 1) % p.vertices.length];
                 const currentVertex = p.vertices[vertexIndex];
-                const nextVertex = p.vertices[(vertexIndex + 1) % p.vertices.length];
+                const nextVertex = p.vertices[(vertexIndex - 1 + p.vertices.length) % p.vertices.length];
 
                 const previousDir = Vector.sub(currentVertex, previousVertex).heading();
                 const nextDir = Vector.sub(currentVertex, nextVertex).heading();
@@ -293,7 +300,7 @@ export class VertexConfiguration {
         }
 
         const partialConfiguration: Polygon[] = orderedPolygons.map(p => p.polygon);
-        const partialConfigurationName = partialConfiguration.map(p => p.getName(vertex)).join(',');
+        const partialConfigurationName = partialConfiguration.map(p => p.getName()).join(',');
 
         return {
             name: partialConfigurationName,

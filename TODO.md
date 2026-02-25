@@ -1,4 +1,42 @@
-# TODO
+# Thesis
+
+## Steps
+- [x] generate polygons
+- [x] compute vertex configuration
+- [x] create compatibility graph
+- [ ] extract all seed sets
+- [ ] build the seeds
+- [ ] apply wallpaper groups
+- [ ] perform final checks
+
+## Content
+- [ ] global navigation
+- [ ] algorithm description and explanation
+- [ ] angles visualization on polygons in the polygon collections (with toggle)
+
+## Filters
+- [ ] add "exact" and "include" to categories
+- [ ] add toggle for displaying names in graph visualization
+- [ ] add range slider input for number of polygons filter in vertex configuration catalogue
+- [ ] improve text input to support logic operators
+
+## QOL
+- [ ] improve graph nodes render quality
+- [ ] move sound toggle
+- [ ] add screenshot functionality to each card (polygons, vcs, seeds, tilings)
+
+## Code and Aspect
+- [ ] add classes and methods descriptions (and some comments here and there for context)
+- [ ] centralize filters in store
+- [ ] add light/dark mode
+- [ ] create a design system and review the components
+
+## Bugs
+- [x] align all logic to counter-clockwise direction
+
+- - -
+
+# PROJECT
 
 ## Big changes
 

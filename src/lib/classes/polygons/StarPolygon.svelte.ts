@@ -31,7 +31,7 @@ export class StarPolygon extends Polygon {
         for (let i = 1; i < this.n * 2; i++) {
             const prev_vertex: Vector = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.copy()));
-            current_dir.rotate(-(Math.PI - angles[i % 2]));
+            current_dir.rotate(Math.PI - angles[i % 2]);
             this.vertices[i].snapToGrid();
         }
     }
@@ -96,9 +96,9 @@ export class StarPolygon extends Polygon {
             return '';
         }
 
-        if (this.centroid.distance(coordinate) === this.outerRadius) {
+        if (isWithinTolerance(this.centroid.distance(coordinate), this.outerRadius)) {
             return this.name.replace('i', 'o')
-        } else if (this.centroid.distance(coordinate) === this.innerRadius) {
+        } else if (isWithinTolerance(this.centroid.distance(coordinate), this.innerRadius)) {
             return this.name.replace('o', 'i')
         } else {
             console.error('Name could not be determined from vertex');

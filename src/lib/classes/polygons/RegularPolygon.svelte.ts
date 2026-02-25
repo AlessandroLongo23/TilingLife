@@ -39,26 +39,34 @@ export class RegularPolygon extends Polygon {
         return polygon;
     }
 
+    /**
+     * Calculates the vertices of the polygon from the centroid and angle.
+     * @note The vertices are generated in counter-clockwise order.
+     */
     calculateVerticesFromCentroidAndAngle = () => {
         this.vertices = [];
         let radius = 0.5 / Math.sin(Math.PI / this.n);
         for (let i = 0; i < this.n; i++) {
             this.vertices.push(new Vector(
-                this.centroid.x + radius * Math.cos(-i * 2 * Math.PI / this.n + this.angle),
-                this.centroid.y + radius * Math.sin(-i * 2 * Math.PI / this.n + this.angle)
+                this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle),
+                this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle)
             ));
 
             this.vertices[i].snapToGrid();
         }
     }
 
+    /**
+     * Calculates the vertices of the polygon from the anchor and direction.
+     * @note The vertices are generated in counter-clockwise order.
+     */
     calculateVerticesFromAnchorAndDir = () => {
         this.vertices = [this.anchor.copy()];
         let current_dir: Vector = this.dir.copy();
         for (let i = 1; i < this.n; i++) {
             const prev_vertex = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.copy()));
-            current_dir.rotate(-(Math.PI - this.interior_angle));
+            current_dir.rotate(Math.PI - this.interior_angle);
             this.vertices[i].snapToGrid();
         }
     }
@@ -80,6 +88,6 @@ export class RegularPolygon extends Polygon {
     }
 
     clone = (): RegularPolygon => {
-        return RegularPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy());
+        return RegularPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]));
     }
 }

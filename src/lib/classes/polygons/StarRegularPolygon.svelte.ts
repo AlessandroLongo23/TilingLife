@@ -46,6 +46,6 @@ export class StarRegularPolygon extends StarPolygon {
     }
 
     clone = (): StarRegularPolygon => {
-        return StarRegularPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy(), this.d, this.startsWith);
+        return StarRegularPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]), this.d, this.startsWith);
     }
 }

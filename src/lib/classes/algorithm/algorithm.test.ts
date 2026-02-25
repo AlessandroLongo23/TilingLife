@@ -1,5 +1,5 @@
 import { PolygonsGenerator, VCGenerator, PolygonType, type GeneratorParameters, PolygonSignature, CompatibilityGraph } from '$classes';
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 import { toRadians } from '$utils';
 import fs from 'fs';
 
@@ -9,17 +9,17 @@ describe('VCGenerator', () => {
             [PolygonType.REGULAR]: {
                 n_max: 42
             },
-            // [PolygonType.STAR_REGULAR]: {
-            //     n_max: 12,
-            //     angle: Math.PI / 12
-            // },
+            [PolygonType.STAR_REGULAR]: {
+                n_max: 12,
+                angle: toRadians(30)
+            },
             // [PolygonType.STAR_PARAMETRIC]: {
-            //     n_max: 12,
-            //     angle: Math.PI / 12
+            //     n_max: 6,
+            //     angle: toRadians(30)
             // },
             // [PolygonType.EQUILATERAL]: {
-            //     n_max: 8,
-            //     angle: Math.PI / 12
+            //     n_max: 6,
+            //     angle: toRadians(30)
             // }
         };
         const additionalPolygons: PolygonSignature[] = [];
@@ -61,10 +61,38 @@ describe('VCGenerator', () => {
         }
         fs.writeFileSync(vcFilePath, JSON.stringify(savedVCs, null, 4));
 
-        // STEP 3: generate the compatibility graph of all vertex configurations
-        const compatibilityGraph = new CompatibilityGraph(vertexConfigurations);
-        // save the compatibility adjacency matrix to a file, with 0 and 1 instead of false and true
-        const compatibilityGraphFilePath = 'src/lib/classes/algorithm/compatibilityGraph.json';
-        fs.writeFileSync(compatibilityGraphFilePath, JSON.stringify(compatibilityGraph.adjacencyMatrix.map(row => row.map(cell => cell ? 1 : 0)).join('\n'), null, 4));
+        // STEP 3: incrementally build the compatibility graph (adjacency list keyed by VC name)
+        const cgFilePath = 'src/lib/classes/algorithm/compatibilityGraph.json';
+        let adjacencyList: Record<string, string[]> = {};
+        if (fs.existsSync(cgFilePath)) {
+            const fileData = fs.readFileSync(cgFilePath, 'utf-8');
+            if (fileData.trim()) {
+                try {
+                    const parsed = JSON.parse(fileData);
+                    if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        adjacencyList = parsed;
+                    }
+                } catch {}
+            }
+        }
+
+        for (const vc of vertexConfigurations) {
+            if (!adjacencyList[vc.name]) adjacencyList[vc.name] = [];
+        }
+
+        for (let i = 0; i < vertexConfigurations.length; i++) {
+            const nameA = vertexConfigurations[i].name;
+            for (let j = i + 1; j < vertexConfigurations.length; j++) {
+                const nameB = vertexConfigurations[j].name;
+                if (adjacencyList[nameA].includes(nameB)) continue;
+
+                if (vertexConfigurations[i].isCompatible(vertexConfigurations[j])) {
+                    adjacencyList[nameA].push(nameB);
+                    adjacencyList[nameB].push(nameA);
+                }
+            }
+        }
+
+        fs.writeFileSync(cgFilePath, JSON.stringify(adjacencyList));
     }, 120 * 1000);
 });

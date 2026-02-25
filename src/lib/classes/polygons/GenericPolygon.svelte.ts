@@ -34,7 +34,7 @@ export class GenericPolygon extends Polygon {
         for (let i = 1; i < this.n; i++) {
             const prev_vertex = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.scale(this.sides[i])));
-            current_dir.rotate(-(Math.PI - this.angles[i]));
+            current_dir.rotate(Math.PI - this.angles[i]);
             this.vertices[i].snapToGrid();
         }
     }

@@ -1,5 +1,5 @@
 import { tolerance } from '$stores';
-import { Vector } from '$classes';
+import { parametricStarRegex, equilateralPolygonRegex, Vector, regularStarRegex, regularPolygonRegex } from '$classes';
 import { isWithinTolerance } from './math.svelte';
 
 export const sortPointsByAngleAndDistance = (points) => {
@@ -162,23 +162,71 @@ export const toDegrees = (radians: number): number => {
     return degrees;
 }
 
-
 export const segmentsIntersect = (p1: Vector, p2: Vector, p3: Vector, p4: Vector): boolean => {
-    if (isWithinTolerance(p1, p3) || isWithinTolerance(p1, p4) || isWithinTolerance(p2, p3) || isWithinTolerance(p2, p4)) {
-        return false;
-    }
-    
+    const isPointEqual = (a: Vector, b: Vector) => Math.abs(a.x - b.x) < tolerance && Math.abs(a.y - b.y) < tolerance;
+    const p1p3 = isPointEqual(p1, p3);
+    const p1p4 = isPointEqual(p1, p4);
+    const p2p3 = isPointEqual(p2, p3);
+    const p2p4 = isPointEqual(p2, p4);
+    const sharedPoints = (p1p3 ? 1 : 0) + (p1p4 ? 1 : 0) + (p2p3 ? 1 : 0) + (p2p4 ? 1 : 0);
+    if (sharedPoints === 2) return false;
     const denom = (p4.y - p3.y) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.y - p1.y);
-    if (Math.abs(denom) < tolerance) {
-        return false;
-    }
-    
     const numT = (p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x);
     const numU = (p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x);
+    if (Math.abs(denom) < tolerance) {
+        if (Math.abs(numT) < tolerance && Math.abs(numU) < tolerance) {
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const lenSq = dx * dx + dy * dy;
+            if (lenSq < tolerance) return false;
+            const t3 = ((p3.x - p1.x) * dx + (p3.y - p1.y) * dy) / lenSq;
+            const t4 = ((p4.x - p1.x) * dx + (p4.y - p1.y) * dy) / lenSq;
+            const tMin = Math.min(t3, t4);
+            const tMax = Math.max(t3, t4);
+            if (tMin < 1 - tolerance && tMax > tolerance) return true;
+        }
+        return false;
+    }
     const t = numT / denom;
     const u = numU / denom;
-    if (t > -tolerance && t < 1 + tolerance && u > -tolerance && u < 1 + tolerance) {
-        return true;
+    const tInterior = t > tolerance && t < 1 - tolerance;
+    const uInterior = u > tolerance && u < 1 - tolerance;
+    if (tInterior && uInterior) return true;
+    if (sharedPoints === 0) {
+        const tOnSegment = t > -tolerance && t < 1 + tolerance;
+        const uOnSegment = u > -tolerance && u < 1 + tolerance;
+        if (tOnSegment && uOnSegment) return true;
     }
     return false;
+};
+
+export const compareNames = (nameA: string, nameB: string): number => {
+    let nA: number, nB: number;
+    if (nameA.match(regularPolygonRegex)) {
+        nA = parseInt(nameA);
+    } else if (nameA.match(regularStarRegex)) {
+        const [, n, d, suffix] = nameA.match(regularStarRegex);
+        nA = parseInt(n);
+    } else if (nameA.match(parametricStarRegex)) {
+        const [, n, value, suffix] = nameA.match(parametricStarRegex);
+        nA = parseInt(n);
+    } else if (nameA.match(equilateralPolygonRegex)) {
+        const [, n, angles] = nameA.match(equilateralPolygonRegex);
+        nA = parseInt(n);
+    }
+
+    if (nameB.match(regularPolygonRegex)) {
+        nB = parseInt(nameB);
+    } else if (nameB.match(regularStarRegex)) {
+        const [, n, d, suffix] = nameB.match(regularStarRegex);
+        nB = parseInt(n);
+    } else if (nameB.match(parametricStarRegex)) {
+        const [, n, value, suffix] = nameB.match(parametricStarRegex);
+        nB = parseInt(n);
+    } else if (nameB.match(equilateralPolygonRegex)) {
+        const [, n, angles] = nameB.match(equilateralPolygonRegex);
+        nB = parseInt(n);
+    }
+
+    return nA - nB;
 }

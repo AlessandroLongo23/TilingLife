@@ -1,5 +1,5 @@
 import { GenericPolygon, Vector } from '$classes';
-import { map, toDegrees } from '$utils';
+import { isWithinTolerance, map, toDegrees } from '$utils';
 
 export class EquilateralPolygon extends GenericPolygon {
     constructor(n: number) {
@@ -27,6 +27,26 @@ export class EquilateralPolygon extends GenericPolygon {
 
     calculateHue = () => {
         this.hue = map(this.vertices.length / 2, 3, 12, 300, 0) + 300 / 12;
+    }
+
+    getName = (coordinate: Vector | null = null): string => {
+        if (!coordinate) return this.name;
+        
+        const index = this.vertices.findIndex(v => isWithinTolerance(v, coordinate));
+        if (index === -1) {
+            console.error('Vertex not found');
+            return '';
+        }
+
+        let name = `${this.n}(`;
+        for (let i = 0; i < this.n; i++) {
+            name += toDegrees(this.angles[(index + i) % this.n]);
+            if (i < this.n - 1) {
+                name += ';';
+            }
+        }
+        name += ')';
+        return name;
     }
 
     clone = (): EquilateralPolygon => {

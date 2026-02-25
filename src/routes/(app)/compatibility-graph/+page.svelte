@@ -10,6 +10,9 @@
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
 
     import allVCNames from '$lib/classes/algorithm/vcs.json';
+    import adjacencyListData from '$lib/classes/algorithm/compatibilityGraph.json';
+
+    const adjacencyList: Record<string, string[]> = adjacencyListData as any;
 
     const categoryOptions = [
         { id: PolygonType.REGULAR, label: 'Regular' },
@@ -98,11 +101,11 @@
     let thumbnailCache = new Map();
     const vcCache = new Map();
 
-    // Rebuild graph whenever filters change
+    // Filter the pre-computed graph whenever filters change (no recomputation)
     $effect(() => {
         if (!browser) return;
 
-        const vcs = [];
+        const vcs: VertexConfiguration[] = [];
         for (const name of filteredNames) {
             if (!vcCache.has(name)) {
                 try { vcCache.set(name, VertexConfiguration.fromName(name)); }
@@ -112,13 +115,11 @@
             if (vc) vcs.push(vc);
         }
 
-        graph = new CompatibilityGraph(vcs);
+        graph = CompatibilityGraph.fromAdjacencyList(adjacencyList, vcs);
 
         let edges = 0;
-        for (let i = 0; i < graph.adjacencyMatrix.length; i++)
-            for (let j = i + 1; j < graph.adjacencyMatrix[i].length; j++)
-                if (graph.adjacencyMatrix[i][j]) edges++;
-        edgeCount = edges;
+        for (const node of graph.nodes) edges += node.neighbors.length;
+        edgeCount = edges / 2;
         nodeCount = graph.nodes.length;
 
         const layoutRadius = Math.max(150, graph.nodes.length * 20);
@@ -189,7 +190,7 @@
         ctx.clip();
 
         ctx.translate(size / 2, size / 2);
-        ctx.scale(sc, sc);
+        ctx.scale(sc, -sc);
         ctx.translate(-cx, -cy);
 
         for (const polygon of vc.polygons) {

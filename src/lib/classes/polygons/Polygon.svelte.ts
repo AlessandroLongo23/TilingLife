@@ -120,58 +120,67 @@ export class Polygon {
     }
 
     containsPoint = (point: Vector): boolean => {
-        let inside = false;
-        for (let i = 0, j = this.vertices.length - 1; i < this.vertices.length; j = i++) {
-            const xi = this.vertices[i].x;
-            const yi = this.vertices[i].y;
-            const xj = this.vertices[j].x;
-            const yj = this.vertices[j].y;
-            const l2 = (xj - xi) ** 2 + (yj - yi) ** 2;
-            
-            let distToSegment = 0;
-
-            if (l2 === 0) {
-                distToSegment = Math.sqrt((point.x - xi) ** 2 + (point.y - yi) ** 2);
-            } else {
-                let t = ((point.x - xi) * (xj - xi) + (point.y - yi) * (yj - yi)) / l2;
-                t = Math.max(0, Math.min(1, t));
-                const projX = xi + t * (xj - xi);
-                const projY = yi + t * (yj - yi);
-                distToSegment = Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
-            }
-            
-            if (distToSegment <= tolerance) return false;
-
-            const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-            if (intersect) {
-                inside = !inside;
-            }
-        }
-        return inside;
+        return this.sdf(point) < -tolerance;
     }
 
     intersects(other: Polygon): boolean {
-        if (this.centroid && other.centroid && this.centroid.distance(other.centroid) < tolerance) {
-            return true;
+        // const isPointEqual = (a: Vector, b: Vector) => Math.abs(a.x - b.x) < tolerance && Math.abs(a.y - b.y) < tolerance;
+        // let unsharedVertexThis: Vector | null = null;
+        // for (const v1 of this.vertices) {
+        //     let shared = false;
+        //     for (const v2 of other.vertices) {
+        //         if (isPointEqual(v1, v2)) {
+        //             shared = true;
+        //             break;
+        //         }
+        //     }
+        //     if (!shared) {
+        //         unsharedVertexThis = v1;
+        //         break;
+        //     }
+        // }
+        // if (!unsharedVertexThis) return true;
+        // if (other.containsPoint(unsharedVertexThis)) return true;
+        // let unsharedVertexOther: Vector | null = null;
+        // for (const v2 of other.vertices) {
+        //     let shared = false;
+        //     for (const v1 of this.vertices) {
+        //         if (isPointEqual(v1, v2)) {
+        //             shared = true;
+        //             break;
+        //         }
+        //     }
+        //     if (!shared) {
+        //         unsharedVertexOther = v2;
+        //         break;
+        //     }
+        // }
+        // if (unsharedVertexOther && this.containsPoint(unsharedVertexOther)) return true;
+        // return false;
+
+        if (this.containsPoint(other.centroid)) return true;
+        if (other.containsPoint(this.centroid)) return true;
+
+        for (let i = 0; i < this.vertices.length; i++) {
+            if (other.containsPoint(this.vertices[i])) return true;
+            if (other.containsPoint(this.halfways[i])) return true;
         }
 
-        if (this.containsPoint(other.centroid) || other.containsPoint(this.centroid)) {
-            return true;
+        for (let i = 0; i < other.vertices.length; i++) {
+            if (this.containsPoint(other.vertices[i])) return true;
+            if (this.containsPoint(other.halfways[i])) return true;
         }
 
         for (let i = 0; i < this.vertices.length; i++) {
             const p1 = this.vertices[i];
             const p2 = this.vertices[(i + 1) % this.vertices.length];
-            
             for (let j = 0; j < other.vertices.length; j++) {
                 const p3 = other.vertices[j];
                 const p4 = other.vertices[(j + 1) % other.vertices.length];
-                
-                if (segmentsIntersect(p1, p2, p3, p4)) {
-                    return true;
-                }
+                if (segmentsIntersect(p1, p2, p3, p4)) return true;
             }
         }
+
         return false;
     }
 
@@ -179,8 +188,8 @@ export class Polygon {
         const vertex = this.vertices.find(v => isWithinTolerance(v, coordinate));
         if (vertex) {
             const index = this.vertices.indexOf(vertex);
-            const dir1 = Vector.sub(vertex, this.vertices[(index - 1 + this.vertices.length) % this.vertices.length]);
-            const dir2 = Vector.sub(this.vertices[(index + 1) % this.vertices.length], vertex);
+            const dir1= Vector.sub(this.vertices[(index + 1) % this.vertices.length], vertex);
+            const dir2 = Vector.sub(vertex, this.vertices[(index - 1 + this.vertices.length) % this.vertices.length]);
             return (dir2.heading() - dir1.heading() + 5 * Math.PI) % (2 * Math.PI);
         }
         return 0;
@@ -216,7 +225,6 @@ export class Polygon {
             ctx.endShape(ctx.CLOSE);
         }
 
-            
         if (showPolygonPoints) {
             ctx.fill(0, 100, 100);
             ctx.ellipse(this.centroid.x, this.centroid.y, 5 / get(controls).zoom);
@@ -298,6 +306,40 @@ export class Polygon {
 
     clone = (): Polygon => {
         throw new Error('Abstract method called');
+    }
+
+    sdf = (p: Vector): number => {
+        let minDistanceSq = Infinity;
+        let inside = false;
+
+        for (let i = 0, j = this.vertices.length - 1; i < this.vertices.length; j = i++) {
+            const vi = this.vertices[j];
+            const vj = this.vertices[i];
+            const ex = vj.x - vi.x;
+            const ey = vj.y - vi.y;
+            const wx = p.x - vi.x;
+            const wy = p.y - vi.y;
+            const eLenSq = ex * ex + ey * ey;
+            let t = Math.max(0, Math.min(1, (wx * ex + wy * ey) / eLenSq));
+
+            if (isNaN(t)) t = 0;
+            const cx = vi.x + t * ex;
+            const cy = vi.y + t * ey;
+            const dx = p.x - cx;
+            const dy = p.y - cy;
+            const distSq = dx * dx + dy * dy;
+            
+            if (distSq < minDistanceSq) {
+                minDistanceSq = distSq;
+            }
+            const intersect = ((vi.y > p.y) !== (vj.y > p.y)) && (p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x);
+            
+            if (intersect) {
+                inside = !inside;
+            }
+        }
+        const distance = Math.sqrt(minDistanceSq);
+        return inside ? -distance : distance;
     }
 
     calculateVerticesFromCentroidAndAngle = (): void => {

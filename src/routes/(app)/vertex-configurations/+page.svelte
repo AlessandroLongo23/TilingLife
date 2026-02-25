@@ -165,7 +165,7 @@
 
         ctx.save();
         ctx.translate(size / 2, size / 2);
-        ctx.scale(scale, scale);
+        ctx.scale(scale, -scale);
         ctx.translate(-centerX, -centerY);
 
         for (const polygon of vc.polygons) {

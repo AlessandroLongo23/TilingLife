@@ -1,5 +1,5 @@
 import { Polygon, PolygonSignature, StarParametricPolygon, StarRegularPolygon, VertexConfiguration } from '$classes';
-import { compareArrays, isWithinAngularTolerance } from '$utils';
+import { compareNames, isWithinAngularTolerance } from '$utils';
 import { tolerance } from '$stores';
 
 export class VCGenerator {
@@ -20,6 +20,7 @@ export class VCGenerator {
         const vc = new VertexConfiguration([]);
 
         const dfs = () => {
+            // if the vertex configuration is complete, add it to the list of vertex configurations
             if (vc.polygons.length > 0 && isWithinAngularTolerance(vc.angle, 2 * Math.PI)) {
                 const names = vc.polygons.map(p => p.name);
                 const canonical = canonicalCyclicForm(names);
@@ -30,31 +31,40 @@ export class VCGenerator {
                 return;
             }
 
+            // if the remaining angle to fill is smaller than the minimum angle of the available polygons, stop the recursion
             if (2 * Math.PI - vc.angle < minAngle - tolerance) return;
 
+            // for each polygon
             for (const polygonData of this.polygons) {
+                // if the candidate polygon's name is lexicographically smaller than the first polygon in the vertex configuration, skip it
+                // it would eventually be filtered out for not being the smallest lexicographically
                 if (vc.polygons.length > 0 &&
-                    polygonData.name.localeCompare(vc.polygons[0].name) < 0) {
+                    compareNames(polygonData.name, vc.polygons[0].name) < 0) {
                     continue;
                 }
 
+                // if the candidate polygon cannot be adjacent to the last polygon in the vertex configuration, skip it
                 if (vc.polygons.length > 0 &&
                     !canBeAdjacent(vc.polygons[vc.polygons.length - 1], polygonData)) {
                     continue;
                 }
 
+                // save the current state of the vertex configuration
                 const prevAngle = vc.angle;
                 const prevDir = vc.current_dir.copy();
                 const prevName = vc.name;
                 const prevValid = vc.valid;
                 const prevLen = vc.polygons.length;
 
+                // add the candidate polygon to the vertex configuration
                 vc.addPolygon(polygonData);
 
+                // if the vertex configuration is valid, continue the recursion
                 if (vc.valid) {
                     dfs();
                 }
 
+                // restore the previous state of the vertex configuration
                 vc.polygons.length = prevLen;
                 vc.angle = prevAngle;
                 vc.current_dir = prevDir;

@@ -83,10 +83,6 @@
         background-color: rgba(0, 0, 0, 0.65);
     }
     
-    .fade-out {
-        opacity: 0;
-    }
-    
     :global(body) {
         background-color: #18181b;
         color: #f8fafc;

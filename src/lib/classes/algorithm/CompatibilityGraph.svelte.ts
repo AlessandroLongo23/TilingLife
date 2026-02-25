@@ -27,18 +27,12 @@ export class VCNode {
 
 export class CompatibilityGraph {
     nodes: VCNode[];
-    adjacencyMatrix: boolean[][];
 
     constructor(vertexConfigurations: VertexConfiguration[]) {
         this.nodes = [];
-        this.adjacencyMatrix = [];
 
         for (let i = 0; i < vertexConfigurations.length; i++) {
             this.nodes.push(new VCNode(vertexConfigurations[i], i));
-            this.adjacencyMatrix.push([]);
-            for (let j = 0; j < vertexConfigurations.length; j++) {
-                this.adjacencyMatrix[i].push(false);
-            }
         }
 
         for (let i = 0; i < vertexConfigurations.length; i++) {
@@ -46,11 +40,37 @@ export class CompatibilityGraph {
                 if (vertexConfigurations[i].isCompatible(vertexConfigurations[j])) {
                     this.nodes[i].neighbors.push(this.nodes[j]);
                     this.nodes[j].neighbors.push(this.nodes[i]);
-
-                    this.adjacencyMatrix[i][j] = true;
-                    this.adjacencyMatrix[j][i] = true;
                 }
             }
         }
+    }
+
+    static fromAdjacencyList(
+        adjacencyList: Record<string, string[]>,
+        vertexConfigurations: VertexConfiguration[]
+    ): CompatibilityGraph {
+        const graph = Object.create(CompatibilityGraph.prototype) as CompatibilityGraph;
+        graph.nodes = [];
+
+        const nameToNode = new Map<string, VCNode>();
+
+        for (let i = 0; i < vertexConfigurations.length; i++) {
+            const node = new VCNode(vertexConfigurations[i], i);
+            graph.nodes.push(node);
+            nameToNode.set(vertexConfigurations[i].name, node);
+        }
+
+        for (const node of graph.nodes) {
+            const neighborNames = adjacencyList[node.vertexConfiguration.name] ?? [];
+            for (const neighborName of neighborNames) {
+                const neighbor = nameToNode.get(neighborName);
+                if (neighbor && neighbor.index > node.index) {
+                    node.neighbors.push(neighbor);
+                    neighbor.neighbors.push(node);
+                }
+            }
+        }
+
+        return graph;
     }
 }

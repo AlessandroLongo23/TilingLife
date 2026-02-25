@@ -244,7 +244,7 @@
 
         ctx.save();
         ctx.translate(size / 2, size / 2);
-        ctx.scale(scale, scale);
+        ctx.scale(scale, -scale);
         ctx.translate(-centerX, -centerY);
 
         const hsl = hsbToHsl(polygon.hue ?? 200, 40, 100);
@@ -313,28 +313,30 @@
                 </div>
 
                 <!-- Vertex type filter (outer/inner) -->
-                <div class="border-t border-zinc-800 pt-5">
-                    <MultiSelect
-                        label="Vertex Type"
-                        options={vertexOptions}
-                        bind:selected={selectedVertexTypes}
-                    />
-                </div>
+                {#if selectedCategories.includes(PolygonType.STAR_REGULAR) || selectedCategories.includes(PolygonType.STAR_PARAMETRIC)}
+                    <div class="border-t border-zinc-800 pt-5">
+                        <MultiSelect
+                            label="Vertex Type"
+                            options={vertexOptions}
+                            bind:selected={selectedVertexTypes}
+                        />
+                    </div>
+                {/if}
 
                 <!-- Unique filter -->
-                <div class="border-t border-zinc-800 pt-5">
-                    <Checkbox
-                        id="uniqueOnly"
-                        label="Unique only"
-                        bind:checked={uniqueOnly}
-                    />
-                    <p class="text-[10px] text-zinc-600 mt-1.5 leading-relaxed">
-                        Keep only outer star variants and cyclic-minimum equilateral polygons.
-                    </p>
-                </div>
-
-                <!-- Angle filter -->
                 {#if selectedCategories.includes(PolygonType.STAR_REGULAR) || selectedCategories.includes(PolygonType.STAR_PARAMETRIC) || selectedCategories.includes(PolygonType.EQUILATERAL)}
+                    <div class="border-t border-zinc-800 pt-5">
+                        <Checkbox
+                            id="uniqueOnly"
+                            label="Unique only"
+                            bind:checked={uniqueOnly}
+                        />
+                        <p class="text-[10px] text-zinc-600 mt-1.5 leading-relaxed">
+                            Keep only outer star variants and cyclic-minimum equilateral polygons.
+                        </p>
+                    </div>
+
+                    <!-- Angle filter -->
                     <div class="border-t border-zinc-800 pt-5">
                         <AngleFilterBlock bind:enabled={filterAngleEnabled} bind:angle={filterAngle} />
                     </div>
