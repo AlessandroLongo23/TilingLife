@@ -1,7 +1,7 @@
 import { SeedConfiguration } from '$classes';
 
 const PAGE_SIZE = 24;
-const BATCH_SIZE = 200;
+const BATCH_SIZE = 1000;
 
 const seedConfigModules = import.meta.glob<{ default: unknown }>(
 	'$lib/classes/algorithm/seedConfigurations/**/*.json'

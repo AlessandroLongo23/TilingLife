@@ -28,7 +28,7 @@ describe('VCGenerator', () => {
         const vertexConfigurations = vertexConfigurationGeneration(polygonSignatures);
         const adjacencyList = compatibilityGraphGeneration(vertexConfigurations);
         seedSetExtraction(adjacencyList, vertexConfigurations, maxK);
-        seedsGeneration(3, 2);
+        seedsGeneration(2, 2);
     }, 15 * 60 * 1000);
 });
 
@@ -159,7 +159,7 @@ const seedSetExtraction = (adjacencyList: Record<string, string[]>, vertexConfig
     console.log(`Seed set extraction: ${(end - start).toFixed(0)}ms`);
 }
 
-const BATCH_SIZE = 200;
+const BATCH_SIZE = 1000;
 
 // STEP 5: generate seeds from the seed sets
 const seedsGeneration = (k: number | null = null, m: number | null = null): void => {
