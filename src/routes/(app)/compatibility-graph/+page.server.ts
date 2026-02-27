@@ -1,35 +1,23 @@
-import fs from 'fs';
-import path from 'path';
-
-const VCS_PATH = path.join(process.cwd(), 'src/lib/classes/algorithm/vcs.json');
-const COMPATIBILITY_GRAPH_PATH = path.join(process.cwd(), 'src/lib/classes/algorithm/compatibilityGraph.json');
-
 export async function load() {
     let allVCNames: string[] = [];
     let adjacencyListData: Record<string, string[]> = {};
 
     try {
-        if (fs.existsSync(VCS_PATH)) {
-            const raw = fs.readFileSync(VCS_PATH, 'utf8');
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-                allVCNames = parsed;
-            }
-        }
+        const mod = await import('$lib/classes/algorithm/vcs.json');
+        const data = mod.default;
+        if (Array.isArray(data)) allVCNames = data;
     } catch {
-        // Return empty on error
+        // Return empty if file missing or invalid
     }
 
     try {
-        if (fs.existsSync(COMPATIBILITY_GRAPH_PATH)) {
-            const raw = fs.readFileSync(COMPATIBILITY_GRAPH_PATH, 'utf8');
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                adjacencyListData = parsed;
-            }
+        const mod = await import('$lib/classes/algorithm/compatibilityGraph.json');
+        const data = mod.default;
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+            adjacencyListData = data;
         }
     } catch {
-        // Return empty on error
+        // Return empty if file missing or invalid
     }
 
     return { allVCNames, adjacencyListData };

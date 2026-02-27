@@ -1,20 +1,11 @@
-import fs from 'fs';
-import path from 'path';
-
-const VCS_PATH = path.join(process.cwd(), 'src/lib/classes/algorithm/vcs.json');
-
 export async function load() {
     let allVCNames: string[] = [];
     try {
-        if (fs.existsSync(VCS_PATH)) {
-            const raw = fs.readFileSync(VCS_PATH, 'utf8');
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-                allVCNames = parsed;
-            }
-        }
+        const mod = await import('$lib/classes/algorithm/vcs.json');
+        const data = mod.default;
+        if (Array.isArray(data)) allVCNames = data;
     } catch {
-        // Return empty array on any error
+        // Return empty array if file missing or invalid
     }
     return { allVCNames };
 }
