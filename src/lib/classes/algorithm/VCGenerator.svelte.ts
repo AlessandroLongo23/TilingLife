@@ -1,4 +1,4 @@
-import { Polygon, PolygonSignature, StarParametricPolygon, StarRegularPolygon, VertexConfiguration } from '$classes';
+import { PolygonSignature, PolygonType, VertexConfiguration } from '$classes';
 import { comparePolygonNames, isWithinAngularTolerance } from '$utils';
 import { tolerance } from '$stores';
 
@@ -12,80 +12,111 @@ export class VCGenerator {
 
     generateVertexConfigurations = (): VertexConfiguration[] => {
         this.vertexConfigurations = [];
-        const seen = new Set<string>();
-        const minAngle = this.polygons.length > 0
-            ? Math.min(...this.polygons.map(p => p.interior_angle))
-            : Infinity;
+        const n = this.polygons.length;
+        if (n === 0) return [];
 
-        const vc = new VertexConfiguration([]);
+        const seen = new Set<string>();
+        const TWO_PI = 2 * Math.PI;
+
+        const interiorAngles = new Float64Array(n);
+        const sharedAngleRight = new Float64Array(n);
+        const sharedAngleLeft = new Float64Array(n);
+        const polyNames: string[] = new Array(n);
+
+        let minAngle = Infinity;
+        for (let i = 0; i < n; i++) {
+            const p = this.polygons[i];
+            interiorAngles[i] = p.interior_angle;
+            sharedAngleRight[i] = p.angles[1];
+            sharedAngleLeft[i] = p.angles[p.angles.length - 1];
+            polyNames[i] = p.name;
+            if (interiorAngles[i] < minAngle) minAngle = interiorAngles[i];
+        }
+
+        const canFollow: Int32Array[] = new Array(n);
+        for (let i = 0; i < n; i++) {
+            const followers: number[] = [];
+            for (let j = 0; j < n; j++) {
+                if (!canBeAdjacentSig(this.polygons[i], this.polygons[j])) continue;
+                if (sharedAngleLeft[i] + sharedAngleRight[j] > TWO_PI + tolerance) continue;
+                followers.push(j);
+            }
+            followers.sort((a, b) => interiorAngles[a] - interiorAngles[b]);
+            canFollow[i] = new Int32Array(followers);
+        }
+
+        const allByAngle = Int32Array.from(
+            Array.from({ length: n }, (_, i) => i)
+                .sort((a, b) => interiorAngles[a] - interiorAngles[b])
+        );
+
+        const stack = new Int32Array(32);
+        const stackNames: string[] = [];
+        let depth = 0;
+        let angleSum = 0;
 
         const dfs = () => {
-            // if the vertex configuration is complete, add it to the list of vertex configurations
-            if (vc.polygons.length > 0 && isWithinAngularTolerance(vc.angle, 2 * Math.PI)) {
-                const names = vc.polygons.map(p => p.name);
-                const canonical = canonicalCyclicForm(names);
+            if (depth > 0 && isWithinAngularTolerance(angleSum, TWO_PI)) {
+                const lastIdx = stack[depth - 1];
+                const firstIdx = stack[0];
+                if (sharedAngleLeft[lastIdx] + sharedAngleRight[firstIdx] > TWO_PI + tolerance) return;
+
+                const canonical = canonicalCyclicForm(stackNames);
                 if (!seen.has(canonical)) {
                     seen.add(canonical);
-                    this.vertexConfigurations.push(vc.clone());
+                    const vc = this.buildAndValidate(stack, depth);
+                    if (vc) this.vertexConfigurations.push(vc);
                 }
                 return;
             }
 
-            // if the remaining angle to fill is smaller than the minimum angle of the available polygons, stop the recursion
-            if (2 * Math.PI - vc.angle < minAngle - tolerance) return;
+            const remaining = TWO_PI - angleSum;
+            if (remaining < minAngle - tolerance) return;
 
-            // for each polygon
-            for (const polygonData of this.polygons) {
-                // if the candidate polygon's name is lexicographically smaller than the first polygon in the vertex configuration, skip it
-                // it would eventually be filtered out for not being the smallest lexicographically
-                if (vc.polygons.length > 0 &&
-                    comparePolygonNames(polygonData.name, vc.polygons[0].name) < 0) {
-                    continue;
-                }
+            const isFirst = depth === 0;
+            const candidates = isFirst ? allByAngle : canFollow[stack[depth - 1]];
+            const len = candidates.length;
+            const firstName = isFirst ? null : polyNames[stack[0]];
 
-                // if the candidate polygon cannot be adjacent to the last polygon in the vertex configuration, skip it
-                if (vc.polygons.length > 0 &&
-                    !canBeAdjacent(vc.polygons[vc.polygons.length - 1], polygonData)) {
-                    continue;
-                }
+            for (let ci = 0; ci < len; ci++) {
+                const j = candidates[ci];
+                const angle = interiorAngles[j];
 
-                // save the current state of the vertex configuration
-                const prevAngle = vc.angle;
-                const prevDir = vc.current_dir.copy();
-                const prevName = vc.name;
-                const prevValid = vc.valid;
-                const prevLen = vc.polygons.length;
+                if (angle > remaining + tolerance) break;
 
-                // add the candidate polygon to the vertex configuration
-                vc.addPolygon(polygonData);
+                if (!isFirst && comparePolygonNames(polyNames[j], firstName!) < 0) continue;
 
-                // if the vertex configuration is valid, continue the recursion
-                if (vc.valid) {
-                    dfs();
-                }
+                stack[depth] = j;
+                stackNames.push(polyNames[j]);
+                angleSum += angle;
+                depth++;
 
-                // restore the previous state of the vertex configuration
-                vc.polygons.length = prevLen;
-                vc.angle = prevAngle;
-                vc.current_dir = prevDir;
-                vc.name = prevName;
-                vc.valid = prevValid;
+                dfs();
+
+                depth--;
+                stackNames.pop();
+                angleSum -= angle;
             }
         };
 
         dfs();
         return this.vertexConfigurations;
     }
+
+    private buildAndValidate = (indices: Int32Array, len: number): VertexConfiguration | null => {
+        const vc = new VertexConfiguration([]);
+        for (let i = 0; i < len; i++) {
+            vc.addPolygon(this.polygons[indices[i]]);
+            if (!vc.valid) return null;
+        }
+        return vc;
+    }
 }
 
-const canBeAdjacent = (polygon1: Polygon, polygon2: PolygonSignature): boolean => {
-    if (
-        (polygon1 instanceof StarRegularPolygon || polygon1 instanceof StarParametricPolygon) && 
-        (polygon2 instanceof StarRegularPolygon || polygon2 instanceof StarParametricPolygon) &&
-        polygon1.startsWith === polygon2.startsWith
-    ) {
-        return false;
-    }
+const canBeAdjacentSig = (a: PolygonSignature, b: PolygonSignature): boolean => {
+    const isStarA = a.type === PolygonType.STAR_REGULAR || a.type === PolygonType.STAR_PARAMETRIC;
+    const isStarB = b.type === PolygonType.STAR_REGULAR || b.type === PolygonType.STAR_PARAMETRIC;
+    if (isStarA && isStarB && a.startsWith === b.startsWith) return false;
     return true;
 }
 

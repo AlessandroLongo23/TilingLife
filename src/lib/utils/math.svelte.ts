@@ -9,13 +9,14 @@ export const map = (value: number, start1: number, stop1: number, start2: number
  * 
  * @param a - The first number to compare, or vector
  * @param b - The second number to compare, or vector
+ * @param tol - The tolerance to use, defaults to the tolerance store
  * @returns True if the numbers/vectors are equal within the tolerance, false otherwise
  */
-export const isWithinTolerance = (a: number | Vector, b: number | Vector): boolean => {
+export const isWithinTolerance = (a: number | Vector, b: number | Vector, tol: number = tolerance): boolean => {
     if (typeof a === 'number' && typeof b === 'number') {
-        return Math.abs(a - b) < tolerance;
+        return Math.abs(a - b) < tol;
     } else if (a instanceof Vector && b instanceof Vector) {
-        return Math.abs(a.x - b.x) < tolerance && Math.abs(a.y - b.y) < tolerance;
+        return Math.abs(a.x - b.x) < tol && Math.abs(a.y - b.y) < tol;
     } else {
         return false;
     }
@@ -45,4 +46,12 @@ export const isWithinAngularTolerance = (a: number | Vector, b: number | Vector)
         diff = 2 * Math.PI - diff;
     }
     return diff < tolerance;
+}
+
+export const gcd = (a: number, b: number): number => {
+    return b === 0 ? a : gcd(b, a % b);
+}
+
+export const coprime = (a: number, b: number): boolean => {
+    return gcd(a, b) === 1;
 }

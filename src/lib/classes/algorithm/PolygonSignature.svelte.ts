@@ -2,6 +2,8 @@ import { PolygonType, StarVertexTypes } from '$classes';
 import { toDegrees } from '$utils';
 
 export interface PolygonSignatureData {
+    type: PolygonType;
+    n: number;
     d?: number;
     alpha?: number;
     startsWith?: StarVertexTypes;
@@ -23,50 +25,50 @@ export class PolygonSignature {
     beta?: number;
     startsWith?: StarVertexTypes;
 
-    constructor(type: PolygonType, n: number, data: PolygonSignatureData = {}) {
-        this.type = type;
-        this.n = n;
+    constructor(data: PolygonSignatureData) {
+        this.type = data.type;
+        this.n = data.n;
 
-        switch(type) {
+        switch(this.type) {
             case PolygonType.REGULAR:
-                this.sides = Array(n).fill(1);
-                this.angles = Array(n).fill(Math.PI * (n - 2) / n);
-                this.name = `${n}`;
+                this.sides = Array(this.n).fill(1);
+                this.angles = Array(this.n).fill(Math.PI * (this.n - 2) / this.n);
+                this.name = `${this.n}`;
                 break
             case PolygonType.STAR_REGULAR:
-                this.sides = Array(n).fill(1);
+                this.sides = Array(this.n).fill(1);
                 this.d = data.d;
-                this.alpha = Math.PI * (1 - 2 * data.d / n);
-                this.beta = Math.PI * (1 + 2 * (data.d - 1) / n);
+                this.alpha = Math.PI * (1 - 2 * data.d / this.n);
+                this.beta = Math.PI * (1 + 2 * (data.d - 1) / this.n);
                 this.angles = [this.alpha, this.beta];
                 if (data.startsWith === StarVertexTypes.INNER) {
                     this.angles.reverse();
                 }
                 this.startsWith = data.startsWith;
-                this.angles = Array(n).fill(this.angles).flat();
-                this.name = `{${n}.${data.d}${data.startsWith === StarVertexTypes.OUTER ? 'o' : 'i'}}`;
+                this.angles = Array(this.n).fill(this.angles).flat();
+                this.name = `{${this.n}.${data.d}${data.startsWith === StarVertexTypes.OUTER ? 'o' : 'i'}}`;
                 break;
             case PolygonType.STAR_PARAMETRIC:
-                this.sides = Array(n).fill(1);
+                this.sides = Array(this.n).fill(1);
                 this.alpha = data.alpha;
-                this.beta = 2 * Math.PI * (1 - 1 / n) - this.alpha;
+                this.beta = 2 * Math.PI * (1 - 1 / this.n) - this.alpha;
                 this.angles = [this.alpha, this.beta];
                 if (data.startsWith === StarVertexTypes.INNER) {
                     this.angles.reverse();
                 }
                 this.startsWith = data.startsWith;
-                this.angles = Array(n).fill(this.angles).flat();
-                this.name = `{${n}|${toDegrees(data.alpha)}${data.startsWith === StarVertexTypes.OUTER ? 'o' : 'i'}}`;
+                this.angles = Array(this.n).fill(this.angles).flat();
+                this.name = `{${this.n}|${toDegrees(data.alpha)}${data.startsWith === StarVertexTypes.OUTER ? 'o' : 'i'}}`;
                 break;
             case PolygonType.EQUILATERAL:
-                this.sides = Array(n).fill(1);
+                this.sides = Array(this.n).fill(1);
                 this.angles = data.angles;
-                this.name = `${n}(${data.angles.map(a => toDegrees(a)).join(';')})`;
+                this.name = `${this.n}(${data.angles.map(a => toDegrees(a)).join(';')})`;
                 break;
             case PolygonType.GENERIC:
                 this.sides = data.sides;
                 this.angles = data.angles;
-                this.name = `${n}[${data.sides.join(';')}](${data.angles.map(a => toDegrees(a)).join(';')})`;
+                this.name = `${this.n}[${this.sides.join(';')}](${this.angles.map(a => toDegrees(a)).join(';')})`;
                 break;
         }
 

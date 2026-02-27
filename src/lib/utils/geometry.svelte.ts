@@ -1,8 +1,8 @@
 import { tolerance } from '$stores';
-import { parametricStarRegex, equilateralPolygonRegex, Vector, regularStarRegex, regularPolygonRegex } from '$classes';
+import { parametricStarRegex, equilateralPolygonRegex, Vector, regularStarRegex, regularPolygonRegex, type PolygonSignatureData, PolygonType, StarVertexTypes } from '$classes';
 import { isWithinTolerance } from './math.svelte';
 
-export const sortPointsByAngleAndDistance = (points) => {
+export const sortPointsByAngleAndDistance = (points: Vector[]): Vector[] => {
     return points.sort((a, b) => {
         const angleA = getClockwiseAngle(a);
         const angleB = getClockwiseAngle(b);
@@ -17,7 +17,7 @@ export const sortPointsByAngleAndDistance = (points) => {
     });
 };
 
-export const getClockwiseAngle = (point) => {
+export const getClockwiseAngle = (point: Vector): number => {
     if (Math.abs(point.x) < tolerance)
         return point.y > 0 ? 0 : Math.PI;
 
@@ -30,108 +30,16 @@ export const getClockwiseAngle = (point) => {
     return angle;
 }
 
-export const apothem = (n) => {
+export const apothem = (n: number): number => {
     return 0.5 / Math.tan(Math.PI / n);
 }
 
-export const angleBetween = (a, b, c) => {
+export const angleBetween = (a: Vector, b: Vector, c: Vector): number => {
     let v1 = new Vector(a.x - b.x, a.y - b.y);
     let v2 = new Vector(c.x - b.x, c.y - b.y);
 
     return (v1.heading() - v2.heading() + Math.PI) % Math.PI;
 }
-
-// export const isTriangleOverlappingHexagon = (triangle, existingNodes) => {
-//     if (triangle.n !== 3) return false;
-    
-//     const hexagons = existingNodes.filter(node => node.n === 6);
-//     if (hexagons.length === 0) return false;
-    
-//     for (let i = 0; i < hexagons.length; i++) {
-//         const hexagon = hexagons[i];
-        
-//         if (p5.dist(triangle.centroid.x, triangle.centroid.y, hexagon.centroid.x, hexagon.centroid.y) > 2) {
-//             continue;
-//         }
-        
-//         let centroidMatchFound = false;
-//         let centroidMatchVertex = -1;
-        
-//         for (let j = 0; j < triangle.vertices.length; j++) {
-//             if (p5.isWithinTolerance(triangle.vertices[j], hexagon.centroid)) {
-//                 centroidMatchFound = true;
-//                 centroidMatchVertex = j;
-//                 break;
-//             }
-//         }
-        
-//         if (!centroidMatchFound) continue;
-        
-//         let vertexMatches = 0;
-        
-//         for (let j = 0; j < triangle.vertices.length; j++) {
-//             if (j === centroidMatchVertex) continue;
-            
-//             for (let k = 0; k < hexagon.vertices.length; k++) {
-//                 if (p5.isWithinTolerance(triangle.vertices[j], hexagon.vertices[k])) {
-//                     vertexMatches++;
-//                     break;
-//                 }
-//             }
-//         }
-        
-//         if (vertexMatches >= 2) {
-//             return true;
-//         }
-//     }
-    
-//     return false;
-// }
-
-// export const isHexagonCoveredByTriangles = (hexagon, existingNodes) => {
-//     if (hexagon.n !== 6) return false;
-    
-//     const triangles = existingNodes.filter(node => node.n === 3);
-//     const coveredVertices = new Set();
-    
-//     for (let i = 0; i < hexagon.vertices.length; i++) {
-//         const hexVertex = hexagon.vertices[i];
-        
-//         for (let j = 0; j < triangles.length; j++) {
-//             const triangle = triangles[j];
-            
-//             if (p5.dist(hexagon.centroid.x, hexagon.centroid.y, triangle.centroid.x, triangle.centroid.y) > 2) {
-//                 continue;
-//             }
-            
-//             for (let k = 0; k < triangle.vertices.length; k++) {
-//                 if (p5.isWithinTolerance(hexVertex, triangle.vertices[k])) {
-//                     coveredVertices.add(i);
-//                     break;
-//                 }
-//             }
-//         }
-//     }
-    
-//     if (coveredVertices.size >= 2) {
-//         const trianglesPointingInward = triangles.filter(triangle => {
-//             if (p5.dist(hexagon.centroid.x, hexagon.centroid.y, triangle.centroid.x, triangle.centroid.y) > 2) {
-//                 return false;
-//             }
-            
-//             for (let i = 0; i < triangle.vertices.length; i++) {
-//                 if (isWithinTolerance(triangle.vertices[i], hexagon.centroid)) {
-//                     return true;
-//                 }
-//             }
-//             return false;
-//         });
-        
-//         return trianglesPointingInward.length >= 2;
-//     }
-    
-//     return false;
-// }
 
 export const findIntersection = (p1: Vector, v1: Vector, p2: Vector, v2: Vector): Vector | null => {
     v1 = v1.normalize();
@@ -200,30 +108,55 @@ export const segmentsIntersect = (p1: Vector, p2: Vector, p3: Vector, p4: Vector
     return false;
 };
 
-export const extractNFromPolygonName = (name: string): number => {
-    let n_sides: number;
-    
+export const extractDataFromPolygonName = (name: string): PolygonSignatureData => {
     if (name.match(regularPolygonRegex)) {
-        n_sides = parseInt(name);
+        return {
+            type: PolygonType.REGULAR,
+            n: parseInt(name)
+        };
     } else if (name.match(regularStarRegex)) {
         const [, n, d, suffix] = name.match(regularStarRegex);
-        n_sides = parseInt(n);
+        return {
+            type: PolygonType.STAR_REGULAR,
+            n: parseInt(n),
+            d: parseInt(d),
+            startsWith: suffix === 'i' ? StarVertexTypes.INNER : StarVertexTypes.OUTER,
+        };
     } else if (name.match(parametricStarRegex)) {
         const [, n, value, suffix] = name.match(parametricStarRegex);
-        n_sides = parseInt(n);
+        return {
+            type: PolygonType.STAR_PARAMETRIC,
+            n: parseInt(n),
+            alpha: toRadians(parseFloat(value)),
+            startsWith: suffix === 'i' ? StarVertexTypes.INNER : StarVertexTypes.OUTER,
+        };
     } else if (name.match(equilateralPolygonRegex)) {
         const [, n, angles] = name.match(equilateralPolygonRegex);
-        n_sides = parseInt(n);
+        return {
+            type: PolygonType.EQUILATERAL,
+            n: parseInt(n),
+            angles: angles.split(';').map(a => toRadians(parseInt(a))),
+        };
     }
-
-    return n_sides;
 }
 
 export const comparePolygonNames = (nameA: string, nameB: string): number => {
-    const nA: number = extractNFromPolygonName(nameA);
-    const nB: number = extractNFromPolygonName(nameB);
-    
-    return nA - nB;
+    const dataA: PolygonSignatureData = extractDataFromPolygonName(nameA);
+    const dataB: PolygonSignatureData = extractDataFromPolygonName(nameB);
+
+    const sortOrder = ['type', 'n', 'd', 'alpha'];
+    const typesOrder = [PolygonType.REGULAR, PolygonType.STAR_REGULAR, PolygonType.STAR_PARAMETRIC, PolygonType.EQUILATERAL];
+    const typeAIndex = typesOrder.indexOf(dataA.type);
+    const typeBIndex = typesOrder.indexOf(dataB.type);
+
+    for (const field of sortOrder) {
+        if (field === 'type') {
+            if (typeAIndex !== typeBIndex) return typeAIndex - typeBIndex;
+            continue;
+        }
+        if (dataA[field] !== dataB[field]) return dataA[field] - dataB[field];
+    }
+    return 0;
 }
 
 export const compareVertexConfigurationNames = (nameA: string, nameB: string): number => {
@@ -239,4 +172,19 @@ export const compareVertexConfigurationNames = (nameA: string, nameB: string): n
         if (result !== 0) return result;
     }
     return 0;
+}
+
+/**
+ * @param points - The points to deduplicate
+ * @returns The deduplicated points
+ * @description Deduplicates points by checking for equality with tolerance
+ */
+export const deduplicatePoints = (points: Vector[]): Vector[] => {
+    const uniquePoints: Vector[] = [];
+    for (const point of points) {
+        if (!uniquePoints.some(p => isWithinTolerance(p, point))) {
+            uniquePoints.push(point);
+        }
+    }
+    return uniquePoints;
 }

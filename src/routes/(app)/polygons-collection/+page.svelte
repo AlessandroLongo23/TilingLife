@@ -5,7 +5,7 @@
     } from '$classes';
     import { regularStarRegex, parametricStarRegex, regularPolygonRegex, equilateralPolygonRegex } from '$classes';
     import { Vector } from '$classes';
-    import { toRadians } from '$utils';
+    import { toRadians, comparePolygonNames } from '$utils';
     import { isValidMultiple } from '$utils/filterHelpers';
     import { browser } from '$app/environment';
     import { Search, Minus, Plus, Hexagon, Network, GitFork, Puzzle } from 'lucide-svelte';
@@ -16,7 +16,9 @@
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
 
-    import allPolygonNames from '$lib/classes/algorithm/polygons.json';
+    const { data } = $props();
+
+    const allPolygonNames = data.allPolygonNames ?? [];
 
     const COL_MIN = 3;
     const COL_MAX = 8;
@@ -166,7 +168,7 @@
 
     let displayedPolygons = $derived.by(() => {
         if (!browser) return [];
-        return paginatedNames.map(name => {
+        let names = paginatedNames.map(name => {
             if (!polygonCache.has(name)) {
                 try {
                     polygonCache.set(name, { name, polygon: parsePolygon(name) });
@@ -176,6 +178,9 @@
             }
             return polygonCache.get(name);
         });
+
+        names.sort((a, b) => comparePolygonNames(a.name, b.name));
+        return names;
     });
 
     function hsbToHsl(h, s, b) {

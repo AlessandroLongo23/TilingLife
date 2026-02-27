@@ -11,10 +11,10 @@
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
 	import Checkbox from '$components/ui/Checkbox.svelte';
 
-    import allVCNames from '$lib/classes/algorithm/vcs.json';
-    import adjacencyListData from '$lib/classes/algorithm/compatibilityGraph.json';
+    const { data } = $props();
 
-    const adjacencyList: Record<string, string[]> = adjacencyListData as any;
+    const allVCNames = data.allVCNames ?? [];
+    const adjacencyList: Record<string, string[]> = data.adjacencyListData ?? {};
 
     const categoryOptions = [
         { id: PolygonType.REGULAR, label: 'Regular' },

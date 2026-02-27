@@ -2,9 +2,11 @@ import type { SeedConfiguration, Vector } from "$lib/classes";
 
 export class WallpaperGroup {
     name: string;
+    sides: number;
 
-    constructor(name: string) {
+    constructor(name: string, sides: number) {
         this.name = name;
+        this.sides = sides;
     }
 
     /**

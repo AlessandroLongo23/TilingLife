@@ -1,5 +1,5 @@
 import { type GeneratorParameters, PolygonType, StarVertexTypes, Vector, PolygonSignature } from '$classes';
-import { isWithinTolerance, segmentsIntersect, toRadians } from '$utils';
+import { coprime, isWithinTolerance, segmentsIntersect, toRadians } from '$utils';
 import { tolerance } from '$stores';
 
 class Segment {
@@ -21,7 +21,10 @@ export class PolygonsGenerator {
         if (parameters[PolygonType.REGULAR]) {
             const n_max = parameters[PolygonType.REGULAR].n_max;
             for (let n = 3; n <= n_max; n++) {
-                this.polygons.push(new PolygonSignature(PolygonType.REGULAR, n));
+                this.polygons.push(new PolygonSignature({ 
+                    type: PolygonType.REGULAR, 
+                    n: n 
+                }));
             }
         }
 
@@ -30,12 +33,22 @@ export class PolygonsGenerator {
             const angle_par: number | null = parameters[PolygonType.STAR_REGULAR].angle ?? null;
 
             for (let n = 3; n <= n_max; n++) {
-                for (let d = 2; d < Math.floor(n / 2); d++) {
+                for (let d = 2; d < Math.ceil(n / 2); d++) {
                     let a = Math.PI * (1 - 2 * d / n);
                     let b = Math.PI * (1 + 2 * (d - 1) / n);
                     if (angle_par === null || (this.isMultiple(a, angle_par) && this.isMultiple(b, angle_par))) {
-                        this.polygons.push(new PolygonSignature(PolygonType.STAR_REGULAR, n, {d: d, startsWith: StarVertexTypes.OUTER}));
-                        this.polygons.push(new PolygonSignature(PolygonType.STAR_REGULAR, n, {d: d, startsWith: StarVertexTypes.INNER}));
+                        this.polygons.push(new PolygonSignature({ 
+                            type: PolygonType.STAR_REGULAR, 
+                            n: n, 
+                            d: d, 
+                            startsWith: StarVertexTypes.OUTER
+                        }));
+                        this.polygons.push(new PolygonSignature({ 
+                            type: PolygonType.STAR_REGULAR, 
+                            n: n, 
+                            d: d, 
+                            startsWith: StarVertexTypes.INNER
+                        }));
                     }
                 }
             }
@@ -43,24 +56,38 @@ export class PolygonsGenerator {
 
         if (parameters[PolygonType.STAR_PARAMETRIC]) {
             const n_max = parameters[PolygonType.STAR_PARAMETRIC].n_max;
-            const angle_par = parameters[PolygonType.STAR_PARAMETRIC].angle;
 
             for (let n = 3; n <= n_max; n++) {
-                let alpha = angle_par;
-                let max_alpha = Math.PI * (n - 2) / n;
-                while (alpha < max_alpha - tolerance) {
-                    let d = n / 2 * (1 - alpha / Math.PI);
-                    if (this.isMultiple(d, 1)) {
-                        alpha += angle_par;
-                        continue;
-                    }
+                for (let den = 2; den < 12; den++) {
+                    if (den == 7 || den == 8 || den == 11) continue;
 
-                    let b = 2 * Math.PI * (1 - 1 / n) - alpha;
-                    if (this.isMultiple(b, angle_par)) {
-                        this.polygons.push(new PolygonSignature(PolygonType.STAR_PARAMETRIC, n, {alpha: alpha, startsWith: StarVertexTypes.OUTER}));
-                        this.polygons.push(new PolygonSignature(PolygonType.STAR_PARAMETRIC, n, {alpha: alpha, startsWith: StarVertexTypes.INNER}));
+                    for (let num = 1; num < den; num++) {
+                        const base_angle = num / den * Math.PI;
+                        if (base_angle >= Math.PI * (n - 2) / n) continue;
+                        if (!coprime(num, den)) continue;
+
+                        let alpha = base_angle;
+                        let d = n / 2 * (1 - alpha / Math.PI);
+                        if (this.isMultiple(d, 1)) {
+                            continue;
+                        }
+
+                        let b = 2 * Math.PI * (1 - 1 / n) - alpha;
+                        if (this.isMultiple(b, base_angle)) {
+                            this.polygons.push(new PolygonSignature({ 
+                                type: PolygonType.STAR_PARAMETRIC, 
+                                n: n,
+                                alpha: alpha, 
+                                startsWith: StarVertexTypes.OUTER
+                            }));
+                            this.polygons.push(new PolygonSignature({ 
+                                type: PolygonType.STAR_PARAMETRIC, 
+                                n: n, 
+                                alpha: alpha, 
+                                startsWith: StarVertexTypes.INNER
+                            }));
+                        }
                     }
-                    alpha += angle_par;
                 }
             }
         }
@@ -113,7 +140,11 @@ export class PolygonsGenerator {
 
                 if (interior_angles.every(angle => isWithinTolerance(angle, interior_angles[0]))) continue;
 
-                this.polygons.push(new PolygonSignature(PolygonType.EQUILATERAL, path.length, { angles: interior_angles }));
+                this.polygons.push(new PolygonSignature({ 
+                    type: PolygonType.EQUILATERAL, 
+                    n: path.length, 
+                    angles: interior_angles 
+                }));
             }
         }
 

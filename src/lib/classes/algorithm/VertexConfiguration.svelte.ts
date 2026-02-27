@@ -25,6 +25,11 @@ export class VertexConfiguration {
     valid: boolean = true;
     neighboringVertices: Vector[];
 
+    private _polygonBaseNames: string[] | null = null;
+    private _edgePairs: Set<string> | null = null;
+    private _partialConfigs: PartialConfiguration[] | null = null;
+    private _partialDoubledReversed: string[] | null = null;
+
     constructor(polygons: Polygon[], angle: number | null = null, name: string | null = null, current_dir: Vector | null = null) {
         this.polygons = polygons;
         this.angle = angle || this.computeAngle();
@@ -178,72 +183,70 @@ export class VertexConfiguration {
         return this.polygons.map(p => p.getName(new Vector())).join(',');
     }
 
+    private getPolygonBaseNames = (): string[] => {
+        if (!this._polygonBaseNames) {
+            this._polygonBaseNames = this.polygons.map(p => p.getName());
+        }
+        return this._polygonBaseNames;
+    }
+
+    private getEdgePairs = (): Set<string> => {
+        if (!this._edgePairs) {
+            const names = this.getPolygonBaseNames();
+            this._edgePairs = new Set<string>();
+            for (let i = 0; i < names.length; i++) {
+                this._edgePairs.add(names[i] + '\0' + names[(i + 1) % names.length]);
+            }
+        }
+        return this._edgePairs;
+    }
+
+    private getPartialConfigs = (): PartialConfiguration[] => {
+        if (!this._partialConfigs) {
+            this.computeNeighboringVertices();
+            this._partialConfigs = this.neighboringVertices.map(nv => this.evaluatePartialconfiguration(nv));
+        }
+        return this._partialConfigs;
+    }
+
+    private getPartialDoubledReversed = (): string[] => {
+        if (!this._partialDoubledReversed) {
+            this._partialDoubledReversed = this.getPartialConfigs().map(pc => {
+                return (pc.name + ',' + pc.name).split(',').reverse().join(',');
+            });
+        }
+        return this._partialDoubledReversed;
+    }
+
     isCompatible = (other: VertexConfiguration): boolean => {
-        // FIRST CHECK: filter out vcs that do not share at least two polygons
-        const thisNames = this.polygons.map(p => p.getName());
-        const otherNames = other.polygons.map(p => p.getName());
-        const sharedNames = thisNames.filter(name => otherNames.includes(name));
-        if (sharedNames.length < 2) {
-            return false;
-        }
+        const thisEdgePairs = this.getEdgePairs();
+        const otherEdgePairs = other.getEdgePairs();
 
-        // SECOND CHECK: filter out vcs that don't share an inverted pair of cyclically consecutive polygons, e.g. {a, b, c} and {a, e, b}
-        let found = false;
-        const len1 = thisNames.length;
-        const len2 = otherNames.length;
-        for (let i = 0; i < len1; i++) {
-            const thisA = thisNames[i];
-            const thisB = thisNames[(i + 1) % len1];
-            for (let j = 0; j < len2; j++) {
-                const otherA = otherNames[j];
-                const otherB = otherNames[(j + 1) % len2];
-                if (thisA === otherB && thisB === otherA) {
-                    found = true;
-                    break;
-                }
-            }
-            if (found) break;
-        }
-        if (!found) return false;
-
-        // THIRD CHECK: for each neighboring vertex, check if the other vcs can be inserted there without conflicts
-        this.computeNeighboringVertices();
-        other.computeNeighboringVertices();
-        const vcAPartialConfigurations: PartialConfiguration[] = this.neighboringVertices.map(nv => this.evaluatePartialconfiguration(nv));
-        const vcBPartialConfigurations: PartialConfiguration[] = other.neighboringVertices.map(nv => other.evaluatePartialconfiguration(nv));
-            
-        const arePartialConfigurationsInvertedCopies = (nameA: string, nameB: string): boolean => {
-            const invertedA = nameA.concat(',').concat(nameA).split(',').reverse().join(',');
-            const invertedB = nameB.concat(',').concat(nameB).split(',').reverse().join(',');
-            return invertedA.includes(nameB) || invertedB.includes(nameA);
-        }
-        
-        // 2. list all pairs of vpc that are inverted copies of each other
-        const compatiblePartialVertexConfigurations: {
-            a: PartialConfiguration,
-            b: PartialConfiguration
-        }[] = [];
-        for (let i = 0; i < vcAPartialConfigurations.length; i++) {
-            for (let j = 0; j < vcBPartialConfigurations.length; j++) {
-                if (arePartialConfigurationsInvertedCopies(vcAPartialConfigurations[i].name, vcBPartialConfigurations[j].name)) {
-                    compatiblePartialVertexConfigurations.push({
-                        a: vcAPartialConfigurations[i],
-                        b: vcBPartialConfigurations[j]
-                    });
-                }
+        let hasInvertedPair = false;
+        for (const pair of thisEdgePairs) {
+            const sep = pair.indexOf('\0');
+            const reversed = pair.substring(sep + 1) + '\0' + pair.substring(0, sep);
+            if (otherEdgePairs.has(reversed)) {
+                hasInvertedPair = true;
+                break;
             }
         }
-        if (compatiblePartialVertexConfigurations.length === 0) return false;
+        if (!hasInvertedPair) return false;
 
-        // 3. Place the other vcs at the neighboring vertex and perform conflict checks
-        for (let i = 0; i < compatiblePartialVertexConfigurations.length; i++) {
-            // 3.1. Merge the two vcs into a seed configuration
-            const a = compatiblePartialVertexConfigurations[i].a;
-            const b = compatiblePartialVertexConfigurations[i].b;
-            const seed: SeedConfiguration = VertexConfiguration.merge(this, other, a, b);
-            
-            // 3.2. then perform conflict checks
-            if (seed.isValid()) return true;
+        const vcAPartials = this.getPartialConfigs();
+        const vcBPartials = other.getPartialConfigs();
+        const vcAReversed = this.getPartialDoubledReversed();
+        const vcBReversed = other.getPartialDoubledReversed();
+
+        for (let i = 0; i < vcAPartials.length; i++) {
+            for (let j = 0; j < vcBPartials.length; j++) {
+                if (vcAReversed[i].includes(vcBPartials[j].name) ||
+                    vcBReversed[j].includes(vcAPartials[i].name)) {
+                    if (checkMergeCompatibility(this, other, vcAPartials[i], vcBPartials[j])) {
+                        return true;
+                    }
+                }
+            }
         }
 
         return false;
@@ -312,4 +315,33 @@ export class VertexConfiguration {
     clone = (): VertexConfiguration => {
         return new VertexConfiguration(this.polygons.map(p => p.clone()), this.angle, this.name, this.current_dir.copy());
     }
+}
+
+const checkMergeCompatibility = (
+    vcA: VertexConfiguration,
+    vcB: VertexConfiguration,
+    a: PartialConfiguration,
+    b: PartialConfiguration
+): boolean => {
+    const clonedB = vcB.clone();
+
+    const dirA = Vector.sub(a.partialVertex, a.fullVertex).heading();
+    const dirB = Vector.sub(b.partialVertex, b.fullVertex).heading();
+    clonedB.rotate(b.fullVertex, dirA - dirB + Math.PI);
+    clonedB.translate(Vector.sub(a.partialVertex, b.fullVertex));
+
+    const newBPolygons: Polygon[] = [];
+    for (const bp of clonedB.polygons) {
+        if (!vcA.polygons.some(ap => isWithinTolerance(ap.centroid, bp.centroid))) {
+            newBPolygons.push(bp);
+        }
+    }
+
+    for (const ap of vcA.polygons) {
+        for (const bp of newBPolygons) {
+            if (ap.intersects(bp)) return false;
+        }
+    }
+
+    return true;
 }

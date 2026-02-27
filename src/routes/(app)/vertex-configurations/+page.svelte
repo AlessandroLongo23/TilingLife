@@ -10,7 +10,9 @@
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
 
-    import allVCNames from '$lib/classes/algorithm/vcs.json';
+    const { data } = $props();
+
+    const allVCNames = data.allVCNames ?? [];
 
     const COL_MIN = 3;
     const COL_MAX = 8;

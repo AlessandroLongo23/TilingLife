@@ -5,18 +5,17 @@ import fs from 'fs';
 
 describe('VCGenerator', () => {
     it('generates vertex configurations for regular polygons', () => {
-        const maxK = 4;
+        const maxK = 3;
         const parameters: GeneratorParameters = {
             [PolygonType.REGULAR]: {
                 n_max: 42
             },
-            // [PolygonType.STAR_REGULAR]: {
-            //     n_max: 12,
-            //     // angle: toRadians(30)
-            // },
+            [PolygonType.STAR_REGULAR]: {
+                n_max: 12,
+                // angle: toRadians(30)
+            },
             // [PolygonType.STAR_PARAMETRIC]: {
             //     n_max: 12,
-            //     angle: toRadians(30)
             // },
             // [PolygonType.EQUILATERAL]: {
             //     n_max: 6,
@@ -35,6 +34,7 @@ describe('VCGenerator', () => {
 
 // STEP 1: generate the polygons based on the selected parameters
 const polygonGeneration = (parameters: GeneratorParameters, additionalPolygons: PolygonSignature[]): PolygonSignature[] => {
+    const start: number = performance.now();
     const polygonsGenerator = new PolygonsGenerator(parameters, additionalPolygons);
     const polygonsFilePath = 'src/lib/classes/algorithm/polygons.json';
     let savedPolygons: string[] = [];
@@ -52,11 +52,14 @@ const polygonGeneration = (parameters: GeneratorParameters, additionalPolygons: 
     }
     savedPolygons.sort((a, b) => comparePolygonNames(a, b));
     fs.writeFileSync(polygonsFilePath, JSON.stringify(savedPolygons, null, 4));
+    const end: number = performance.now();
+    console.log(`Polygon generation: ${(end - start).toFixed(0)}ms`);
     return polygonsGenerator.polygons;
 }
 
 // STEP 2: generate all vertex configurations from the selected polygon set
 const vertexConfigurationGeneration = (polygonSignatures: PolygonSignature[]): VertexConfiguration[] => {
+    const start: number = performance.now();
     const vcGenerator = new VCGenerator(polygonSignatures);
     const vertexConfigurations = vcGenerator.generateVertexConfigurations();
     const vcFilePath = 'src/lib/classes/algorithm/vcs.json';
@@ -75,6 +78,8 @@ const vertexConfigurationGeneration = (polygonSignatures: PolygonSignature[]): V
     }
     savedVCs.sort((a, b) => compareVertexConfigurationNames(a, b));
     fs.writeFileSync(vcFilePath, JSON.stringify(savedVCs, null, 4));
+    const end: number = performance.now();
+    console.log(`Vertex configuration generation: ${(end - start).toFixed(0)}ms`);
     return vertexConfigurations;
 }
 
@@ -118,6 +123,7 @@ const compatibilityGraphGeneration = (vertexConfigurations: VertexConfiguration[
 // STEP 4: extract seed sets from the compatibility graph
 // save in different folders for each k and different files for each m, where m is the number of unique vcs in the seed set
 const seedSetExtraction = (adjacencyList: Record<string, string[]>, vertexConfigurations: VertexConfiguration[], maxK: number): void => {
+    const start: number = performance.now();
     const compatibilityGraph = CompatibilityGraph.fromAdjacencyList(adjacencyList, vertexConfigurations);
     const extractor = new SeedSetExtractor(compatibilityGraph);
 
@@ -129,7 +135,7 @@ const seedSetExtraction = (adjacencyList: Record<string, string[]>, vertexConfig
         const start: number = performance.now();
         const seedSets = extractor.findSeedSets(k);
         const end: number = performance.now();
-        console.log(`\nk=${k}: ${seedSets.length} (${(end - start).toFixed(0)}ms)`);
+        // console.log(`\nk=${k}: ${seedSets.length} (${(end - start).toFixed(0)}ms)`);
 
         // divide seed sets based on the number of unique vcs in the seed set
         const seedSetsByM = new Map<number, string[][]>();
@@ -142,22 +148,46 @@ const seedSetExtraction = (adjacencyList: Record<string, string[]>, vertexConfig
         }
 
         for (const [m, seedSets] of seedSetsByM.entries()) {
-            console.log(` - m=${m}: ${seedSets.length}`);
+            // console.log(` - m=${m}: ${seedSets.length}`);
             const filePath = `${folderPath}/m=${m}.json`;
             if (!fs.existsSync(filePath)) {
                 fs.writeFileSync(filePath, JSON.stringify(seedSets, null, 4));
             }
         }
     }
+    const end: number = performance.now();
+    console.log(`Seed set extraction: ${(end - start).toFixed(0)}ms`);
 }
+
+const BATCH_SIZE = 1000;
 
 // STEP 5: generate seeds from the seed sets
 const seedsGeneration = (k: number | null = null, m: number | null = null): void => {
+    const start: number = performance.now();
     const seedBuilder = new SeedBuilder();
     const seedConfigurations = seedBuilder.buildSeeds(k, m);
     const seedConfigurationsFolderPath = `src/lib/classes/algorithm/seedConfigurations/k=${k}/m=${m}`;
     if (!fs.existsSync(seedConfigurationsFolderPath)) {
         fs.mkdirSync(seedConfigurationsFolderPath, { recursive: true });
     }
-    fs.writeFileSync(`${seedConfigurationsFolderPath}/seedConfigurations.json`, JSON.stringify(seedConfigurations.map(sc => sc.encode()), null, 4));
+
+    const compactData = seedConfigurations.map(sc => sc.encodeCompact());
+    const total = compactData.length;
+
+    for (let i = 0; i < total; i += BATCH_SIZE) {
+        const batch = compactData.slice(i, i + BATCH_SIZE);
+        const batchIndex = Math.floor(i / BATCH_SIZE);
+        const filePath = `${seedConfigurationsFolderPath}/seedConfigurations_${String(batchIndex).padStart(4, '0')}.json`;
+        fs.writeFileSync(filePath, JSON.stringify(batch));
+    }
+
+    const manifest = { format: 'compact', total, batchSize: BATCH_SIZE };
+    fs.writeFileSync(`${seedConfigurationsFolderPath}/manifest.json`, JSON.stringify(manifest));
+    const end: number = performance.now();
+    console.log(`Seeds generation: ${(end - start).toFixed(0)}ms`);
+}
+
+// STEP 6: generate tilings from the seed configurations
+const tilingsGeneration = (k: number | null = null, m: number | null = null): void => {
+    
 }

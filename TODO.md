@@ -5,7 +5,7 @@
 - [x] compute vertex configuration
 - [x] create compatibility graph
 - [x] extract all seed sets
-- [ ] build the seeds
+- [-] build the seeds
 - [ ] apply wallpaper groups
 - [ ] perform final checks
 
@@ -13,6 +13,7 @@
 - [ ] global navigation
 - [ ] algorithm description and explanation
 - [ ] angles visualization on polygons in the polygon collections (with toggle)
+- [ ] run algorithm steps directly from interface
 
 ## Filters
 - [ ] add "exact" and "include" to categories
@@ -24,6 +25,7 @@
 ## QOL
 - [x] improve graph nodes render quality
 - [x] add simulation settings to compatibility graph
+- [ ] implement logger to keep track of functions execution times and memory consumption 
 - [ ] move sound toggle
 - [ ] add screenshot functionality to each card (polygons, vcs, seeds, tilings)
 

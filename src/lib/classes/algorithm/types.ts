@@ -10,7 +10,6 @@ export interface GeneratorParameters {
     },
     [PolygonType.STAR_PARAMETRIC]?: {
         n_max: number;
-        angle: number;
     },
     [PolygonType.EQUILATERAL]?: {
         n_max: number;

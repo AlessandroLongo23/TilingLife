@@ -1,25 +1,55 @@
 import fs from 'fs';
 import path from 'path';
+import { SeedConfiguration } from '$classes';
 
 const BASE_DIR = 'src/lib/classes/algorithm/seedConfigurations';
 const PAGE_SIZE = 24;
+const BATCH_SIZE = 1000;
 
-let dataCache: Map<string, any[]> = new Map();
-
-function getCacheKey(k: number, m: number): string {
-    return `${k}:${m}`;
+function loadManifest(k: number, m: number): { total: number; format: string; batchSize: number } | null {
+    const manifestPath = path.join(BASE_DIR, `k=${k}`, `m=${m}`, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) return null;
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    return manifest;
 }
 
-function loadData(k: number, m: number): any[] {
-    const key = getCacheKey(k, m);
-    if (dataCache.has(key)) return dataCache.get(key)!;
+function loadBatch(k: number, m: number, batchIndex: number): any[] {
+    const batchPath = path.join(BASE_DIR, `k=${k}`, `m=${m}`, `seedConfigurations_${String(batchIndex).padStart(4, '0')}.json`);
+    if (!fs.existsSync(batchPath)) return [];
+    return JSON.parse(fs.readFileSync(batchPath, 'utf8'));
+}
 
-    const filePath = path.join(BASE_DIR, `k=${k}`, `m=${m}`, 'seedConfigurations.json');
-    if (!fs.existsSync(filePath)) return [];
+function loadPageData(k: number, m: number, page: number): { data: any[]; total: number } {
+    const folderPath = path.join(BASE_DIR, `k=${k}`, `m=${m}`);
 
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    dataCache.set(key, data);
-    return data;
+    const manifest = loadManifest(k, m);
+    if (manifest) {
+        const { total, format } = manifest;
+        const start = (page - 1) * PAGE_SIZE;
+        const end = Math.min(start + PAGE_SIZE, total);
+        if (start >= total) return { data: [], total };
+
+        const batchStart = Math.floor(start / BATCH_SIZE);
+        const batchEnd = Math.floor((end - 1) / BATCH_SIZE);
+        const allData: any[] = [];
+        for (let i = batchStart; i <= batchEnd; i++) {
+            allData.push(...loadBatch(k, m, i));
+        }
+        const pageData = allData.slice(start - batchStart * BATCH_SIZE, end - batchStart * BATCH_SIZE);
+
+        if (format === 'compact') {
+            const decoded = pageData.map((item: any) => SeedConfiguration.decodeCompact(item));
+            return { data: decoded, total };
+        }
+        return { data: pageData, total };
+    }
+
+    const legacyPath = path.join(folderPath, 'seedConfigurations.json');
+    if (!fs.existsSync(legacyPath)) return { data: [], total: 0 };
+    const data = JSON.parse(fs.readFileSync(legacyPath, 'utf8'));
+    const total = data.length;
+    const start = (page - 1) * PAGE_SIZE;
+    return { data: data.slice(start, start + PAGE_SIZE), total };
 }
 
 export async function load({ url }) {
@@ -36,10 +66,15 @@ export async function load({ url }) {
                 const mMatch = mFolder.match(/^m=(\d+)$/);
                 if (!mMatch) continue;
                 const m = parseInt(mMatch[1]);
-                const filePath = path.join(kPath, mFolder, 'seedConfigurations.json');
-                if (fs.existsSync(filePath)) {
-                    const data = loadData(k, m);
-                    available.push({ k, m, count: data.length });
+                const manifest = loadManifest(k, m);
+                if (manifest) {
+                    available.push({ k, m, count: manifest.total });
+                } else {
+                    const legacyPath = path.join(kPath, mFolder, 'seedConfigurations.json');
+                    if (fs.existsSync(legacyPath)) {
+                        const data = JSON.parse(fs.readFileSync(legacyPath, 'utf8'));
+                        available.push({ k, m, count: data.length });
+                    }
                 }
             }
         }
@@ -65,10 +100,9 @@ export async function load({ url }) {
     let totalItems = 0;
 
     if (selectedK !== null && selectedM !== null) {
-        const allData = loadData(selectedK, selectedM);
-        totalItems = allData.length;
-        const start = (page - 1) * PAGE_SIZE;
-        seedConfigurations = allData.slice(start, start + PAGE_SIZE);
+        const result = loadPageData(selectedK, selectedM, page);
+        seedConfigurations = result.data;
+        totalItems = result.total;
     }
 
     return {

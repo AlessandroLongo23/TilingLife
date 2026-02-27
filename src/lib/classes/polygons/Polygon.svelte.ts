@@ -119,6 +119,25 @@ export class Polygon {
         return this;
     }
 
+    /**
+     * @param point - the point of the reflection
+     * @param dir - the direction of the reflection axis
+     * @param delta - the amount it translates in the same direction as the reflection axis
+     * @returns the polygon after the glide
+     * @description A glide is a reflection followed by a translation in the same direction to the reflection axis
+     */
+    glide = (point: Vector, dir: Vector, delta: number): Polygon => {
+        dir = dir.normalize();
+
+        // first apply the reflection
+        this.mirror(point, dir);
+
+        // then translate in the same direction as the reflection axis
+        this.translate(Vector.scale(dir, delta));
+
+        return this;
+    }
+
     containsPoint = (point: Vector): boolean => {
         return this.sdf(point) < -tolerance;
     }
