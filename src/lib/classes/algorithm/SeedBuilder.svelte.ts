@@ -7,6 +7,14 @@ type PlacedVC = {
     neighboringVertices: Vector[];
 };
 
+type BFSNode = {
+    seed: SeedConfiguration;
+    placedVCs: PlacedVC[];
+    remaining: string[];
+};
+
+const CANONICAL_PRECISION = 3;
+
 export class SeedBuilder {
     seedConfigurations: SeedConfiguration[] = [];
     
@@ -24,34 +32,45 @@ export class SeedBuilder {
     }
 
     buildSeedsFromSet = (seedSet: string[]): SeedConfiguration[] => {
-        const results: SeedConfiguration[] = [];
-
         const firstVC = VertexConfiguration.fromName(seedSet[0]);
         firstVC.computeNeighboringVertices();
 
         const initialSeed = new SeedConfiguration(firstVC.polygons.map(p => p.clone()));
-        const placedVCs: PlacedVC[] = [{
+        const initialPlacedVCs: PlacedVC[] = [{
             center: new Vector(0, 0),
             neighboringVertices: firstVC.neighboringVertices.map(v => v.copy())
         }];
 
-        this.dfs(initialSeed, placedVCs, seedSet.slice(1), results);
+        if (seedSet.length === 1) {
+            return [initialSeed];
+        }
 
-        return results;
+        let currentLayer: BFSNode[] = [{
+            seed: initialSeed,
+            placedVCs: initialPlacedVCs,
+            remaining: seedSet.slice(1)
+        }];
+
+        while (currentLayer.length > 0) {
+            const nextLayer: BFSNode[] = [];
+
+            for (const node of currentLayer) {
+                nextLayer.push(...this.expandNode(node));
+            }
+
+            if (nextLayer.length === 0) return [];
+
+            currentLayer = this.deduplicateLayer(nextLayer);
+
+            if (currentLayer[0].remaining.length === 0) break;
+        }
+
+        return currentLayer.map(node => node.seed);
     }
 
-    dfs = (
-        seed: SeedConfiguration,
-        placedVCs: PlacedVC[],
-        remaining: string[],
-        results: SeedConfiguration[]
-    ): void => {
-        if (remaining.length === 0) {
-            if (!this.isDuplicate(seed, results)) {
-                results.push(seed);
-            }
-            return;
-        }
+    private expandNode = (node: BFSNode): BFSNode[] => {
+        const { seed, placedVCs, remaining } = node;
+        const children: BFSNode[] = [];
 
         const availableVertices = this.computeAvailableVertices(placedVCs);
 
@@ -97,12 +116,58 @@ export class SeedBuilder {
                                 neighboringVertices: clonedVC.neighboringVertices.map(nv => nv.copy())
                             }];
                             const newRemaining = [...remaining.slice(0, i), ...remaining.slice(i + 1)];
-                            this.dfs(newSeed, newPlacedVCs, newRemaining, results);
+                            children.push({
+                                seed: newSeed,
+                                placedVCs: newPlacedVCs,
+                                remaining: newRemaining
+                            });
                         }
                     }
                 }
             }
         }
+
+        return children;
+    }
+
+    private deduplicateLayer = (nodes: BFSNode[]): BFSNode[] => {
+        const seen = new Map<string, BFSNode>();
+
+        for (const node of nodes) {
+            const remainingKey = [...node.remaining].sort().join('\0');
+            const canonical = this.computeCanonicalForm(node.seed);
+            const key = remainingKey + '|' + canonical;
+
+            if (!seen.has(key)) {
+                seen.set(key, node);
+            }
+        }
+
+        return Array.from(seen.values());
+    }
+
+    private computeCanonicalForm = (seed: SeedConfiguration): string => {
+        const polygons = seed.polygons;
+        const n = polygons.length;
+        if (n === 0) return '';
+
+        const P = CANONICAL_PRECISION;
+        const profiles: string[] = new Array(n);
+
+        for (let i = 0; i < n; i++) {
+            const neighbors: string[] = new Array(n - 1);
+            let k = 0;
+            for (let j = 0; j < n; j++) {
+                if (i === j) continue;
+                const dist = polygons[i].centroid.distance(polygons[j].centroid).toFixed(P);
+                neighbors[k++] = polygons[j].getName() + '@' + dist;
+            }
+            neighbors.sort();
+            profiles[i] = polygons[i].getName() + ':' + neighbors.join(',');
+        }
+
+        profiles.sort();
+        return profiles.join('|');
     }
 
     computeAvailableVertices = (placedVCs: PlacedVC[]): { vertex: Vector, directions: number[] }[] => {
@@ -124,18 +189,6 @@ export class SeedBuilder {
         }
 
         return available;
-    }
-
-    isDuplicate = (seed: SeedConfiguration, existing: SeedConfiguration[]): boolean => {
-        for (const other of existing) {
-            if (seed.polygons.length !== other.polygons.length) continue;
-            if (seed.polygons.every(p =>
-                other.polygons.some(op => isWithinTolerance(p.centroid, op.centroid))
-            )) {
-                return true;
-            }
-        }
-        return false;
     }
 
     loadSeedSets = (k: number | null = null, m: number | null = null): string[][] => {

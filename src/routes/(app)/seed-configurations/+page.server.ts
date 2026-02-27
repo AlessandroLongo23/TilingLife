@@ -4,7 +4,7 @@ import { SeedConfiguration } from '$classes';
 
 const BASE_DIR = 'src/lib/classes/algorithm/seedConfigurations';
 const PAGE_SIZE = 24;
-const BATCH_SIZE = 1000;
+const BATCH_SIZE = 200;
 
 function loadManifest(k: number, m: number): { total: number; format: string; batchSize: number } | null {
     const manifestPath = path.join(BASE_DIR, `k=${k}`, `m=${m}`, 'manifest.json');
