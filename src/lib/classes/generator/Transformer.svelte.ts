@@ -46,9 +46,9 @@ export class Transformer {
                     if (dir) break;
                 }
 
-                newNode.mirror(origin, dir!);
+                newNode.mirror(origin.copy(), dir!.copy());
             } else {
-                newNode.mirror(origin, new Vector(0, 1));
+                newNode.mirror(origin.copy(), new Vector(0, 1));
             }
 
             newNodes.push(newNode);
@@ -61,9 +61,9 @@ export class Transformer {
         const newNodes: Polygon[] = [];
         for (let angle = alpha; angle < 2 * Math.PI; angle *= 2) {
             const anchor = new Vector();
-            const dir = Vector.fromAngle(angle + Math.PI / 2);
+            const dir = Vector.fromAngle(Math.PI / 2 - angle);
             for (let newLayerNode of [...tiling.newLayerNodes, ...tiling.seedNodes, ...additionalNodes, ...newNodes]) {
-                newNodes.push(newLayerNode.clone().mirror(anchor, dir));
+                newNodes.push(newLayerNode.clone().mirror(anchor.copy(), dir.copy()));
             }
         }
 
@@ -85,7 +85,7 @@ export class Transformer {
         const rotationAngle = this.transforms[transformationIndex].angle;
         for (let angle = rotationAngle; angle < 2 * Math.PI; angle += rotationAngle)
             for (const newLayerNode of [...tiling.newLayerNodes, ...tiling.seedNodes, ...additionalNodes])
-                newNodes.push(newLayerNode.clone().rotate(origin, angle));
+                newNodes.push(newLayerNode.clone().rotate(origin.copy(), angle));
 
         return this.filterDuplicates([...tiling.nodes, ...tiling.seedNodes, ...additionalNodes], newNodes);
     }
@@ -112,7 +112,7 @@ export class Transformer {
         
         const newNodes: Polygon[] = [];
         for (let newLayerNode of [...tiling.newLayerNodes, ...tiling.seedNodes, ...additionalNodes, ...newNodes]) {
-            newNodes.push(newLayerNode.clone().translate(origin));
+            newNodes.push(newLayerNode.clone().translate(origin.copy()));
         }
 
         return this.filterDuplicates([...tiling.nodes, ...tiling.seedNodes, ...additionalNodes], newNodes);

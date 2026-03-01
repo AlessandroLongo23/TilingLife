@@ -4,10 +4,10 @@
 	import { ChevronDown } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	
-	let sections = $derived(contentService.sections || []);
-	let isLoading = $derived(contentService.isLoading);
-	let error = $derived(contentService.error);
-	let { activeSection = '' } = $props();
+	let { activeSection = '', sections: sectionsProp = null } = $props();
+	let sections = $derived(sectionsProp ?? contentService.sections ?? []);
+	let isLoading = $derived(sectionsProp ? false : contentService.isLoading);
+	let error = $derived(sectionsProp ? null : contentService.error);
 	
 	let expandedSections = $state({});
 	

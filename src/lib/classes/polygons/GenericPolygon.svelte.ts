@@ -117,6 +117,6 @@ export class GenericPolygon extends Polygon {
     }
 
     clone = (): GenericPolygon => {
-        return GenericPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy(), [...this.sides], [...this.angles]);
+        return GenericPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]).copy(), [...this.sides], [...this.angles]);
     }
 }

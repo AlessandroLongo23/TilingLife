@@ -39,7 +39,7 @@ export class StarPolygon extends Polygon {
     calculateVerticesFromCentroidAndAngle = () => {
         this.vertices = [];
 
-        const angleToCenter = -2 * Math.PI / this.n;
+        const angleToCenter = 2 * Math.PI / this.n;
         for (let i = 0; i < this.n; i++) {
             this.vertices.push(new Vector(
                 this.centroid.x + this.outerRadius * Math.cos(angleToCenter * (i - 0.5) + this.angle),
@@ -51,6 +51,28 @@ export class StarPolygon extends Polygon {
                 this.centroid.y + this.innerRadius * Math.sin(angleToCenter * i + this.angle)
             ));
         }
+    }
+
+    mirror = (point: Vector, dir: Vector): StarPolygon => {
+        this.angle = (2 * dir.heading() - this.angle + 2 * Math.PI) % (2 * Math.PI);
+        this.centroid.mirrorByPointAndDir(point.copy(), dir.copy());
+        this.centroid.snapToGrid();
+        for (let i = 0; i < this.vertices.length; i++) {
+            this.vertices[i].mirrorByPointAndDir(point.copy(), dir.copy());
+            this.vertices[i].snapToGrid();
+        }
+        this.vertices.reverse();
+        for (let i = 0; i < this.halfways.length; i++) {
+            this.halfways[i].mirrorByPointAndDir(point.copy(), dir.copy());
+            this.halfways[i].snapToGrid();
+        }
+        this.halfways.reverse();
+        // After vertices.reverse(), the first vertex swaps outer<->inner, so startsWith must flip
+        this.startsWith = this.startsWith === StarVertexTypes.OUTER ? StarVertexTypes.INNER : StarVertexTypes.OUTER;
+        this.name = this.name.replace(/[oi](?=})/, (m) => (m === 'o' ? 'i' : 'o'));
+        this.anchor = this.vertices[0].copy();
+        this.dir = Vector.sub(this.vertices[1], this.vertices[0]);
+        return this;
     }
 
     calculateHue = () => {

@@ -59,7 +59,7 @@ export class StarParametricPolygon extends StarPolygon {
     }
 
     clone = (): StarParametricPolygon => {
-        return StarParametricPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy(), this.alpha, this.startsWith);
+        return StarParametricPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]).copy(), this.alpha, this.startsWith);
     }
 
     encode = (): Object => {

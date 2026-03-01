@@ -121,7 +121,7 @@ export class TilingGeneratorFromRule extends TilingGenerator {
                         this.tiling.coreNode = RegularPolygon.fromAnchorAndDir(3, new Vector(), new Vector(1, 0));
                     } else {
                         centerCoreToOrigin = false;
-                        this.tiling.coreNode = RegularPolygon.fromAnchorAndDir(3, new Vector(), new Vector(0, 1));
+                        this.tiling.coreNode = RegularPolygon.fromAnchorAndDir(3, new Vector(), new Vector(Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)));
                     }
                 } else {
                     this.tiling.coreNode = RegularPolygon.fromAnchorAndDir(coreNode.n, new Vector(), new Vector(0, 1));
@@ -245,7 +245,7 @@ export class TilingGeneratorFromRule extends TilingGenerator {
 
         const dir: Vector = Vector.sub(
             selectedHalfway.node.vertices[selectedHalfway.halfwayPointIndex],
-            selectedHalfway.node.vertices[(selectedHalfway.halfwayPointIndex + 1) % selectedHalfway.node.vertices.length]
+            selectedHalfway.node.vertices[(selectedHalfway.halfwayPointIndex + 1) % selectedHalfway.node.vertices.length],
         ).normalize();
         const anchor: Vector = selectedHalfway.node.vertices[(selectedHalfway.halfwayPointIndex + 1) % selectedHalfway.node.vertices.length] as Vector;
         return [anchor, dir];

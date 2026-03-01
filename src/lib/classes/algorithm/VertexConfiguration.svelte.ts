@@ -13,7 +13,7 @@ import {
     type PartialConfiguration,
     type SurroundingPolygon
 } from '$classes';
-import { isWithinAngularTolerance, isWithinTolerance, toRadians } from '$utils';
+import { deduplicatePoints, isWithinAngularTolerance, isWithinTolerance, toRadians } from '$utils';
 import { regularPolygonRegex, regularStarRegex, parametricStarRegex, equilateralPolygonRegex } from './regex';
 import { tolerance } from '$stores';
 
@@ -24,6 +24,7 @@ export class VertexConfiguration {
     current_dir: Vector;
     valid: boolean = true;
     neighboringVertices: Vector[];
+    sharedVertex: Vector;
 
     private _polygonBaseNames: string[] | null = null;
     private _edgePairs: Set<string> | null = null;
@@ -36,6 +37,7 @@ export class VertexConfiguration {
         this.name = name || this.getName();
         this.current_dir = current_dir || new Vector(1, 0);
         this.neighboringVertices = [];
+        this.sharedVertex = this.computeSharedVertex();
     }
 
     static fromName = (name: string): VertexConfiguration => {
@@ -79,19 +81,12 @@ export class VertexConfiguration {
     static merge = (vcA: VertexConfiguration, vcB: VertexConfiguration, a: PartialConfiguration, b: PartialConfiguration): SeedConfiguration => {
         const clonedB = vcB.clone();
 
-        // first map the second vc to the first vc based on the partial configurations
         const dirA = Vector.sub(a.partialVertex, a.fullVertex).heading();
         const dirB = Vector.sub(b.partialVertex, b.fullVertex).heading();
         clonedB.rotate(b.fullVertex, dirA - dirB + Math.PI);
         clonedB.translate(Vector.sub(a.partialVertex, b.fullVertex));
 
-        // then filter out the duplicated polygons, i.e., polygons that ended up in the same position
-        const mergedPolygons = [...vcA.polygons, ...clonedB.polygons].filter((polygon, index, self) => {
-            const firstIndex = self.findIndex(p => isWithinTolerance(p.centroid, polygon.centroid));
-            return index === firstIndex;
-        });
-
-        return new SeedConfiguration(mergedPolygons);
+        return new SeedConfiguration([vcA, clonedB]);
     }
     
     addPolygon = (polygonData: PolygonSignature) => {
@@ -257,12 +252,52 @@ export class VertexConfiguration {
         for (let polygon of this.polygons) {
             polygon.rotate(origin, angle);
         }
+        this.sharedVertex = Vector.rotateAround(this.sharedVertex, origin, angle);
+    }
+
+    static rotate = (vc: VertexConfiguration, origin: Vector, angle: number): VertexConfiguration => {
+        const clonedVC = vc.clone();
+        clonedVC.rotate(origin, angle);
+        return clonedVC;
     }
 
     translate = (vector: Vector): void => {
         for (let polygon of this.polygons) {
             polygon.translate(vector);
         }
+        this.sharedVertex = Vector.add(this.sharedVertex, vector);
+    }
+
+    static translate = (vc: VertexConfiguration, vector: Vector): VertexConfiguration => {
+        const clonedVC = vc.clone();
+        clonedVC.translate(vector);
+        return clonedVC;
+    }
+
+    mirror = (point: Vector, dir: Vector): void => {
+        for (let polygon of this.polygons) {
+            polygon.mirror(point, dir);
+        }
+        this.sharedVertex = this.sharedVertex.mirrorByPointAndDir(point, dir);
+    }
+
+    static mirror = (vc: VertexConfiguration, point: Vector, dir: Vector): VertexConfiguration => {
+        const clonedVC = vc.clone();
+        clonedVC.mirror(point, dir);
+        return clonedVC;
+    }
+
+    glide = (point: Vector, dir: Vector, delta: number): void => {
+        for (let polygon of this.polygons) {
+            polygon.glide(point, dir, delta);
+        }
+        this.sharedVertex = Vector.add(this.sharedVertex, Vector.scale(dir, delta));
+    }
+
+    static glide = (vc: VertexConfiguration, point: Vector, dir: Vector, delta: number): VertexConfiguration => {
+        const clonedVC = vc.clone();
+        clonedVC.glide(point, dir, delta);
+        return clonedVC;
     }
 
     evaluatePartialconfiguration = (vertex: Vector): PartialConfiguration => {
@@ -314,6 +349,15 @@ export class VertexConfiguration {
 
     clone = (): VertexConfiguration => {
         return new VertexConfiguration(this.polygons.map(p => p.clone()), this.angle, this.name, this.current_dir.copy());
+    }
+
+    /**
+     * The shared vertex is the vertex that is shared by all the polygons
+     * @returns the shared vertex
+     */
+    computeSharedVertex = (): Vector => {
+        const allVertices = deduplicatePoints(this.polygons.flatMap(p => p.vertices));
+        return allVertices.find(v => this.polygons.every(p => p.vertices.some(v2 => isWithinTolerance(v2, v))))!;
     }
 }
 

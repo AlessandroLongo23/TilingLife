@@ -58,6 +58,13 @@ export class SeedSetExtractor {
                         seedSets.push(names);
                     }
                 }
+            } else if (k === 1) {
+                const names = subgraph.map(i => this.compatibilityGraph.nodes[i].vertexConfiguration.name).sort();
+                const key = names.join('|');
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    seedSets.push(names);
+                }
             }
         }
 

@@ -1,23 +1,20 @@
 <script>
-    import { speed, selectedTiling, tilingRules } from '$stores';
+    import { speed, selectedTiling, tilingStore, tilingStoreReady } from '$stores';
     import { fade, fly } from 'svelte/transition';
     import { browser } from '$app/environment';
     import { onMount } from 'svelte';
-    import { page } from '$app/stores';
 
     import Canvas from '$components/Canvas.svelte';
 
     let ready = $state(false);
     let width = $state();
     let height = $state();
+    let pickedForBackground = $state(false);
 
     onMount(() => {
         if (browser) {
             width = window.innerWidth;
             height = window.innerHeight;
-
-            let tilings = tilingRules.flatMap(rule => rule.rules);
-            selectedTiling.set(tilings[Math.floor(Math.random() * tilings.length)]);
 
             window.addEventListener('resize', () => {
                 width = window.innerWidth;
@@ -29,13 +26,27 @@
             }, 10);
         }
     });
+
+    $effect(() => {
+        if (browser && $tilingStoreReady && !pickedForBackground) {
+            const rules = tilingStore.tilingRules?.flatMap((g) => g.rules) ?? [];
+            if (rules.length > 0) {
+                pickedForBackground = true;
+                const randomRule = rules[Math.floor(Math.random() * rules.length)];
+                selectedTiling.set({
+                    ...randomRule,
+                    golRules: randomRule.golRules ?? { standard: [], dual: [] }
+                });
+            }
+        }
+    });
 </script>
 
 <div class="w-full h-full">
     <Canvas 
         width={width}
         height={height} 
-        showGameOfLife={$page.url.pathname === '/'}
+        showGameOfLife={true}
         speed={$speed}
         showExtra={false}
     />

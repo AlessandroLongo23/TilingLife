@@ -1,11 +1,13 @@
 import { PolygonsGenerator, VCGenerator, PolygonType, type GeneratorParameters, PolygonSignature, CompatibilityGraph, SeedSetExtractor, VertexConfiguration, SeedBuilder } from '$classes';
+import { TilingGenerator } from './TilingGenerator.svelte';
 import { describe, it } from 'vitest';
 import { comparePolygonNames, compareVertexConfigurationNames, toRadians } from '$utils';
+import { BATCH_SIZE } from '$stores';
 import fs from 'fs';
 
 describe('VCGenerator', () => {
     it('generates vertex configurations for regular polygons', () => {
-        const maxK = 3;
+        const maxK = 1;
         const parameters: GeneratorParameters = {
             [PolygonType.REGULAR]: {
                 n_max: 12
@@ -18,7 +20,7 @@ describe('VCGenerator', () => {
             //     n_max: 12,
             // },
             // [PolygonType.EQUILATERAL]: {
-            //     n_max: 6,
+            //     n_max: 12,
             //     angle: toRadians(30)
             // }
         };
@@ -28,7 +30,8 @@ describe('VCGenerator', () => {
         const vertexConfigurations = vertexConfigurationGeneration(polygonSignatures);
         const adjacencyList = compatibilityGraphGeneration(vertexConfigurations);
         seedSetExtraction(adjacencyList, vertexConfigurations, maxK);
-        seedsGeneration(2, 2);
+        seedsGeneration(1, 1);
+        tilingsGeneration(1, 1);
     }, 15 * 60 * 1000);
 });
 
@@ -36,7 +39,7 @@ describe('VCGenerator', () => {
 const polygonGeneration = (parameters: GeneratorParameters, additionalPolygons: PolygonSignature[]): PolygonSignature[] => {
     const start: number = performance.now();
     const polygonsGenerator = new PolygonsGenerator(parameters, additionalPolygons);
-    const polygonsFilePath = 'src/lib/classes/algorithm/polygons.json';
+    const polygonsFilePath = 'src/lib/data/polygons.json';
     let savedPolygons: string[] = [];
     if (fs.existsSync(polygonsFilePath)) {
         const fileData = fs.readFileSync(polygonsFilePath, 'utf-8');
@@ -62,7 +65,7 @@ const vertexConfigurationGeneration = (polygonSignatures: PolygonSignature[]): V
     const start: number = performance.now();
     const vcGenerator = new VCGenerator(polygonSignatures);
     const vertexConfigurations = vcGenerator.generateVertexConfigurations();
-    const vcFilePath = 'src/lib/classes/algorithm/vcs.json';
+    const vcFilePath = 'src/lib/data/vcs.json';
     let savedVCs: string[] = [];
     if (fs.existsSync(vcFilePath)) {
         const fileData = fs.readFileSync(vcFilePath, 'utf-8');
@@ -85,7 +88,7 @@ const vertexConfigurationGeneration = (polygonSignatures: PolygonSignature[]): V
 
 // STEP 3: incrementally build the compatibility graph (adjacency list keyed by VC name)
 const compatibilityGraphGeneration = (vertexConfigurations: VertexConfiguration[]): Record<string, string[]> => {
-    const cgFilePath = 'src/lib/classes/algorithm/compatibilityGraph.json';
+    const cgFilePath = 'src/lib/data/compatibilityGraph.json';
     let adjacencyList: Record<string, string[]> = {};
     if (fs.existsSync(cgFilePath)) {
         const fileData = fs.readFileSync(cgFilePath, 'utf-8');
@@ -127,8 +130,8 @@ const seedSetExtraction = (adjacencyList: Record<string, string[]>, vertexConfig
     const compatibilityGraph = CompatibilityGraph.fromAdjacencyList(adjacencyList, vertexConfigurations);
     const extractor = new SeedSetExtractor(compatibilityGraph);
 
-    for (let k = 2; k <= maxK; k++) {
-        const folderPath = `src/lib/classes/algorithm/seedSets/k=${k}`;
+    for (let k = 1; k <= maxK; k++) {
+        const folderPath = `src/lib/data/seedSets/k=${k}`;
         if (!fs.existsSync(folderPath)) {
             fs.mkdirSync(folderPath, { recursive: true });
         }
@@ -159,14 +162,12 @@ const seedSetExtraction = (adjacencyList: Record<string, string[]>, vertexConfig
     console.log(`Seed set extraction: ${(end - start).toFixed(0)}ms`);
 }
 
-const BATCH_SIZE = 1000;
-
 // STEP 5: generate seeds from the seed sets
 const seedsGeneration = (k: number | null = null, m: number | null = null): void => {
     const start: number = performance.now();
     const seedBuilder = new SeedBuilder();
     const seedConfigurations = seedBuilder.buildSeeds(k, m);
-    const seedConfigurationsFolderPath = `src/lib/classes/algorithm/seedConfigurations/k=${k}/m=${m}`;
+    const seedConfigurationsFolderPath = `src/lib/data/seedConfigurations/k=${k}/m=${m}`;
     if (!fs.existsSync(seedConfigurationsFolderPath)) {
         fs.mkdirSync(seedConfigurationsFolderPath, { recursive: true });
     }
@@ -188,6 +189,16 @@ const seedsGeneration = (k: number | null = null, m: number | null = null): void
 }
 
 // STEP 6: generate tilings from the seed configurations
-const tilingsGeneration = (k: number | null = null, m: number | null = null): void => {
-    
+const tilingsGeneration = (k: number, m: number): void => {
+    const start: number = performance.now();
+    const tilingGenerator = new TilingGenerator();
+    const tilings = tilingGenerator.generateTilings(k, m);
+    const tilingsFolderPath = `src/lib/data/tilings/k=${k}/m=${m}`;
+    if (!fs.existsSync(tilingsFolderPath)) {
+        fs.mkdirSync(tilingsFolderPath, { recursive: true });
+    }
+    const encoded = tilings.map(t => t.encode());
+    fs.writeFileSync(`${tilingsFolderPath}/tilings.json`, JSON.stringify(encoded));
+    const end: number = performance.now();
+    console.log(`Tilings generation: ${tilings.length} tilings in ${(end - start).toFixed(0)}ms`);
 }

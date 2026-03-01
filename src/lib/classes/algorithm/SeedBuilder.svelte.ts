@@ -1,5 +1,5 @@
 import { SeedConfiguration, VertexConfiguration, Vector } from '$classes';
-import { isWithinTolerance } from '$utils';
+import { deduplicatePolygons, isWithinTolerance } from '$utils';
 import fs from 'fs';
 
 type PlacedVC = {
@@ -32,10 +32,10 @@ export class SeedBuilder {
     }
 
     buildSeedsFromSet = (seedSet: string[]): SeedConfiguration[] => {
-        const firstVC = VertexConfiguration.fromName(seedSet[0]);
+        const firstVC: VertexConfiguration = VertexConfiguration.fromName(seedSet[0]);
         firstVC.computeNeighboringVertices();
 
-        const initialSeed = new SeedConfiguration(firstVC.polygons.map(p => p.clone()));
+        const initialSeed = new SeedConfiguration([firstVC]);
         const initialPlacedVCs: PlacedVC[] = [{
             center: new Vector(0, 0),
             neighboringVertices: firstVC.neighboringVertices.map(v => v.copy())
@@ -102,14 +102,11 @@ export class SeedBuilder {
 
                         const seedCount = seed.polygons.length;
                         const vcCount = clonedVC.polygons.length;
-                        const allPolygons = [...seed.polygons, ...clonedVC.polygons];
-                        const mergedPolygons = allPolygons.filter((p, idx, self) => {
-                            return idx === self.findIndex(other => isWithinTolerance(p.centroid, other.centroid));
-                        });
+                        const mergedPolygons = deduplicatePolygons([...seed.polygons, ...clonedVC.polygons]);
 
                         if (mergedPolygons.length === seedCount + vcCount) continue;
 
-                        const newSeed = new SeedConfiguration(mergedPolygons);
+                        const newSeed = new SeedConfiguration([...seed.vertexConfigurations, clonedVC]);
                         if (newSeed.isValid()) {
                             const newPlacedVCs: PlacedVC[] = [...placedVCs, {
                                 center: v.copy(),
@@ -196,7 +193,7 @@ export class SeedBuilder {
 
         // if k is provided, load only the seed sets for the given k
         if (k !== null) {
-            const seedSetsFolder = `src/lib/classes/algorithm/seedSets/k=${k}`;
+            const seedSetsFolder = `src/lib/data/seedSets/k=${k}`;
 
             // if m is provided, load only the seed sets for the given m
             if (m !== null) {
@@ -216,9 +213,9 @@ export class SeedBuilder {
         }
 
         // if k is not provided, load all seed sets
-        const seedSetsFolders = fs.readdirSync('src/lib/classes/algorithm/seedSets');
+        const seedSetsFolders = fs.readdirSync('src/lib/data/seedSets');
         for (const folder of seedSetsFolders) {
-            const seedSetsFolder = `src/lib/classes/algorithm/seedSets/${folder}`;
+            const seedSetsFolder = `src/lib/data/seedSets/${folder}`;
             const seedSetsFiles = fs.readdirSync(seedSetsFolder);
             for (const file of seedSetsFiles) {
                 const seedSet = fs.readFileSync(`${seedSetsFolder}/${file}`, 'utf8');

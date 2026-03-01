@@ -21,6 +21,7 @@
 - [ ] add range slider input for number of polygons filter in vertex configuration catalogue
 - [ ] improve text input to support logic operators
 - [ ] add sorting by n, category, or internal_angle
+- [ ] in tilings page, add toggle to show wallpaper group fundamental domain and cell structure
 
 ## QOL
 - [x] improve graph nodes render quality

@@ -1,11 +1,10 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, islamicAngle, isIslamic, gameOfLifeRules, tilingModalOpen, tilingRules, tilingStore } from '$stores';
+	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, islamicAngle, isIslamic, gameOfLifeRules, tilingModalOpen, tilingStore } from '$stores';
 
-	// Use Supabase data when available, otherwise fallback to static tilingRules
 	let activeTilingRules = $derived(
 		tilingStore.initialized && tilingStore.tilingRules.length > 0
 			? tilingStore.tilingRules
-			: tilingRules
+			: []
 	);
 	import { contentService } from '$lib/services/contentService';
 	import { createEventDispatcher, onMount } from 'svelte';
@@ -34,11 +33,10 @@
 	let expandedGroups = $state({});
 	
 	$effect(() => {
-		if (Object.keys(expandedGroups).length === 0) {
-			let initialState = {};
-			activeTilingRules.forEach(group => {
-				initialState[group.title] = true;
-			});
+		if (activeTilingRules.length > 0 && Object.keys(expandedGroups).length === 0) {
+			const initialState = Object.fromEntries(
+				activeTilingRules.map((group) => [group.title, true])
+			);
 			expandedGroups = initialState;
 		}
 	});

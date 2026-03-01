@@ -7,6 +7,7 @@
     import Canvas from '$components/Canvas.svelte';
     import TheoryContent from '$components/TheoryContent.svelte';
     import TilingModalContent from '$components/TilingModalContent.svelte';
+    import ScreenshotPreviewModal from '$components/ScreenshotPreviewModal.svelte';
 
     let sidebarElement = $state('');
     let isSidebarOpen = $state(true);
@@ -52,7 +53,7 @@
     };
 </script>
 
-<div class="h-screen w-full bg-zinc-900 overflow-hidden relative">
+<div class="flex-1 min-h-0 w-full bg-zinc-900 overflow-hidden relative">
     <div
         class="absolute inset-0 z-0 transition-transform duration-300 ease-in-out"
         style="transform: translateX({canvasOffset}px);"
@@ -81,4 +82,5 @@
     />
     
     <TilingModalContent />
+    <ScreenshotPreviewModal />
 </div>

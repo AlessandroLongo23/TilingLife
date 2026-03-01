@@ -112,6 +112,10 @@ export class Vector {
         return Math.atan2(this.y, this.x);
     }
 
+    static linearCombination(a: number, v1: Vector, b: number, v2: Vector): Vector {
+        return new Vector(a * v1.x + b * v2.x, a * v1.y + b * v2.y);
+    }
+
     mirror(angle: number): Vector {
         const dir = Vector.fromAngle(angle);
         const dotProduct = this.dot(dir);
@@ -120,6 +124,12 @@ export class Vector {
         this.y = 2 * dotProduct * dir.y - this.y;
 
         return this.copy();
+    }
+
+    static mirrorByPointAndDir(v: Vector, point: Vector, dir: Vector): Vector {
+        const vector = v.copy();
+        vector.mirrorByPointAndDir(point.copy(), dir.copy());
+        return vector;
     }
 
     mirrorByPointAndDir(point: Vector, dir: Vector): void {
@@ -146,6 +156,14 @@ export class Vector {
         this.y = newY;
 
         return this.copy();
+    }
+
+    static rotateAround(v: Vector, origin: Vector, angle: number): Vector {
+        return v.copy().rotateAround(origin, angle);
+    }
+
+    rotateAround(origin: Vector, angle: number): Vector {
+        return Vector.add(origin, Vector.sub(this, origin).rotate(angle));
     }
 
     distance(other: Vector): number {

@@ -5,7 +5,7 @@
 
 	let isDual = $derived(rulestring.includes('*'));
 
-	// Determine the image source - use Supabase URL if available, fallback to local
+	// Determine the image source - use Supabase URL if available
 	let imageSrc = $derived.by(() => {
 		if (isDual && dualImageUrl) {
 			return dualImageUrl;
@@ -13,8 +13,8 @@
 		if (imageUrl) {
 			return imageUrl;
 		}
-		// Fallback to local path for backward compatibility
-		return `/tilings/${groupId}/${rulestring.replaceAll('/', '_').replaceAll('*', '_')}.webp`;
+
+		return false;
 	});
 
 	const capitalize = (str) => {

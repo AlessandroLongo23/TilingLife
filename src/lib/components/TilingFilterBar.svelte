@@ -1,5 +1,5 @@
 <script>
-    import { tilingStore, tilingRules, vertexTypes } from '$stores';
+    import { tilingStore, vertexTypes } from '$stores';
     import { ChevronUp, ChevronDown } from 'lucide-svelte';
 
     import Toggle from '$components/ui/Toggle.svelte';
@@ -14,11 +14,10 @@
         vertexTypeFilterMode = $bindable('exact')
     } = $props();
 
-    // Use Supabase data if available, otherwise fallback to static data
     let activeTilingRules = $derived(
         tilingStore.initialized && tilingStore.tilingRules.length > 0 
             ? tilingStore.tilingRules 
-            : tilingRules
+            : []
     );
 
     let typesSectionExpanded = $state(true);

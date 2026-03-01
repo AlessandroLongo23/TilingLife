@@ -1,4 +1,4 @@
-import { PolygonType, StarVertexTypes } from '$classes';
+import { PolygonType, StarVertexTypes, Vector } from '$classes';
 import { toDegrees } from '$utils';
 
 export interface PolygonSignatureData {
@@ -7,23 +7,26 @@ export interface PolygonSignatureData {
     d?: number;
     alpha?: number;
     startsWith?: StarVertexTypes;
-    sides?: number[];
     angles?: number[];
+    sides?: number[];
 }
 
 export class PolygonSignature {
     type: PolygonType;
-    name: string;
     n: number;
     sides: number[];
     angles: number[];
     interior_angle: number;
-
+    anchor?: Vector;
+    dir?: Vector;
+    
     // star polygons
     d?: number;
     alpha?: number;
     beta?: number;
     startsWith?: StarVertexTypes;
+    
+    name?: string;
 
     constructor(data: PolygonSignatureData) {
         this.type = data.type;

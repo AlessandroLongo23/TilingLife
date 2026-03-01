@@ -1,5 +1,5 @@
 <script>
-    import { tilingStore, tilingRules, selectedTiling, tilingModalOpen, tilingFilters } from '$stores';
+    import { tilingStore, selectedTiling, tilingModalOpen, tilingFilters } from '$stores';
     import { Grid, Funnel, Loader2 } from 'lucide-svelte';
     
     import Modal from '$components/ui/Modal.svelte';
@@ -12,7 +12,7 @@
     let activeTilingRules = $derived(
         tilingStore.initialized && tilingStore.tilingRules.length > 0 
             ? tilingStore.tilingRules 
-            : tilingRules
+            : []
     );
     
     const toggleFilters = () => {

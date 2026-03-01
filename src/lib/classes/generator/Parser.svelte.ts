@@ -97,22 +97,6 @@ export class Parser {
                     continue;
                 }
 
-                // isotoxal
-                if (shapeSeedLayer[j].includes('(')){
-                    let angles: number[] = shapeSeedLayer[j].split('(')[1].split(')')[0].split(';').map(Number);
-                    if (n % angles.length != 0) {
-                        throw new Error('Invalid shape seed');
-                    } else {
-                        angles = Array(n / angles.length).fill(angles).flat();
-                    }
-                    this.shapeSeed[i][j] = {
-                        type: PolygonType.ISOTOXAL,
-                        n: n,
-                        angles: angles.map(angle => toRadians(angle))
-                    };
-                    continue;
-                }
-
                 // isohedral
                 if (shapeSeedLayer[j].includes('[')) {
                     let sides: number[] = shapeSeedLayer[j].split('[')[1].split(']')[0].split(';').map(Number);

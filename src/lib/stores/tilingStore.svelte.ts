@@ -1,10 +1,18 @@
+import { writable } from 'svelte/store';
 import { supabase } from '$services/supabase.js';
+import { listTilingImagesFromStorage } from '$services/tilingStorageList';
 
 let tilingGroups: TilingGroup[] = $state([]);
 let tilings: Tiling[] = $state([]);
+let storageImageMap = $state<Map<string, { standard: string; dual: string }>>(new Map());
 let loading = $state(true);
 let error = $state(null);
 let initialized = $state(false);
+/** Timestamp when tilings were last refreshed - use for cache-busting image URLs */
+let tilingsUpdatedAt = $state(Date.now());
+
+/** Writable set when tilings are loaded - use for reactive waiting (e.g. landing page) */
+export const tilingStoreReady = writable(false);
 
 interface Tiling {
     original_id: number;
@@ -86,14 +94,17 @@ async function initialize() {
     error = null;
     
     try {
-        const [groupsData, tilingsData] = await Promise.all([
+        const [groupsData, tilingsData, imageMap] = await Promise.all([
             fetchGroups(),
-            fetchTilings()
+            fetchTilings(),
+            listTilingImagesFromStorage()
         ]);
         
         tilingGroups = groupsData;
         tilings = tilingsData;
+        storageImageMap = imageMap;
         initialized = true;
+        tilingStoreReady.set(true);
     } catch (err) {
         console.error('Error initializing tiling store:', err);
         error = err.message;
@@ -117,6 +128,11 @@ function getLegacyFormat() {
     for (const tiling of tilings) {
         const group = groupMap.get(tiling.group_id);
         if (group) {
+            const storageKey = `${tiling.group_id}:${tiling.rulestring}`;
+            const storageImages = storageImageMap.get(storageKey);
+            const imageUrl = storageImages?.standard || tiling.image_url;
+            const dualImageUrl = storageImages?.dual || tiling.dual_image_url;
+
             group.rules.push({
                 id: tiling.original_id,
                 name: tiling.name,
@@ -125,8 +141,8 @@ function getLegacyFormat() {
                 dualname: tiling.dual_name,
                 alternatives: tiling.alternatives,
 
-                imageUrl: tiling.image_url,
-                dualImageUrl: tiling.dual_image_url,
+                imageUrl: imageUrl ? `${imageUrl}?t=${tilingsUpdatedAt}` : imageUrl,
+                dualImageUrl: dualImageUrl ? `${dualImageUrl}?t=${tilingsUpdatedAt}` : dualImageUrl,
                 isRegular: tiling.is_regular,
                 isSemiregular: tiling.is_semiregular,
                 isStar: tiling.is_star,
@@ -168,8 +184,22 @@ function filterTilings(filters: FilterOptions = {}) {
 }
 
 async function refresh() {
-    initialized = false;
-    await initialize();
+    loading = true;
+    try {
+        const [groupsData, tilingsData, imageMap] = await Promise.all([
+            fetchGroups(),
+            fetchTilings(),
+            listTilingImagesFromStorage()
+        ]);
+        tilingGroups = groupsData;
+        tilings = tilingsData;
+        storageImageMap = imageMap;
+        tilingsUpdatedAt = Date.now();
+    } catch (err) {
+        console.error('Error refreshing tiling store:', err);
+    } finally {
+        loading = false;
+    }
 }
 
 export const tilingStore = {
@@ -178,6 +208,7 @@ export const tilingStore = {
     get loading() { return loading; },
     get error() { return error; },
     get initialized() { return initialized; },
+    get tilingsUpdatedAt() { return tilingsUpdatedAt; },
     
     get tilingRules() { return getLegacyFormat(); },
     

@@ -231,12 +231,11 @@ export class Tiling {
             
             let nodeRule = this.golRuleType === GOLRuleType.SINGLE ? this.parsedGolRule : this.rules[node.n];
             if (!nodeRule) {
-                console.error(`No rule found for node with n=${node.n}`);
                 node.nextState = State.DEAD;
                 continue;
             }
 
-            let aliveRate = node.alive_neighbors / node.neighbors.length;
+            const aliveRate: number = node.alive_neighbors / node.neighbors.length;
 
             if (node.state === State.DEAD) {
                 let hasBirthNeighbors = false;

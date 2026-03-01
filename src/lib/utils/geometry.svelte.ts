@@ -1,5 +1,5 @@
 import { tolerance } from '$stores';
-import { parametricStarRegex, equilateralPolygonRegex, Vector, regularStarRegex, regularPolygonRegex, type PolygonSignatureData, PolygonType, StarVertexTypes } from '$classes';
+import { parametricStarRegex, equilateralPolygonRegex, Vector, regularStarRegex, regularPolygonRegex, type PolygonSignatureData, PolygonType, StarVertexTypes, TriangleType, QuadrilateralType, type TriangleSignature, type QuadrilateralSignature, Polygon } from '$classes';
 import { isWithinTolerance } from './math.svelte';
 
 export const sortPointsByAngleAndDistance = (points: Vector[]): Vector[] => {
@@ -187,4 +187,141 @@ export const deduplicatePoints = (points: Vector[]): Vector[] => {
         }
     }
     return uniquePoints;
+}
+
+export const evaluateTriangle = (vertices: Vector[]): TriangleSignature => {
+    if (vertices.length !== 3) return { types: [TriangleType.INVALID], vertices: [], rightVertexIndex: null };
+    let rightVertexIndex: number | null = null;
+
+    // CORRECT ANGLE CALCULATION: Angle between adjacent edges, not position vectors
+    vertices = sortPointsByAngle(vertices);
+    const angles = vertices.map((v, i) => {
+        const prev = vertices[(i - 1 + vertices.length) % vertices.length];
+        const next = vertices[(i + 1) % vertices.length];
+        const edge1 = Vector.sub(prev, v);
+        const edge2 = Vector.sub(next, v);
+        const angle = Vector.angleBetween(edge1, edge2); 
+        if (isWithinTolerance(angle, Math.PI / 2)) rightVertexIndex = i;
+        return angle;
+    });
+
+    // Use a standard helper for grouping floats safely, or keep your Set trick 
+    // (but ensure Math.PI / 2 maps exactly to the tolerance bin)
+    const uniqueAngles = new Set(angles.map(a => Math.round(a / tolerance) * tolerance));
+    const rightAngleBin = Math.round((Math.PI / 2) / tolerance) * tolerance;
+
+    const types: TriangleType[] = [];
+
+    // Check for 90 degrees
+    if (uniqueAngles.has(rightAngleBin)) {
+        types.push(TriangleType.RIGHT);
+    }
+
+    // Side/Angle uniqueness classifications
+    if (uniqueAngles.size === 1) {
+        types.push(TriangleType.EQUILATERAL);
+    } else if (uniqueAngles.size === 2) {
+        types.push(TriangleType.ISOSCELES);
+    } else if (uniqueAngles.size === 3) {
+        types.push(TriangleType.SCALENE);
+    }
+
+    return { types: types.length > 0 ? types : [TriangleType.INVALID], vertices: vertices, rightVertexIndex: rightVertexIndex };
+}
+
+export const evaluateQuadrilateral = (vertices: Vector[]): QuadrilateralSignature => {
+    if (vertices.length !== 4) return { types: [QuadrilateralType.INVALID], vertices: [] };
+
+    // CORRECT CALCULATIONS
+    vertices = sortPointsByAngle(vertices);
+    const angles = vertices.map((v, i) => {
+        const prev = vertices[(i - 1 + vertices.length) % vertices.length];
+        const next = vertices[(i + 1) % vertices.length];
+        const edge1 = Vector.sub(prev, v);
+        const edge2 = Vector.sub(next, v);
+        return Vector.angleBetween(edge1, edge2);
+    });
+    const sides = vertices.map((v, i) => Vector.distance(v, vertices[(i + 1) % vertices.length]));
+
+    const uniqueAngles = new Set(angles.map(a => Math.round(a / tolerance) * tolerance));
+    const uniqueSides = new Set(sides.map(s => Math.round(s / tolerance) * tolerance));
+
+    if (uniqueAngles.size > 2 || uniqueSides.size > 2) return { types: [QuadrilateralType.INVALID], vertices: [] };
+
+    // All angles equal (must be 90 degrees in a quad)
+    if (uniqueAngles.size === 1) {
+        if (uniqueSides.size === 1) return { types: [QuadrilateralType.SQUARE, QuadrilateralType.RECTANGLE, QuadrilateralType.RHOMBUS], vertices: vertices };
+        if (uniqueSides.size === 2) return { types: [QuadrilateralType.RECTANGLE, QuadrilateralType.PARALLELOGRAM], vertices: vertices };
+    }
+
+    // Check if opposite sides are equal to filter out Kites
+    const isParallelogram = 
+        Math.abs(sides[0] - sides[2]) < tolerance && 
+        Math.abs(sides[1] - sides[3]) < tolerance;
+
+    if (!isParallelogram) return { types: [QuadrilateralType.INVALID], vertices: [] };
+
+    // All sides equal (Rhombus family)
+    if (uniqueSides.size === 1) {
+        const sixtyDegBin = Math.round((Math.PI / 3) / tolerance) * tolerance;
+        const oneTwentyDegBin = Math.round((2 * Math.PI / 3) / tolerance) * tolerance;
+        
+        if (uniqueAngles.has(sixtyDegBin) && uniqueAngles.has(oneTwentyDegBin)) {
+            return { types: [QuadrilateralType.HEX_UNIT, QuadrilateralType.RHOMBUS, QuadrilateralType.PARALLELOGRAM], vertices: vertices };
+        }
+        return { types: [QuadrilateralType.RHOMBUS, QuadrilateralType.PARALLELOGRAM], vertices: vertices };
+    }
+
+    // If it's a parallelogram but not a rhombus or rectangle
+    return { types: [QuadrilateralType.PARALLELOGRAM], vertices: vertices };
+}
+
+export const sortPointsByAngle = (vertices: Vector[]): Vector[] => {
+    const centroid = vertices.reduce((acc, v) => Vector.add(acc, v), new Vector(0, 0)).scale(1 / vertices.length);
+    return vertices.sort((a, b) => Vector.sub(a, centroid).heading() - Vector.sub(b, centroid).heading());
+}
+
+export const isWithinConvexHull = (vertices: Vector[], point: Vector): boolean => {
+    return sdf(vertices, point) < -tolerance;
+}
+
+export const sdf = (vertices: Vector[], point: Vector): number => {
+    let minDistanceSq = Infinity;
+    let inside = false;
+    const verticesSorted = sortPointsByAngle(vertices);
+
+    for (let i = 0, j = verticesSorted.length - 1; i < verticesSorted.length; j = i++) {
+        const vi = verticesSorted[j];
+        const vj = verticesSorted[i];
+        const ex = vj.x - vi.x;
+        const ey = vj.y - vi.y;
+        const wx = point.x - vi.x;
+        const wy = point.y - vi.y;
+        const eLenSq = ex * ex + ey * ey;
+        let t = Math.max(0, Math.min(1, (wx * ex + wy * ey) / eLenSq));
+
+        if (isNaN(t)) t = 0;
+        const cx = vi.x + t * ex;
+        const cy = vi.y + t * ey;
+        const dx = point.x - cx;
+        const dy = point.y - cy;
+        const distSq = dx * dx + dy * dy;
+        
+        if (distSq < minDistanceSq) {
+            minDistanceSq = distSq;
+        }
+        const intersect = ((vi.y > point.y) !== (vj.y > point.y)) && (point.x < (vj.x - vi.x) * (point.y - vi.y) / (vj.y - vi.y) + vi.x);
+        
+        if (intersect) {
+            inside = !inside;
+        }
+    }
+    const distance = Math.sqrt(minDistanceSq);
+    return inside ? -distance : distance;
+}
+
+export const deduplicatePolygons = (polygons: Polygon[]): Polygon[] => {
+    return polygons.filter((p, idx, self) => {
+        return idx === self.findIndex(other => isWithinTolerance(p.centroid, other.centroid));
+    });
 }

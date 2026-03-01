@@ -25,6 +25,6 @@ export class IsohedralPolygon extends GenericPolygon {
     }
 
     clone = (): IsohedralPolygon => {
-        return IsohedralPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy(), [...this.sides]);
+        return IsohedralPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]).copy(), [...this.sides]);
     }
 }

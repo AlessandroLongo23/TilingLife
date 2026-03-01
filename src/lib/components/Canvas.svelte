@@ -1,5 +1,5 @@
 <script>
-    import { ruleType, parameter, selectedTiling, showCR, debugView, controls, transformSteps, patch, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph } from '$stores';
+    import { ruleType, parameter, selectedTiling, showCR, debugView, controls, transformSteps, patch, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, openScreenshotPreview, tilingStore } from '$stores';
     import { debugManager, debugStore, updateDebugStore } from '$stores';
     import { sortPointsByAngleAndDistance } from '$utils';
     // import { TilingGeneratorWFC } from '$lib/classes/generator/TilingGeneratorWFC.svelte.ts';
@@ -101,7 +101,6 @@
     $effect(() => {
         if ($takeScreenshot && myp5) {
             (async () => {
-                sounds.screenshot();
                 await myp5.takeScreenshot();
                 $takeScreenshot = false;
             })();
@@ -146,74 +145,74 @@
             p5.background(240, 7, 16);
 
             try {
-                // if (showGameOfLife) {
-                //     if (
-                //         prevRuleType != $ruleType || 
-                //         ($ruleType == "Single" && !p5.isSameRule(prevGolRule, $golRule)) || 
-                //         ($ruleType == "By Shape" && !p5.isSameRule(prevGolRules, $golRules)) ||
-                //         resetGameOfLife
-                //     ) {
-                //         tilingGenerator.setupGameOfLife($ruleType, $golRule, $golRules);
-                //         resetGameOfLife = false;
-                //     }
+                if (showGameOfLife) {
+                    if (
+                        prevRuleType != $ruleType || 
+                        ($ruleType == "Single" && !p5.isSameRule(prevGolRule, $golRule)) || 
+                        ($ruleType == "By Shape" && !p5.isSameRule(prevGolRules, $golRules)) ||
+                        resetGameOfLife
+                    ) {
+                        tilingGenerator.setupGameOfLife($ruleType, $golRule, $golRules);
+                        resetGameOfLife = false;
+                    }
 
-                //     if (p5.frameCount % Math.round(frameMod) == 0) {
-                //         // Store previous states to calculate changes
-                //         const prevStates = tiling.nodes.map(node => node.state);
+                    if (p5.frameCount % Math.round(frameMod) == 0) {
+                        // Store previous states to calculate changes
+                        const prevStates = tiling.nodes.map(node => node.state);
                         
-                //         tiling.updateGameOfLife();
+                        tiling.updateGameOfLife();
                         
-                //         // Calculate state changes
-                //         const changedCells = tiling.nodes.filter((node, index) => node.state !== prevStates[index]).length;
-                //         const totalCells = tiling.nodes.length;
-                //         const changeRatio = totalCells > 0 ? changedCells / totalCells : 0;
+                        // Calculate state changes
+                        const changedCells = tiling.nodes.filter((node, index) => node.state !== prevStates[index]).length;
+                        const totalCells = tiling.nodes.length;
+                        const changeRatio = totalCells > 0 ? changedCells / totalCells : 0;
                         
-                //         // Play state change sound with volume proportional to change ratio
-                //         // and subtle variations based on simulation state
-                //         if (changedCells > 0) {
-                //             // Use behavior data to influence sound variation
-                //             const bornCells = tiling.nodes.filter((node, index) => 
-                //                 prevStates[index] === 0 && node.state === 1).length;
-                //             const diedCells = tiling.nodes.filter((node, index) => 
-                //                 prevStates[index] === 1 && node.state === 0).length;
+                        // Play state change sound with volume proportional to change ratio
+                        // and subtle variations based on simulation state
+                        if (changedCells > 0) {
+                            // Use behavior data to influence sound variation
+                            const bornCells = tiling.nodes.filter((node, index) => 
+                                prevStates[index] === 0 && node.state === 1).length;
+                            const diedCells = tiling.nodes.filter((node, index) => 
+                                prevStates[index] === 1 && node.state === 0).length;
                             
-                //             // Calculate additional parameters for sound variation
-                //             const bornRatio = totalCells > 0 ? bornCells / totalCells : 0;
-                //             const diedRatio = totalCells > 0 ? diedCells / totalCells : 0;
-                //             const activityLevel = Math.min(1.0, (bornRatio + diedRatio) * 2);
+                            // Calculate additional parameters for sound variation
+                            const bornRatio = totalCells > 0 ? bornCells / totalCells : 0;
+                            const diedRatio = totalCells > 0 ? diedCells / totalCells : 0;
+                            const activityLevel = Math.min(1.0, (bornRatio + diedRatio) * 2);
                             
-                //             // Adjust volume based on change ratio but ensure it's audible
-                //             const volume = changeRatio / 5;
+                            // Adjust volume based on change ratio but ensure it's audible
+                            const volume = changeRatio / 5;
                             
-                //             // Pass simulation parameters to the sound function
-                //             sounds.stateChange(volume, {
-                //                 bornRatio,
-                //                 diedRatio,
-                //                 activityLevel,
-                //                 iteration: iterationCount
-                //             });
-                //         }
+                            // Pass simulation parameters to the sound function
+                            sounds.stateChange(volume, {
+                                bornRatio,
+                                diedRatio,
+                                activityLevel,
+                                iteration: iterationCount
+                            });
+                        }
                         
-                //         alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
+                        alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
                         
-                //         // Update behavior data
-                //         const totalNodes = tiling.nodes.length;
-                //         const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
-                //         const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
-                //         const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
+                        // Update behavior data
+                        const totalNodes = tiling.nodes.length;
+                        const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
+                        const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
+                        const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
                         
-                //         behaviorData = {
-                //             increasing: (increasingNodes / totalNodes) * 100,
-                //             chaotic: (chaoticNodes / totalNodes) * 100,
-                //             decreasing: (decreasingNodes / totalNodes) * 100
-                //         };
+                        behaviorData = {
+                            increasing: (increasingNodes / totalNodes) * 100,
+                            chaotic: (chaoticNodes / totalNodes) * 100,
+                            decreasing: (decreasingNodes / totalNodes) * 100
+                        };
                         
-                //         iterationCount++;
-                //     }
+                        iterationCount++;
+                    }
 
-                //     tiling.drawGameOfLife(p5);
-                //     p5.pop();
-                // } else {
+                    tiling.drawGameOfLife(p5);
+                    p5.pop();
+                } else {
                     if (
                         prevSelectedTiling.rulestring != $selectedTiling.rulestring || 
                         parseInt($transformSteps) != parseInt(prevTransformSteps) ||
@@ -224,7 +223,7 @@
                         tilingGenerator.golEngine.setupGameOfLife(tiling, $ruleType, $golRule, $golRules);
                         // cr = new Cr($selectedTiling.cr || tiling.crNotation);
 
-                        crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
+                        // crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
                     }
 
                     if ($exportGraphButtonHover) {
@@ -237,7 +236,7 @@
                         tiling.drawConstructionPoints(p5);
                     
                     // tiling.showNeighbors(p5, $showPolygonPoints);
-                    tilingGenerator.showWFCInfo(p5);
+                    // tilingGenerator.showWFCInfo(p5);
 
                     p5.pop();
 
@@ -278,9 +277,9 @@
                         tiling.exportGraph(p5);
                         $exportGraph = false;
                     }
-                // }
+                }
             } catch (e) {
-                // console.error(e);
+                console.error(e);
             }
 
             if (grab) {
@@ -526,15 +525,20 @@
                 }
             }
             
-            p5.saveCanvas(screenshotCanvas, filename, 'png');
+            const imageDataUrl = screenshotCanvas.elt.toDataURL('image/png');
+            const baseRulestring = $selectedTiling.rulestring.replace(/\*$/, '');
+            const dbTiling = tilingStore.getTilingByRulestring($selectedTiling.rulestring)
+                ?? tilingStore.getTilingByRulestring(baseRulestring);
+            const groupId = dbTiling?.group_id ?? null;
 
             screenshotCanvas.remove();
-            
-            notificationMessage = `Screenshot saved as ${filename}`;
-            showNotification = true;
-            setTimeout(() => {
-                showNotification = false;
-            }, 3000);
+
+            openScreenshotPreview({
+                imageDataUrl,
+                filename,
+                rulestring: $selectedTiling.rulestring,
+                groupId
+            });
         }
     };
 

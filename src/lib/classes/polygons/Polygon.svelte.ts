@@ -1,5 +1,5 @@
-import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic, tolerance } from '$stores';
-import { isWithinTolerance, segmentsIntersect } from '$lib/utils';
+import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic } from '$stores';
+import { isWithinConvexHull, isWithinTolerance, segmentsIntersect } from '$lib/utils';
 import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
 
@@ -101,17 +101,17 @@ export class Polygon {
     mirror = (point: Vector, dir: Vector): Polygon => {
         this.angle = (2 * dir.heading() - this.angle + 2 * Math.PI) % (2 * Math.PI);
         
-        this.centroid.mirrorByPointAndDir(point, dir);
+        this.centroid.mirrorByPointAndDir(point.copy(), dir.copy());
         this.centroid.snapToGrid();
         
         for (let i = 0; i < this.vertices.length; i++) {
-            this.vertices[i].mirrorByPointAndDir(point, dir);
+            this.vertices[i].mirrorByPointAndDir(point.copy(), dir.copy());
             this.vertices[i].snapToGrid();
         }
         this.vertices.reverse();
 
         for (let i = 0; i < this.halfways.length; i++) {
-            this.halfways[i].mirrorByPointAndDir(point, dir);
+            this.halfways[i].mirrorByPointAndDir(point.copy(), dir.copy());
             this.halfways[i].snapToGrid();
         }
         this.halfways.reverse();
@@ -139,7 +139,7 @@ export class Polygon {
     }
 
     containsPoint = (point: Vector): boolean => {
-        return this.sdf(point) < -tolerance;
+        return isWithinConvexHull(this.vertices, point);
     }
 
     intersects(other: Polygon): boolean {
@@ -291,40 +291,6 @@ export class Polygon {
 
     clone = (): Polygon => {
         throw new Error('Abstract method called');
-    }
-
-    sdf = (p: Vector): number => {
-        let minDistanceSq = Infinity;
-        let inside = false;
-
-        for (let i = 0, j = this.vertices.length - 1; i < this.vertices.length; j = i++) {
-            const vi = this.vertices[j];
-            const vj = this.vertices[i];
-            const ex = vj.x - vi.x;
-            const ey = vj.y - vi.y;
-            const wx = p.x - vi.x;
-            const wy = p.y - vi.y;
-            const eLenSq = ex * ex + ey * ey;
-            let t = Math.max(0, Math.min(1, (wx * ex + wy * ey) / eLenSq));
-
-            if (isNaN(t)) t = 0;
-            const cx = vi.x + t * ex;
-            const cy = vi.y + t * ey;
-            const dx = p.x - cx;
-            const dy = p.y - cy;
-            const distSq = dx * dx + dy * dy;
-            
-            if (distSq < minDistanceSq) {
-                minDistanceSq = distSq;
-            }
-            const intersect = ((vi.y > p.y) !== (vj.y > p.y)) && (p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x);
-            
-            if (intersect) {
-                inside = !inside;
-            }
-        }
-        const distance = Math.sqrt(minDistanceSq);
-        return inside ? -distance : distance;
     }
 
     calculateVerticesFromCentroidAndAngle = (): void => {

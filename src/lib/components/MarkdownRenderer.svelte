@@ -47,6 +47,14 @@
 		});
 	}
 	
+	// Handle heading clicks - navigate to section when clicking h2, h3, h4
+	function handleHeadingClick(event) {
+		const heading = event.target.closest('h2, h3, h4');
+		if (heading?.id) {
+			scrollToSection(heading.id);
+		}
+	}
+	
 	// Handle GIF click events
 	function handleGifClick(event) {
 		// Disable GIF expansion on click
@@ -123,7 +131,8 @@
 			if (containerElement) {
 				const container = containerElement.querySelector('#content-container');
 				if (container) {
-					container.removeEventListener('click', handleGifClick);
+					container.removeEventListener('click', handleHeadingClick);
+				container.removeEventListener('click', handleGifClick);
 				}
 			}
 		};
@@ -187,16 +196,16 @@
 
 <style lang="postcss">
 	:global(.markdown-content h2) {
-		@apply text-4xl font-bold text-white mb-10 mt-24 pb-4 border-b border-green-400/80;
+		@apply text-4xl font-bold text-white mb-10 mt-24 pb-4 border-b border-green-400/80 cursor-pointer;
 		scroll-margin-top: 1rem;
 	}
 	
 	:global(.markdown-content h3) {
-		@apply text-2xl font-semibold text-white mb-4 mt-16 scroll-mt-20;
+		@apply text-2xl font-semibold text-white mb-4 mt-16 scroll-mt-20 cursor-pointer;
 	}
 	
 	:global(.markdown-content h4) {
-		@apply text-xl font-medium text-white mb-3 mt-8 scroll-mt-16;
+		@apply text-xl font-medium text-white mb-3 mt-8 scroll-mt-16 cursor-pointer;
 	}
 	
 	:global(.markdown-content p) {
