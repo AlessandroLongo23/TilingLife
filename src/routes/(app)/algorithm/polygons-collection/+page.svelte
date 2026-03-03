@@ -80,8 +80,42 @@
         return true;
     }
 
+    /** Compare two arrays lexicographically. Returns -1 if a < b, 1 if a > b, 0 if equal. */
+    function compareLex(a: number[], b: number[]) {
+        for (let i = 0; i < Math.min(a.length, b.length); i++) {
+            if (a[i] < b[i]) return -1;
+            if (a[i] > b[i]) return 1;
+        }
+        return a.length - b.length;
+    }
+
+    /** For generic polygons: two are the same if n is equal and sides/angles are cyclic rotations (same offset).
+     * Returns true if this name is the lexicographically smallest rotation. */
+    function isCanonicalGeneric(name: string) {
+        const m = name.match(genericPolygonRegex);
+        if (!m) return true;
+        const [, nStr, sidesStr, anglesStr] = m;
+        const n = parseInt(nStr, 10);
+        const sides = sidesStr.split(';').map(s => parseFloat(s));
+        const angles = anglesStr.split(';').map(a => parseFloat(a));
+        if (sides.length !== n || angles.length !== n) return true;
+
+        const base = [...sides, ...angles];
+        for (let r = 1; r < n; r++) {
+            const rotSides = sides.map((_, i) => sides[(i + r) % n]);
+            const rotAngles = angles.map((_, i) => angles[(i + r) % n]);
+            const rotated = [...rotSides, ...rotAngles];
+            if (compareLex(rotated, base) < 0) return false;
+        }
+        return true;
+    }
+
     const canonicalEquilateralNames = new Set(
         allPolygonNames.filter(n => n.match(equilateralPolygonRegex) && isCyclicMinimum(n))
+    );
+
+    const canonicalGenericNames = new Set(
+        allPolygonNames.filter(n => n.match(genericPolygonRegex) && isCanonicalGeneric(n))
     );
 
     function getCategory(name) {
@@ -121,6 +155,7 @@
             if (uniqueOnly) {
                 if (vertexType === StarVertexTypes.INNER) return false;
                 if (category === PolygonType.EQUILATERAL && !canonicalEquilateralNames.has(name)) return false;
+                if (category === PolygonType.GENERIC && !canonicalGenericNames.has(name)) return false;
             }
 
             if (filterAngleEnabled) {
@@ -451,7 +486,7 @@
                         bind:checked={uniqueOnly}
                     />
                     <p class="text-[10px] text-zinc-600 mt-1.5 leading-relaxed">
-                        Keep only outer star variants, cyclic-minimum equilateral, and generic polygons.
+                        Keep only outer star variants, cyclic-minimum equilateral, and cyclic-minimum generic (sides and angles rotated together).
                     </p>
                 </div>
 
