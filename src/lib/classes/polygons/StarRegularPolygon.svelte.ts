@@ -23,6 +23,8 @@ export class StarRegularPolygon extends StarPolygon {
         polygon.interior_angle = startsWith === StarVertexTypes.OUTER ? polygon.alpha : polygon.beta;
 
         polygon.calculateVerticesFromAnchorAndDir(startsWith);
+        polygon.calculateSides();
+        polygon.calculateAngles();
         polygon.calculateHalfways();
         polygon.calculateCentroid();
         polygon.calculateAngle();
@@ -38,6 +40,8 @@ export class StarRegularPolygon extends StarPolygon {
         polygon.angle = angle;
 
         polygon.calculateVerticesFromCentroidAndAngle();
+        polygon.calculateSides();
+        polygon.calculateAngles();
         polygon.calculateHalfways();
         polygon.calculateCentroid();
         polygon.calculateHue();
@@ -64,7 +68,9 @@ export class StarRegularPolygon extends StarPolygon {
     }
 
     clone = (): StarRegularPolygon => {
-        return StarRegularPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]), this.d, this.startsWith);
+        const anchor = this.vertices[0].copy();
+        const dir = Vector.sub(this.vertices[1], this.vertices[0]).copy().normalize();
+        return StarRegularPolygon.fromAnchorAndDir(this.n, anchor, dir, this.d, this.startsWith);
     }
 
     encode = (): Object => {

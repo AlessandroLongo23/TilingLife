@@ -1,10 +1,7 @@
-import { Polygon, Vector } from '$classes';
-import { map, toDegrees } from '$utils';
+import { Polygon, PolygonType, Vector } from '$classes';
+import { getAngleAtVertex, isWithinTolerance, map, toDegrees } from '$utils';
 
 export class GenericPolygon extends Polygon {
-    sides: number[];
-    angles: number[];
-
     constructor(n: number) {
         super(n);
     }
@@ -20,6 +17,8 @@ export class GenericPolygon extends Polygon {
         polygon.interior_angle = angles[0];
 
         polygon.calculateVerticesFromAnchorAndDir();
+        polygon.calculateSides();
+        polygon.calculateAngles();
         polygon.calculateHalfways();
         polygon.calculateCentroid();
         polygon.calculateAngle();
@@ -29,20 +28,19 @@ export class GenericPolygon extends Polygon {
     }
 
     static fromVertices = (vertices: Vector[]): GenericPolygon => {
-        const sides = vertices.map(v => Vector.distance(v, vertices[(vertices.indexOf(v) + 1) % vertices.length]));
-        const angles = vertices.map(v => Vector.angleBetween(v, vertices[(vertices.indexOf(v) + 1) % vertices.length]));
+        const angles = vertices.map(v => getAngleAtVertex(vertices, v));
+        const sides = vertices.map((v, index) => Vector.distance(v, vertices[(index + 1) % vertices.length]));
         const anchor = vertices[0].copy();
         const dir = Vector.sub(vertices[1], vertices[0]).copy();
-
         return GenericPolygon.fromAnchorAndDir(vertices.length, anchor, dir, sides, angles);
     }
 
     calculateVerticesFromAnchorAndDir = () => {
         this.vertices = [this.anchor.copy()];
-        let current_dir: Vector = this.dir.copy();
+        let current_dir: Vector = this.dir.copy().normalize();
         for (let i = 1; i < this.n; i++) {
             const prev_vertex = this.vertices[this.vertices.length - 1];
-            this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.scale(this.sides[i])));
+            this.vertices.push(Vector.add(prev_vertex.copy(), Vector.scale(current_dir, this.sides[i - 1])));
             current_dir.rotate(Math.PI - this.angles[i]);
             this.vertices[i].snapToGrid();
         }
@@ -116,7 +114,48 @@ export class GenericPolygon extends Polygon {
         return this;
     }
 
+    getName = (coordinate: Vector | null = null): string => {
+        if (!coordinate) return this.name;
+        
+        const index = this.vertices.findIndex(v => isWithinTolerance(v, coordinate));
+        if (index === -1) {
+            console.error('Vertex not found');
+            return '';
+        }
+
+        // const rotatedSides = Array.from({ length: this.n }, (_, i) => this.sides[(vertexIndex + i) % this.n]);
+        // const rotatedAngles = Array.from({ length: this.n }, (_, i) => toDegrees(this.angles[(vertexIndex + i) % this.n]));
+        let name = `${this.n}[`;
+        for (let i = 0; i < this.n; i++) {
+            name += this.sides[(index + i) % this.n].toFixed(3);
+            if (i < this.n - 1) {
+                name += ';';
+            }
+        }
+        name += '](';
+        for (let i = 0; i < this.n; i++) {
+            name += toDegrees(this.angles[(index + i) % this.n]);
+            if (i < this.n - 1) {
+                name += ';';
+            }
+        }
+        name += ')';
+        return name;
+    }
+
     clone = (): GenericPolygon => {
-        return GenericPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]).copy(), [...this.sides], [...this.angles]);
+        const anchor = this.vertices[0].copy();
+        const dir = Vector.sub(this.vertices[1], this.vertices[0]).copy().normalize();
+        return GenericPolygon.fromAnchorAndDir(this.n, anchor, dir, [...this.sides], [...this.angles]);
+    }
+
+    encode = (): Object => {
+        return {
+            type: PolygonType.GENERIC,
+            n: this.n,
+            sides: this.sides.map(s => s.toFixed(3)),
+            angles: this.angles.map(a => toDegrees(a)),
+            vertices: this.vertices.map(v => v.encode()),
+        };
     }
 }

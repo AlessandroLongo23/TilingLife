@@ -13,8 +13,8 @@ import {
     type PartialConfiguration,
     type SurroundingPolygon
 } from '$classes';
-import { deduplicatePoints, isWithinAngularTolerance, isWithinTolerance, toRadians } from '$utils';
-import { regularPolygonRegex, regularStarRegex, parametricStarRegex, equilateralPolygonRegex } from './regex';
+import { deduplicatePoints, isWithinAngularTolerance, isWithinTolerance, toRadians, compareVCNames } from '$utils';
+import { regularPolygonRegex, regularStarRegex, parametricStarRegex, equilateralPolygonRegex, genericPolygonRegex } from './regex';
 import { tolerance } from '$stores';
 
 export class VertexConfiguration {
@@ -68,6 +68,10 @@ export class VertexConfiguration {
                 const equilateralPolygonMatch = p.match(equilateralPolygonRegex);
                 const [, n, angles] = equilateralPolygonMatch;
                 polygon = EquilateralPolygon.fromAnchorAndDir(parseInt(n), new Vector(0, 0), current_dir.copy(), angles.split(';').map(a => toRadians(parseInt(a))));
+            } else if (p.match(genericPolygonRegex)) {
+                const genericPolygonMatch = p.match(genericPolygonRegex);
+                const [, n, sides, angles] = genericPolygonMatch;
+                polygon = GenericPolygon.fromAnchorAndDir(parseInt(n), new Vector(0, 0), current_dir.copy(), sides.split(';').map(s => parseFloat(s)), angles.split(';').map(a => toRadians(parseInt(a))));
             }
 
             if (polygon) {
@@ -88,78 +92,90 @@ export class VertexConfiguration {
 
         return new SeedConfiguration([vcA, clonedB]);
     }
-    
-    addPolygon = (polygonData: PolygonSignature) => {
+
+    generatePolygon = (polygonData: PolygonSignature, dir: Vector): Polygon => {
         let polygon: Polygon;
         switch (polygonData.type) {
             case PolygonType.REGULAR:
-                polygon = RegularPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), this.current_dir);
+                polygon = RegularPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), dir);
                 break;
             case PolygonType.STAR_REGULAR:
-                polygon = StarRegularPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), this.current_dir, polygonData.d, polygonData.startsWith);
+                polygon = StarRegularPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), dir, polygonData.d, polygonData.startsWith);
                 break;
             case PolygonType.STAR_PARAMETRIC:
-                polygon = StarParametricPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), this.current_dir, polygonData.alpha, polygonData.startsWith);
+                polygon = StarParametricPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), dir, polygonData.alpha, polygonData.startsWith);
                 break;
             case PolygonType.EQUILATERAL:
-                polygon = EquilateralPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), this.current_dir, polygonData.angles);
+                polygon = EquilateralPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), dir, [...polygonData.angles]);
                 break;
             case PolygonType.GENERIC:
-                polygon = GenericPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), this.current_dir, polygonData.sides, polygonData.angles);
+                polygon = GenericPolygon.fromAnchorAndDir(polygonData.n, new Vector(0, 0), dir, [...polygonData.sides], [...polygonData.angles]);
                 break;
         }
-        
-        this.polygons.push(polygon);
-        this.angle += polygon.interior_angle;
 
-        // FIRST CHECK: check if any polygon conflicts with any other polygon
+        return polygon;
+    }
+
+    addPolygon = (polygonData: PolygonSignature) => {
+        let newPolygon = this.generatePolygon(polygonData, this.current_dir.copy().normalize());
+        this.polygons.push(newPolygon);
+        this.angle += newPolygon.interior_angle;
+
+        // FIRST CHECK: check if the new polygon conflicts with any other polygon
         if (this.polygons.length > 1) {
-            const lastPolygon = this.polygons[this.polygons.length - 1];
-            
             for (let i = 0; i < this.polygons.length - 1; i++) {
-                if (lastPolygon.intersects(this.polygons[i])) {
+                if (newPolygon.intersects(this.polygons[i])) {
                     this.valid = false;
                     return;
                 }
             }
         }
 
-        // SECOND CHECK: check the vertex configuration validity by checking the sum of the interior angles of the two last polygons on the adjacent vertex
+        // SECOND CHECK: at the adjacent vertex (where last two polygons meet, excluding center), the angle sum must not exceed 2π
         if (this.polygons.length > 1) {
-            const lastPolygon = this.polygons[this.polygons.length - 1];
             const secondLastPolygon = this.polygons[this.polygons.length - 2];
-            
-            const adjacentVertex = this.current_dir.copy();
-
-            const angleA = lastPolygon.getAngleAtVertex(adjacentVertex);
-            const angleB = secondLastPolygon.getAngleAtVertex(adjacentVertex);
-            const sum = angleA + angleB;
-            if (sum > 2 * Math.PI + tolerance) {
-                this.valid = false;
-                return;
+            const adjacentVertex = findAdjacentVertex(newPolygon, secondLastPolygon);
+            if (adjacentVertex) {
+                const angleA = newPolygon.getAngleAtVertex(adjacentVertex);
+                const angleB = secondLastPolygon.getAngleAtVertex(adjacentVertex);
+                if (angleA + angleB > 2 * Math.PI + tolerance) {
+                    this.valid = false;
+                    return;
+                }
             }
         }
 
+        // THIRD CHECK: when cycle closes, at the adjacent vertex (where first and last meet, excluding center), the angle sum must not exceed 2π
         if (isWithinAngularTolerance(this.angle, 2 * Math.PI)) {
             const firstPolygon = this.polygons[0];
-            const lastPolygon = this.polygons[this.polygons.length - 1];
-            const adjacentVertex = new Vector(1, 0);
-
-            const angleA = lastPolygon.getAngleAtVertex(adjacentVertex);
-            const angleB = firstPolygon.getAngleAtVertex(adjacentVertex);
-            const sum = angleA + angleB;
-            if (sum > 2 * Math.PI + tolerance) {
-                this.valid = false;
-                return;
+            const adjacentVertex = findAdjacentVertex(newPolygon, firstPolygon);
+            if (adjacentVertex) {
+                const angleA = newPolygon.getAngleAtVertex(adjacentVertex);
+                const angleB = firstPolygon.getAngleAtVertex(adjacentVertex);
+                if (angleA + angleB > 2 * Math.PI + tolerance) {
+                    this.valid = false;
+                    return;
+                }
             }
         }
 
         this.name = this.getName();
-        this.current_dir.rotate(polygon.interior_angle);
+        this.current_dir.rotate(newPolygon.interior_angle);
     }
 
     computeNeighboringVertices = (): void => {
-        this.neighboringVertices = this.polygons.map(p => p.vertices[1]);
+        this.neighboringVertices = [];
+        this.sharedVertex = this.computeSharedVertex();
+
+        for (const polygon of this.polygons) {
+            for (let i = 0; i < polygon.vertices.length; i++) {
+                const next = polygon.vertices[(i + 1) % polygon.vertices.length];
+                if (isWithinTolerance(next, this.sharedVertex)) 
+                    this.neighboringVertices.push(polygon.vertices[i].copy());
+            }
+        }
+
+        this.neighboringVertices = deduplicatePoints(this.neighboringVertices);
     }
 
     computeAngle = (): number => {
@@ -175,7 +191,16 @@ export class VertexConfiguration {
     }
 
     getName = (): string => {
-        return this.polygons.map(p => p.getName(new Vector())).join(',');
+        const polygonNames: string[] = this.polygons.map(p => p.getName());
+        let minPolygonNames: string[] = polygonNames;
+        for (let i = 0; i < polygonNames.length; i++) {
+            let rotated = polygonNames.slice(i).concat(polygonNames.slice(0, i));
+            if (compareVCNames(rotated, minPolygonNames) < 0) {
+                minPolygonNames = rotated;
+            }
+        }
+
+        return minPolygonNames.join(',');
     }
 
     private getPolygonBaseNames = (): string[] => {
@@ -190,7 +215,7 @@ export class VertexConfiguration {
             const names = this.getPolygonBaseNames();
             this._edgePairs = new Set<string>();
             for (let i = 0; i < names.length; i++) {
-                this._edgePairs.add(names[i] + '\0' + names[(i + 1) % names.length]);
+                this._edgePairs.add(names[i] + ',' + names[(i + 1) % names.length]);
             }
         }
         return this._edgePairs;
@@ -219,8 +244,8 @@ export class VertexConfiguration {
 
         let hasInvertedPair = false;
         for (const pair of thisEdgePairs) {
-            const sep = pair.indexOf('\0');
-            const reversed = pair.substring(sep + 1) + '\0' + pair.substring(0, sep);
+            const sep = pair.indexOf(',');
+            const reversed = pair.substring(sep + 1) + ',' + pair.substring(0, sep);
             if (otherEdgePairs.has(reversed)) {
                 hasInvertedPair = true;
                 break;
@@ -248,11 +273,12 @@ export class VertexConfiguration {
     }
 
     rotate = (origin: Vector, angle: number): void => {
+        this.sharedVertex = this.computeSharedVertex();
         this.current_dir.rotate(angle);
         for (let polygon of this.polygons) {
             polygon.rotate(origin, angle);
         }
-        this.sharedVertex = Vector.rotateAround(this.sharedVertex, origin, angle);
+        this.sharedVertex = this.sharedVertex.rotateAround(origin, angle);
     }
 
     static rotate = (vc: VertexConfiguration, origin: Vector, angle: number): VertexConfiguration => {
@@ -278,7 +304,7 @@ export class VertexConfiguration {
         for (let polygon of this.polygons) {
             polygon.mirror(point, dir);
         }
-        this.sharedVertex = this.sharedVertex.mirrorByPointAndDir(point, dir);
+        this.sharedVertex = Vector.mirrorByPointAndDir(this.sharedVertex.copy(), point.copy(), dir.copy());
     }
 
     static mirror = (vc: VertexConfiguration, point: Vector, dir: Vector): VertexConfiguration => {
@@ -360,6 +386,21 @@ export class VertexConfiguration {
         return allVertices.find(v => this.polygons.every(p => p.vertices.some(v2 => isWithinTolerance(v2, v))))!;
     }
 }
+
+/**
+ * Finds the adjacent vertex where two polygons meet (excluding the center at origin).
+ * Returns the vertex position if found, null otherwise.
+ */
+const findAdjacentVertex = (polyA: Polygon, polyB: Polygon): Vector | null => {
+    const origin = new Vector(0, 0);
+    for (let i = 1; i < polyA.vertices.length; i++) {
+        const v = polyA.vertices[i];
+        if (isWithinTolerance(v, origin)) continue;
+        const match = polyB.vertices.find(vb => isWithinTolerance(v, vb));
+        if (match && !isWithinTolerance(match, origin)) return v.copy();
+    }
+    return null;
+};
 
 const checkMergeCompatibility = (
     vcA: VertexConfiguration,

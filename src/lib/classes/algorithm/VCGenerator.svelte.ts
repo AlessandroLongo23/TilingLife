@@ -1,5 +1,5 @@
 import { PolygonSignature, PolygonType, VertexConfiguration } from '$classes';
-import { comparePolygonNames, isWithinAngularTolerance } from '$utils';
+import { comparePolygonNames, isWithinAngularTolerance, isWithinTolerance, toDegrees } from '$utils';
 import { tolerance } from '$stores';
 
 export class VCGenerator {
@@ -21,16 +21,20 @@ export class VCGenerator {
         const interiorAngles = new Float64Array(n);
         const sharedAngleRight = new Float64Array(n);
         const sharedAngleLeft = new Float64Array(n);
+        const sideLengthLeft = new Float64Array(n);
+        const sideLengthRight = new Float64Array(n);
         const polyNames: string[] = new Array(n);
 
-        let minAngle = Infinity;
+        let minAngle = TWO_PI;
         for (let i = 0; i < n; i++) {
             const p = this.polygons[i];
             interiorAngles[i] = p.interior_angle;
             sharedAngleRight[i] = p.angles[1];
             sharedAngleLeft[i] = p.angles[p.angles.length - 1];
+            sideLengthRight[i] = p.sides[0];
+            sideLengthLeft[i] = p.sides[p.sides.length - 1];
             polyNames[i] = p.name;
-            if (interiorAngles[i] < minAngle) minAngle = interiorAngles[i];
+            minAngle = Math.min(minAngle, interiorAngles[i]);
         }
 
         const canFollow: Int32Array[] = new Array(n);
@@ -38,7 +42,10 @@ export class VCGenerator {
             const followers: number[] = [];
             for (let j = 0; j < n; j++) {
                 if (!canBeAdjacentSig(this.polygons[i], this.polygons[j])) continue;
-                if (sharedAngleLeft[i] + sharedAngleRight[j] > TWO_PI + tolerance) continue;
+                if (
+                    sharedAngleLeft[i] + sharedAngleRight[j] > TWO_PI + tolerance ||
+                    !isWithinTolerance(sideLengthLeft[i], sideLengthRight[j])
+                ) continue;
                 followers.push(j);
             }
             followers.sort((a, b) => interiorAngles[a] - interiorAngles[b]);
@@ -60,6 +67,7 @@ export class VCGenerator {
                 const lastIdx = stack[depth - 1];
                 const firstIdx = stack[0];
                 if (sharedAngleLeft[lastIdx] + sharedAngleRight[firstIdx] > TWO_PI + tolerance) return;
+                if (!isWithinTolerance(sideLengthLeft[lastIdx], sideLengthRight[firstIdx])) return;
 
                 const canonical = canonicalCyclicForm(stackNames);
                 if (!seen.has(canonical)) {

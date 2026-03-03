@@ -1,15 +1,19 @@
 <script>
     import { VertexConfiguration } from '$classes/algorithm';
     import { browser } from '$app/environment';
-    import { regularStarRegex, parametricStarRegex, regularPolygonRegex, equilateralPolygonRegex, PolygonType } from '$classes';
-    import { Search, Minus, Plus } from 'lucide-svelte';
-    import { headerStore } from '$stores';
+    import { regularStarRegex, parametricStarRegex, regularPolygonRegex, equilateralPolygonRegex, PolygonType, genericPolygonRegex } from '$classes';
+    import { Search, Minus, Plus, Camera } from 'lucide-svelte';
+    import { headerStore, openScreenshotPreview } from '$stores';
+    import { sounds } from '$utils';
     import { isValidMultiple } from '$utils/filterHelpers';
+    import { categoryOptions } from '$stores';
 
     import MultiSelect from '$components/ui/MultiSelect.svelte';
     import SearchInput from '$components/ui/SearchInput.svelte';
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
+    import RangeSlider from '$components/ui/RangeSlider.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
+    import Checkbox from '$components/ui/Checkbox.svelte';
 
     const { data } = $props();
 
@@ -22,24 +26,30 @@
     const PAGE_SIZE = 32;
     let currentPage = $state(1);
 
-    const categoryOptions = [
-        { id: PolygonType.REGULAR, label: 'Regular' },
-        { id: PolygonType.STAR_REGULAR, label: 'Star Regular' },
-        { id: PolygonType.STAR_PARAMETRIC, label: 'Star Parametric' },
-        { id: PolygonType.EQUILATERAL, label: 'Equilateral' },
-    ];
-
-    let selectedCategories = $state([PolygonType.REGULAR, PolygonType.STAR_REGULAR, PolygonType.STAR_PARAMETRIC, PolygonType.EQUILATERAL]);
+    let selectedCategories = $state(categoryOptions.map(c => c.id));
 
     let activeSearch = $state('');
     let filterAngleEnabled = $state(false);
     let filterAngle = $state(30);
+    let filterVertexCountEnabled = $state(false);
+    let filterVertexCountRange = $state([3, 12]);
+
+    const vertexCountBounds = $derived.by(() => {
+        if (allVCNames.length === 0) return { min: 3, max: 12 };
+        const counts = allVCNames.map(name => name.split(',').length);
+        return { min: Math.min(...counts), max: Math.max(...counts) };
+    });
 
     const vcCache = new Map();
 
     let filteredNames = $derived.by(() => {
         return allVCNames.filter(name => {
             if (activeSearch && !name.toLowerCase().includes(activeSearch)) return false;
+            const vertexCount = name.split(',').length;
+            if (filterVertexCountEnabled) {
+                const [minV, maxV] = filterVertexCountRange;
+                if (vertexCount < minV || vertexCount > maxV) return false;
+            }
             const parts = name.split(',');
 
             for (const p of parts) {
@@ -72,6 +82,14 @@
                     if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
                         return true;
                 }
+
+                if (p.match(genericPolygonRegex) && selectedCategories.includes(PolygonType.GENERIC)) {
+                    const genericPolygonMatch = p.match(genericPolygonRegex);
+                    const sides = genericPolygonMatch[2].split(';').map(s => parseFloat(s));
+                    const angles = genericPolygonMatch[3].split(';').map(a => parseInt(a));
+                    if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
+                        return true;
+                }
             }
             return false;
         });
@@ -101,6 +119,15 @@
             return vcCache.get(name);
         });
     });
+
+    function handleCardScreenshot(e, filename) {
+        const card = e.currentTarget.closest('.vc-card');
+        const canvas = card?.querySelector('canvas');
+        if (!canvas) return;
+        const dataUrl = canvas.toDataURL('image/png');
+        openScreenshotPreview({ imageDataUrl: dataUrl, filename, rulestring: '', groupId: null });
+        sounds.screenshot();
+    }
 
     function hsbToHsl(h, s, b) {
         s /= 100;
@@ -198,7 +225,7 @@
 <div class="flex-1 max-w-[1600px] mx-auto w-full flex flex-col lg:flex-row">
     <!-- Sidebar filters -->
     <aside class="w-full lg:w-72 xl:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-900/50">
-        <div class="p-5 flex flex-col gap-6 lg:sticky lg:top-[65px] lg:max-h-[calc(100vh-65px)] lg:overflow-y-auto">
+        <div class="p-5 flex flex-col gap-6 lg:sticky lg:top-[65px] lg:max-h-[calc(100vh-65px)] lg:overflow-y-auto scrollbar-hide">
             <SearchInput bind:activeSearch />
 
             <!-- Category filter -->
@@ -211,11 +238,35 @@
             </div>
 
             <!-- Angle filter -->
-            {#if selectedCategories.includes(PolygonType.STAR_REGULAR) || selectedCategories.includes(PolygonType.STAR_PARAMETRIC) || selectedCategories.includes(PolygonType.EQUILATERAL)}
+            {#if selectedCategories.includes(PolygonType.STAR_REGULAR) || selectedCategories.includes(PolygonType.STAR_PARAMETRIC) || selectedCategories.includes(PolygonType.EQUILATERAL) || selectedCategories.includes(PolygonType.GENERIC)}
                 <div class="border-t border-zinc-800 pt-5">
                     <AngleFilterBlock bind:enabled={filterAngleEnabled} bind:angle={filterAngle} />
                 </div>
             {/if}
+
+            <!-- Vertex count filter -->
+            <div class="border-t border-zinc-800 pt-5">
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Vertices at vertex</span>
+                    </div>
+                    <Checkbox
+                        id="vertexCountEnabled"
+                        label="Filter by vertex count"
+                        bind:checked={filterVertexCountEnabled}
+                    />
+                    {#if filterVertexCountEnabled}
+                        <RangeSlider
+                            label="Count range"
+                            bind:value={filterVertexCountRange}
+                            min={vertexCountBounds.min}
+                            max={vertexCountBounds.max}
+                            step={1}
+                            unit=""
+                        />
+                    {/if}
+                </div>
+            </div>
 
             <!-- Per Row -->
             <div class="border-t border-zinc-800 pt-5">
@@ -289,7 +340,7 @@
                 >
                     {#each displayedVCs as { name, vc }, i (name + i)}
                         {@const globalIndex = (currentPage - 1) * PAGE_SIZE + i}
-                        <div class="vc-card group">
+                        <div class="vc-card group relative">
                             <div class="vc-card-header">
                                 <span class="vc-index">{globalIndex + 1}</span>
                                 <span class="truncate" title={name}>{name}</span>
@@ -305,6 +356,17 @@
                                 >
                                     Could not parse
                                 </div>
+                            {/if}
+                            {#if vc}
+                                <button
+                                    type="button"
+                                    class="absolute bottom-2 right-2 p-1.5 rounded-md bg-zinc-800/90 border border-zinc-600/60 text-zinc-400 hover:text-white hover:bg-zinc-700/90 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onclick={(e) => handleCardScreenshot(e, `${name.replace(/[/\\?%*:|"<>]/g, '-')}.png`)}
+                                    title="Screenshot"
+                                    aria-label="Take screenshot"
+                                >
+                                    <Camera size={14} />
+                                </button>
                             {/if}
                         </div>
                     {/each}

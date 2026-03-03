@@ -1,8 +1,9 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
     import { browser } from '$app/environment';
-    import { Search, Minus, Plus, Puzzle } from 'lucide-svelte';
-    import { headerStore } from '$stores';
+    import { Search, Minus, Plus, Puzzle, Camera } from 'lucide-svelte';
+    import { headerStore, openScreenshotPreview } from '$stores';
+    import { sounds } from '$utils';
 
     import Pagination from '$components/ui/Pagination.svelte';
 
@@ -27,7 +28,7 @@
         if (k !== null) params.set('k', String(k));
         if (m !== null) params.set('m', String(m));
         if (pg > 1) params.set('page', String(pg));
-        goto(`/seed-configurations?${params.toString()}`);
+        goto(`/algorithm/seed-configurations?${params.toString()}`);
     }
 
     function handlePageChange() {
@@ -43,6 +44,15 @@
     let mValuesForSelectedK = $derived(
         data.available.filter((a: any) => a.k === data.selectedK)
     );
+
+    function handleCardScreenshot(e: MouseEvent, filename: string) {
+        const card = (e.currentTarget as HTMLElement).closest('.sc-card');
+        const canvas = card?.querySelector('canvas');
+        if (!canvas) return;
+        const dataUrl = (canvas as HTMLCanvasElement).toDataURL('image/png');
+        openScreenshotPreview({ imageDataUrl: dataUrl, filename, rulestring: '', groupId: null });
+        sounds.screenshot();
+    }
 
     function mapValue(value: number, s1: number, e1: number, s2: number, e2: number): number {
         return s2 + (e2 - s2) * ((value - s1) / (e1 - s1));
@@ -152,7 +162,7 @@
 <div class="flex-1 max-w-[1600px] mx-auto w-full flex flex-col lg:flex-row">
     <!-- Sidebar filters -->
     <aside class="w-full lg:w-72 xl:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-900/50">
-        <div class="p-5 flex flex-col gap-6 lg:sticky lg:top-[65px] lg:max-h-[calc(100vh-65px)] lg:overflow-y-auto">
+        <div class="p-5 flex flex-col gap-6 lg:sticky lg:top-[65px] lg:max-h-[calc(100vh-65px)] lg:overflow-y-auto scrollbar-hide">
             <!-- k selector -->
             <div>
                 <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Set size (k)</span>
@@ -273,7 +283,7 @@
                 >
                     {#each data.seedConfigurations as seedConfig, i}
                         {@const globalIndex = (data.page - 1) * data.pageSize + i}
-                        <div class="sc-card group">
+                        <div class="sc-card group relative">
                             <div class="sc-card-header">
                                 <span class="sc-index">{globalIndex + 1}</span>
                                 <span class="text-zinc-500">{seedConfig.polygons.length} polygons</span>
@@ -287,6 +297,17 @@
                                 <div class="flex items-center justify-center text-zinc-600 text-xs w-full aspect-square">
                                     Loading...
                                 </div>
+                            {/if}
+                            {#if browser}
+                                <button
+                                    type="button"
+                                    class="absolute bottom-2 right-2 p-1.5 rounded-md bg-zinc-800/90 border border-zinc-600/60 text-zinc-400 hover:text-white hover:bg-zinc-700/90 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onclick={(e) => handleCardScreenshot(e, `seed-k${data.selectedK}-m${data.selectedM}-${globalIndex + 1}.png`)}
+                                    title="Screenshot"
+                                    aria-label="Take screenshot"
+                                >
+                                    <Camera size={14} />
+                                </button>
                             {/if}
                         </div>
                     {/each}

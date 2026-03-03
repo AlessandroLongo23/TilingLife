@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { BookOpen, Hexagon, Grid2x2, GitFork, Puzzle, Grid3x3 } from 'lucide-svelte';
 	import { headerStore } from '$stores';
+	import ScreenshotPreviewModal from '$components/ScreenshotPreviewModal.svelte';
 
 	let { children } = $props();
 
@@ -65,6 +66,7 @@
 	<div class="flex-1 flex flex-col min-w-0">
 		{@render children()}
 	</div>
+	<ScreenshotPreviewModal />
 </div>
 
 <style>

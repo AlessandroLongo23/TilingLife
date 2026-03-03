@@ -1,11 +1,22 @@
 <script lang="ts">
-    import { VertexConfiguration, CompatibilityGraph, VCNode, regularPolygonRegex, regularStarRegex, parametricStarRegex, equilateralPolygonRegex, PolygonType } from '$classes';
+    import { 
+        VertexConfiguration, 
+        CompatibilityGraph, 
+        VCNode, 
+        regularPolygonRegex, 
+        regularStarRegex, 
+        parametricStarRegex, 
+        equilateralPolygonRegex, 
+        genericPolygonRegex,
+        PolygonType 
+    } from '$classes';
     import { browser } from '$app/environment';
     import { Vector } from '$classes/Vector.svelte';
     import { onMount } from 'svelte';
     import { ChevronRight, SlidersHorizontal } from 'lucide-svelte';
     import { headerStore } from '$stores';
     import { isValidMultiple } from '$utils/filterHelpers';
+    import { categoryOptions } from '$stores';
 
     import MultiSelect from '$components/ui/MultiSelect.svelte';
     import SearchInput from '$components/ui/SearchInput.svelte';
@@ -17,13 +28,6 @@
     const allVCNames = data.allVCNames ?? [];
     const adjacencyList: Record<string, string[]> = data.adjacencyListData ?? {};
 
-    const categoryOptions = [
-        { id: PolygonType.REGULAR, label: 'Regular' },
-        { id: PolygonType.STAR_REGULAR, label: 'Star Regular' },
-        { id: PolygonType.STAR_PARAMETRIC, label: 'Star Parametric' },
-        { id: PolygonType.EQUILATERAL, label: 'Equilateral' },
-    ];
-
     let selectedCategories = $state([PolygonType.REGULAR]);
     let activeSearch = $state('');
     let filterAngleEnabled = $state(false);
@@ -33,41 +37,48 @@
     let filteredNames = $derived.by(() => {
         return allVCNames.filter(name => {
             if (activeSearch && !name.toLowerCase().includes(activeSearch)) return false;
+            
             const parts = name.split(',');
             for (const p of parts) {
-                if (p.match(regularPolygonRegex)) {
-                    if (!selectedCategories.includes(PolygonType.REGULAR)) return false;
-                } else {
+                if (p.match(regularPolygonRegex) && selectedCategories.includes(PolygonType.REGULAR)) {
+                    return true;
+                }
+                
+                if (p.match(regularStarRegex) && selectedCategories.includes(PolygonType.STAR_REGULAR)) {
                     const regularStarMatch = p.match(regularStarRegex);
-                    if (regularStarMatch) {
-                        if (!selectedCategories.includes(PolygonType.STAR_REGULAR)) return false;
-                        const n = parseInt(regularStarMatch[1]);
-                        const d = parseInt(regularStarMatch[2]);
-                        const a = 180 * (1 - 2 * d / n);
-                        const b = 180 * (1 + 2 * (d - 1) / n);
-                        if (filterAngleEnabled && (!isValidMultiple(a, filterAngle) || !isValidMultiple(b, filterAngle))) return false;
-                    } else {
-                        const parametricStarMatch = p.match(parametricStarRegex);
-                        if (parametricStarMatch) {
-                            if (!selectedCategories.includes(PolygonType.STAR_PARAMETRIC)) return false;
-                            const n = parseInt(parametricStarMatch[1]);
-                            const alpha = parseInt(parametricStarMatch[2]);
-                            const bb = 360 * (1 - 1 / n) - alpha;
-                            if (filterAngleEnabled && (!isValidMultiple(alpha, filterAngle) || !isValidMultiple(bb, filterAngle))) return false;
-                        } else {
-                            const equilateralMatch = p.match(equilateralPolygonRegex);
-                            if (equilateralMatch) {
-                                if (!selectedCategories.includes(PolygonType.EQUILATERAL)) return false;
-                                const angles = equilateralMatch[2].split(';').map(a => parseInt(a));
-                                if (filterAngleEnabled && angles.some(a => !isValidMultiple(a, filterAngle))) return false;
-                            } else {
-                                return false;
-                            }
-                        }
-                    }
+                    const n = parseInt(regularStarMatch[1]);
+                    const d = parseInt(regularStarMatch[2]);
+                    const a = 180 * (1 - 2 * d / n);
+                    const b = 180 * (1 + 2 * (d - 1) / n);
+                    if (!filterAngleEnabled || (isValidMultiple(a, filterAngle) && isValidMultiple(b, filterAngle))) 
+                        return true;
+                } 
+            
+                if (p.match(parametricStarRegex) && selectedCategories.includes(PolygonType.STAR_PARAMETRIC)) {
+                    const parametricStarMatch = p.match(parametricStarRegex);
+                    const n = parseInt(parametricStarMatch[1]);
+                    const alpha = parseInt(parametricStarMatch[2]);
+                    const b = 360 * (1 - 1 / n) - alpha;
+                    if (!filterAngleEnabled || (isValidMultiple(alpha, filterAngle) && isValidMultiple(b, filterAngle))) 
+                        return true;
+                } 
+                
+                if (p.match(equilateralPolygonRegex) && selectedCategories.includes(PolygonType.EQUILATERAL)) {
+                    const equilateralPolygonMatch = p.match(equilateralPolygonRegex);
+                    const angles = equilateralPolygonMatch[2].split(';').map(a => parseInt(a));
+                    if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
+                        return true;
+                }
+
+                if (p.match(genericPolygonRegex) && selectedCategories.includes(PolygonType.GENERIC)) {
+                    const genericPolygonMatch = p.match(genericPolygonRegex);
+                    const sides = genericPolygonMatch[2].split(';').map(s => parseFloat(s));
+                    const angles = genericPolygonMatch[3].split(';').map(a => parseInt(a));
+                    if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
+                        return true;
                 }
             }
-            return true;
+            return false;
         });
     });
 
@@ -607,7 +618,7 @@
 <div class="flex-1 flex min-h-0 max-w-[1600px] w-full mx-auto overflow-hidden">
         <!-- Sidebar -->
         <aside class="w-full lg:w-72 xl:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-900/50 flex flex-col">
-            <div class="p-5 flex flex-col gap-6 lg:overflow-y-auto">
+            <div class="p-5 flex flex-col gap-6 lg:overflow-y-auto scrollbar-hide">
                 <SearchInput bind:activeSearch placeholder="Filter by name..." />
 
                 <div class="border-t border-zinc-800 pt-5">

@@ -33,7 +33,6 @@ export let debugView = writable(false);
 export let showPolygonPoints = writable(false);
 export let showConstructionPoints = writable(false);
 export let showChart = writable(false);
-export let showCR = writable(false);
 export let liveChartMode = writable('count');
 
 export let screenshotButtonHover = writable(false);
@@ -47,6 +46,9 @@ export let possibleSides = [0, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 16, 18, 20, 24, 
 
 export let isIslamic = writable(false);
 export let islamicAngle = writable(90);
+
+export let circlePacking = writable(false);
+export let isTilingRegularOnly = writable(false);
 
 export const patch = {
 	size: {

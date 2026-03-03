@@ -1,5 +1,5 @@
 import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic } from '$stores';
-import { isWithinConvexHull, isWithinTolerance, segmentsIntersect } from '$lib/utils';
+import { isWithinConvexHull, segmentsIntersect, getAngleAtVertex } from '$utils';
 import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
 
@@ -20,6 +20,8 @@ export class Polygon {
     golNeighbors?: Polygon[];
     alive_neighbors: number;
     interior_angle: number;
+    sides: number[];
+    angles: number[];
 
     constructor(n: number = 3) {
         this.n = n;
@@ -27,9 +29,19 @@ export class Polygon {
         this.neighbors = [];
         this.state = State.DEAD;
         this.nextState = State.DEAD;
+        this.sides = [];
+        this.angles = [];
 
         this.hue = 0;
         this.alive_neighbors = 0;
+    }
+
+    calculateSides = () => {
+        this.sides = this.vertices.map((v, index) => Vector.distance(v, this.vertices[(index + 1) % this.vertices.length]));
+    }
+
+    calculateAngles = () => {
+        this.angles = this.vertices.map(v => getAngleAtVertex(this.vertices, v));
     }
 
     calculateCentroid = () => {
@@ -169,15 +181,8 @@ export class Polygon {
         return false;
     }
 
-    getAngleAtVertex = (coordinate: Vector): number => {
-        const vertex = this.vertices.find(v => isWithinTolerance(v, coordinate));
-        if (vertex) {
-            const index = this.vertices.indexOf(vertex);
-            const dir1= Vector.sub(this.vertices[(index + 1) % this.vertices.length], vertex);
-            const dir2 = Vector.sub(vertex, this.vertices[(index - 1 + this.vertices.length) % this.vertices.length]);
-            return (dir2.heading() - dir1.heading() + 5 * Math.PI) % (2 * Math.PI);
-        }
-        return 0;
+    getAngleAtVertex = (vertex: Vector): number => {
+        return getAngleAtVertex(this.vertices, vertex);
     }
 
     show = (ctx, showPolygonPoints, customColor = null, opacity = 0.80) => {

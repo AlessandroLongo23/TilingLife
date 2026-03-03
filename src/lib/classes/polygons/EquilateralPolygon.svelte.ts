@@ -1,5 +1,5 @@
 import { GenericPolygon, PolygonType, Vector } from '$classes';
-import { isWithinTolerance, map, toDegrees } from '$utils';
+import { getAngleAtVertex, isWithinTolerance, map, toDegrees } from '$utils';
 
 export class EquilateralPolygon extends GenericPolygon {
     constructor(n: number) {
@@ -9,7 +9,6 @@ export class EquilateralPolygon extends GenericPolygon {
     static fromAnchorAndDir = (n: number, anchor: Vector, dir: Vector, angles: number[]): EquilateralPolygon => {
         const polygon: EquilateralPolygon = new EquilateralPolygon(n);
 
-        polygon.sides = Array(n).fill(1);
         polygon.angles = angles;
         polygon.name = `${n}(${angles.map(a => toDegrees(a)).join(';')})`;
         polygon.anchor = anchor;
@@ -17,6 +16,8 @@ export class EquilateralPolygon extends GenericPolygon {
         polygon.interior_angle = angles[0];
 
         polygon.calculateVerticesFromAnchorAndDir();
+        polygon.calculateSides();
+        polygon.calculateAngles();
         polygon.calculateHalfways();
         polygon.calculateCentroid();
         polygon.calculateAngle();
@@ -26,10 +27,21 @@ export class EquilateralPolygon extends GenericPolygon {
     }
 
     static fromVertices = (vertices: Vector[]): EquilateralPolygon => {
-        const angles = vertices.map(v => Vector.angleBetween(v, vertices[(vertices.indexOf(v) + 1) % vertices.length]));
+        const angles = vertices.map(v => getAngleAtVertex(vertices, v));
         const anchor = vertices[0].copy();
         const dir = Vector.sub(vertices[1], vertices[0]).copy();
         return EquilateralPolygon.fromAnchorAndDir(vertices.length, anchor, dir, angles);
+    }
+
+    calculateVerticesFromAnchorAndDir = () => {
+        this.vertices = [this.anchor.copy()];
+        let current_dir: Vector = this.dir.copy().normalize();
+        for (let i = 1; i < this.n; i++) {
+            const prev_vertex = this.vertices[this.vertices.length - 1];
+            this.vertices.push(Vector.add(prev_vertex, current_dir));
+            current_dir.rotate(Math.PI - this.angles[i]);
+            this.vertices[i].snapToGrid();
+        }
     }
 
     calculateHue = () => {
@@ -57,7 +69,9 @@ export class EquilateralPolygon extends GenericPolygon {
     }
 
     clone = (): EquilateralPolygon => {
-        return EquilateralPolygon.fromAnchorAndDir(this.n, this.anchor.copy(), this.dir.copy(), [...this.angles]);
+        const anchor = this.vertices[0].copy();
+        const dir = Vector.sub(this.vertices[1], this.vertices[0]).copy().normalize();
+        return EquilateralPolygon.fromAnchorAndDir(this.n, anchor, dir, [...this.angles]);
     }
 
     encode = (): Object => {

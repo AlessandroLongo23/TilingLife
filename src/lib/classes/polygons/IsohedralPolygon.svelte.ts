@@ -16,6 +16,8 @@ export class IsohedralPolygon extends GenericPolygon {
         polygon.name = `${n}[${sides.join(';')}]`;
 
         polygon.calculateVerticesFromAnchorAndDir();
+        polygon.calculateSides();
+        polygon.calculateAngles();
         polygon.calculateHalfways();
         polygon.calculateCentroid();
         polygon.calculateAngle();
@@ -25,6 +27,8 @@ export class IsohedralPolygon extends GenericPolygon {
     }
 
     clone = (): IsohedralPolygon => {
-        return IsohedralPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]).copy(), [...this.sides]);
+        const anchor = this.vertices[0].copy();
+        const dir = Vector.sub(this.vertices[1], this.vertices[0]).copy().normalize();
+        return IsohedralPolygon.fromAnchorAndDir(this.n, anchor, dir, [...this.sides]);
     }
 }

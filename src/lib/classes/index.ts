@@ -1,10 +1,10 @@
 // Core
 export * from "./Vector.svelte";
-export * from "./Cr.svelte";
 export * from "./Transform";
 export * from "./Transform";
 export * from "./Tiling.svelte";
 export * from "./GameOfLifeRule.svelte";
+export * from "./TilingChecker.svelte";
 // Polygons
 export * from "./polygons/Polygon.svelte";
 export * from "./polygons/RegularPolygon.svelte";
@@ -27,7 +27,7 @@ export * from "./algorithm/PolygonSignature.svelte";
 export * from "./algorithm/SeedConfiguration.svelte";
 export * from "./algorithm/SeedSetExtractor.svelte";
 export * from "./algorithm/SeedBuilder.svelte";
-export * from "./algorithm/wallpaperGroups";
+export * from "./wallpaperGroups";
 export * from "./algorithm/regex";
 export * from "./algorithm/types";
 

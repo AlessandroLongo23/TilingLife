@@ -14,7 +14,7 @@ import {
     Tiling, 
     Vector, 
     Transformer, 
-    Parser, 
+    Parser,
     TransformType 
 } from '$classes';
 
@@ -47,14 +47,12 @@ export class TilingGeneratorFromRule extends TilingGenerator {
 
         this.calculateNeighbors();
 
-        // console.log(this.tiling);
-
         // this.golEngine.calculateGoLNeighbors();
         
         // if (debugView) debugManager.endTimer("Tiling generation");
         // updateDebugStore();
 
-        // this.tilingChecker.findVertexConfigurations(this.tiling);
+        this.tilingChecker.findVertexConfigurations(this.tiling);
 
         return this.tiling;
     }

@@ -15,6 +15,9 @@ export interface GeneratorParameters {
         n_max: number;
         angle: number;
     },
+    [PolygonType.DUAL]?: {
+        n_max: number;
+    },
 }
 
 export type PartialConfiguration = {

@@ -1,12 +1,14 @@
-import { lineWidth, showDualConnections, controls } from '$stores';
-import { sortPointsByAngleAndDistance, isWithinTolerance } from '$utils';
-import { get } from 'svelte/store';
 import { type GameOfLifeRule, GOLRuleType, Behavior, State, Polygon, Vector } from '$classes';
-import { tolerance } from '$stores';
+import { sortPointsByAngleAndDistance, isWithinTolerance } from '$utils';
+import { lineWidth, showDualConnections, controls, liveChartMode } from '$stores';
+import { get } from 'svelte/store';
+
+export type VCWithOccurrences = { vc: { polygons: Polygon[]; name: string }; occurrences: number };
 
 export class Tiling {
     nodes: Polygon[];
     anchorNodes: Polygon[];
+    vcs: VCWithOccurrences[] = [];
     parsedGolRule: GameOfLifeRule;
     golRuleType: GOLRuleType;
     rules: { [key: number]: GameOfLifeRule };
@@ -27,7 +29,7 @@ export class Tiling {
         this.coreNode = null;
     }
 
-    show = (ctx, showPolygonPoints: boolean, opacity: number = 1): void => {
+    show = (ctx, showPolygonPoints: boolean, opacity: number = 1, circlePacking: boolean = false): void => {
         const lineWidthValue = get(lineWidth);
         if (lineWidthValue > 1) {
             ctx.strokeWeight(lineWidthValue / get(controls).zoom);
@@ -38,9 +40,22 @@ export class Tiling {
             ctx.strokeWeight(1 / get(controls).zoom);
             ctx.stroke(0, 0, 0, lineWidthValue);
         }
-        
-        for (let i = 0; i < this.nodes.length; i++) {
-            this.nodes[i].show(ctx, showPolygonPoints, null, opacity);
+
+        if (circlePacking) {
+            for (let i = 0; i < this.nodes.length; i++) {
+                const node = this.nodes[i];
+                const radius = node.halfways?.length > 0
+                    ? Vector.distance(node.centroid, node.halfways[0])
+                    : 0;
+                if (radius > 0) {
+                    ctx.fill(node.hue, 40, 100 / opacity, 0.80 * opacity);
+                    ctx.ellipse(node.centroid.x, node.centroid.y, radius * 2, radius * 2);
+                }
+            }
+        } else {
+            for (let i = 0; i < this.nodes.length; i++) {
+                this.nodes[i].show(ctx, showPolygonPoints, null, opacity);
+            }
         }
         
         const showDualConnectionsValue = get(showDualConnections);
@@ -267,11 +282,7 @@ export class Tiling {
                     }
                 }
 
-                if (hasBirthNeighbors) {
-                    node.nextState = State.ALIVE;
-                } else {
-                    node.nextState = State.DEAD;
-                }
+                node.nextState = hasBirthNeighbors ? State.ALIVE : State.DEAD;
             }
                                 
             else if (node.state === State.ALIVE) {
@@ -305,7 +316,7 @@ export class Tiling {
             this.nodes[i].state = this.nodes[i].nextState;
     }
 
-    drawGameOfLife = (ctx) => {
+    drawGameOfLife = (ctx, circlePacking: boolean = false) => {
         const lineWidthValue = get(lineWidth);
         if (lineWidthValue > 1) {
             ctx.strokeWeight(lineWidthValue / get(controls).zoom);
@@ -317,8 +328,36 @@ export class Tiling {
             ctx.stroke(0, 0, 0, lineWidthValue);
         }
 
-        for (let i = 0; i < this.nodes.length; i++)
-            this.nodes[i].showGameOfLife(ctx, this.golRuleType, this.parsedGolRule, this.rules);
+        if (circlePacking) {
+            const liveChartModeValue = get(liveChartMode);
+            for (let i = 0; i < this.nodes.length; i++) {
+                const node = this.nodes[i];
+                const radius = node.halfways?.length > 0
+                    ? Vector.distance(node.centroid, node.halfways[0])
+                    : 0;
+                if (radius > 0) {
+                    ctx.push();
+                    if (liveChartModeValue === 'count') {
+                        if (node.state === 0) ctx.fill(0, 0, 100);
+                        else if (node.state === 1) ctx.fill(0, 0, 0);
+                        else {
+                            const maxGen = this.golRuleType === GOLRuleType.SINGLE ? this.parsedGolRule.generations : this.rules[node.n].generations;
+                            const progress = (node.state - 1) / (maxGen - 1);
+                            ctx.fill(0, 0, progress * 100);
+                        }
+                    } else {
+                        if (node.behavior === Behavior.DECREASING) ctx.fill(0, 0, 100);
+                        else if (node.behavior === Behavior.INCREASING) ctx.fill(0, 0, 0);
+                        else ctx.fill(345, 50, 100);
+                    }
+                    ctx.ellipse(node.centroid.x, node.centroid.y, radius * 2, radius * 2);
+                    ctx.pop();
+                }
+            }
+        } else {
+            for (let i = 0; i < this.nodes.length; i++)
+                this.nodes[i].showGameOfLife(ctx, this.golRuleType, this.parsedGolRule, this.rules);
+        }
     }
 
     exportGraph = () => {

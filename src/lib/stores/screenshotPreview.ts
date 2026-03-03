@@ -5,13 +5,16 @@ export interface ScreenshotPreviewState {
     filename: string;
     rulestring: string;
     groupId: string | null;
+    /** When true, shows the "Save to Supabase" option. Defaults to false for algorithm cards. */
+    allowSupabaseUpload?: boolean;
 }
 
 const initialState: ScreenshotPreviewState = {
     imageDataUrl: null,
     filename: '',
     rulestring: '',
-    groupId: null
+    groupId: null,
+    allowSupabaseUpload: false
 };
 
 export const screenshotPreview = writable<ScreenshotPreviewState>(initialState);

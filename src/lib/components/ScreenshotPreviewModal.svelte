@@ -8,6 +8,7 @@
     let filename = $derived($screenshotPreview.filename);
     let rulestring = $derived($screenshotPreview.rulestring);
     let groupId = $derived($screenshotPreview.groupId);
+    let allowSupabaseUpload = $derived($screenshotPreview.allowSupabaseUpload ?? false);
 
     let savingLocal = $state(false);
     let savingSupabase = $state(false);
@@ -95,23 +96,25 @@
                     Save Locally
                 {/if}
             </button>
-            <button
-                onclick={handleSaveToSupabase}
-                disabled={savingSupabase || !imageDataUrl || !groupId}
-                title={!groupId ? 'This tiling is not in the database' : 'Replace the tiling image in Supabase storage'}
-                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-md border border-zinc-700/50 bg-green-700/40 hover:bg-green-700/60 text-white font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                {#if savingSupabase}
-                    <Loader2 size={18} class="animate-spin" />
-                    Uploading…
-                {:else}
-                    <CloudUpload size={18} />
-                    Save to Supabase
-                {/if}
-            </button>
+            {#if allowSupabaseUpload}
+                <button
+                    onclick={handleSaveToSupabase}
+                    disabled={savingSupabase || !imageDataUrl || !groupId}
+                    title={!groupId ? 'This tiling is not in the database' : 'Replace the tiling image in Supabase storage'}
+                    class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-md border border-zinc-700/50 bg-green-700/40 hover:bg-green-700/60 text-white font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {#if savingSupabase}
+                        <Loader2 size={18} class="animate-spin" />
+                        Uploading…
+                    {:else}
+                        <CloudUpload size={18} />
+                        Save to Supabase
+                    {/if}
+                </button>
+            {/if}
         </div>
 
-        {#if !groupId && imageDataUrl}
+        {#if allowSupabaseUpload && !groupId && imageDataUrl}
             <p class="text-xs text-zinc-500">
                 "Save to Supabase" is only available for tilings in the database.
             </p>

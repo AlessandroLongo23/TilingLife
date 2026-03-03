@@ -1,6 +1,7 @@
 import { Polygon, Vector } from '$classes';
 import { get } from 'svelte/store';
 import { colorParams } from '$stores';
+import { toDegrees } from '$lib/utils/geometry.svelte';
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 
@@ -12,6 +13,8 @@ export class DualPolygon extends Polygon {
         this.halfways = data.halfways;
 
         this.calculateHue();
+        this.calculateSides();
+        this.calculateAngles();
     }
 
     calculateHue = () => {
@@ -72,6 +75,10 @@ export class DualPolygon extends Polygon {
         const displacedHue = rotatedHue + b * this.vertices.length * Math.sin(rotatedHue * Math.PI / 180);
         
         return (displacedHue + 360) % 360;
+    }
+
+    getName = (): string => {
+        return `${this.vertices.length}[${this.sides.map(s => s.toFixed(3)).join(';')}](${this.angles.map(a => toDegrees(a)).join(';')})`;
     }
 
     clone = (): DualPolygon => {

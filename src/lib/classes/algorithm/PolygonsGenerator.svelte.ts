@@ -1,4 +1,4 @@
-import { type GeneratorParameters, PolygonType, StarVertexTypes, Vector, PolygonSignature } from '$classes';
+import { type GeneratorParameters, PolygonType, StarVertexTypes, Vector, PolygonSignature, VCGenerator, EquilateralPolygon, GenericPolygon } from '$classes';
 import { coprime, isWithinTolerance, segmentsIntersect, toRadians } from '$utils';
 import { tolerance } from '$stores';
 
@@ -145,6 +145,38 @@ export class PolygonsGenerator {
                     n: path.length, 
                     angles: interior_angles 
                 }));
+            }
+        }
+
+        if (parameters[PolygonType.DUAL]) {
+            // first generate all regular polygons
+            const n_max = parameters[PolygonType.DUAL].n_max;
+            const regularPolygons: PolygonSignature[] = [];
+            for (let n = 3; n <= n_max; n++) {
+                regularPolygons.push(new PolygonSignature({ 
+                    type: PolygonType.REGULAR, 
+                    n: n 
+                }));
+            }
+            
+            // then generate all vertex configurations with regular polygons
+            const vcGenerator = new VCGenerator(regularPolygons);
+            const vertexConfigurations = vcGenerator.generateVertexConfigurations();
+
+            // then generate all dual polygons by connecting the centroids of the polygons in the vertex configurations
+            for (const vc of vertexConfigurations) {
+                const planigon: GenericPolygon = GenericPolygon.fromVertices(vc.polygons.map(p => p.centroid));
+                // for each planigon, add all its rotations (create new arrays to avoid mutating shared references)
+                for (let i = 0; i < planigon.n; i++) {
+                    const rotatedAngles = planigon.angles.slice(i).concat(planigon.angles.slice(0, i));
+                    const rotatedSides = planigon.sides.slice(i).concat(planigon.sides.slice(0, i));
+                    this.polygons.push(new PolygonSignature({
+                        type: PolygonType.GENERIC, 
+                        n: planigon.n,
+                        angles: rotatedAngles,
+                        sides: rotatedSides.map(s => parseFloat(s.toFixed(3)))
+                    }));
+                }
             }
         }
 

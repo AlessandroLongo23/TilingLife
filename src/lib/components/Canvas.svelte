@@ -1,15 +1,13 @@
 <script>
-    import { ruleType, parameter, selectedTiling, showCR, debugView, controls, transformSteps, patch, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, openScreenshotPreview, tilingStore } from '$stores';
+    import { ruleType, parameter, selectedTiling, debugView, controls, transformSteps, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, openScreenshotPreview, tilingStore, isTilingRegularOnly, circlePacking } from '$stores';
     import { debugManager, debugStore, updateDebugStore } from '$stores';
     import { sortPointsByAngleAndDistance } from '$utils';
     // import { TilingGeneratorWFC } from '$lib/classes/generator/TilingGeneratorWFC.svelte.ts';
-    import { TilingGeneratorFromRule } from '$classes';
+    import { TilingGeneratorFromRule, RegularPolygon } from '$classes';
     import { isWithinTolerance } from '$utils';
     import { Vector } from '$classes';
-    import { Cr } from '$classes';
     import * as ls from 'lucide-svelte';
     import { onMount } from 'svelte';
-    import { browser } from '$app/environment';
     import { sounds } from '$utils';
 
     import LiveChart from '$components/LiveChart.svelte';
@@ -49,8 +47,7 @@
 
     let tiling = $state();
     let tilingGenerator = $state();
-    let cr = $state();
-    let crCanvases = $state([]);
+    let canvasError = $state(null);
 
     let resetGameOfLife = $state(false);
 
@@ -122,14 +119,15 @@
                 // tiling = tilingGenerator.generateWithWFC();
                 tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
                 tilingGenerator.golEngine.setupGameOfLife(tiling, $ruleType, $golRule, $golRules);
+                const regularOnly = tiling?.nodes?.length > 0 && tiling.nodes.every((n) => n instanceof RegularPolygon);
+                isTilingRegularOnly.set(regularOnly);
+                if (!regularOnly) circlePacking.set(false);
                 if ($debugView) {
                     updateDebugStore();
                 }
-
-                // cr = new Cr($selectedTiling.cr || tiling.crNotation);
-                // crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
+                canvasError = null;
             } catch (e) {
-                console.error(e);
+                canvasError = e?.message ?? String(e);
             }
         }
 
@@ -137,149 +135,33 @@
             $controls.zoom += ($controls.targetZoom - $controls.zoom) * $controls.dampening;
             $controls.offset.add(Vector.sub($controls.targetOffset, $controls.offset).scale($controls.dampening));
             
-            p5.push();
-            p5.translate(p5.width / 2, p5.height / 2);
-            p5.translate($controls.offset.x, $controls.offset.y);
-            p5.scale($controls.zoom);
-            p5.scale(1, -1);
             p5.background(240, 7, 16);
+            
+            canvasError = null;
 
             try {
+                p5.push();
+                p5.translate(p5.width / 2, p5.height / 2);
+                p5.translate($controls.offset.x, $controls.offset.y);
+                p5.scale($controls.zoom);
+                p5.scale(1, -1);
+
                 if (showGameOfLife) {
-                    if (
-                        prevRuleType != $ruleType || 
-                        ($ruleType == "Single" && !p5.isSameRule(prevGolRule, $golRule)) || 
-                        ($ruleType == "By Shape" && !p5.isSameRule(prevGolRules, $golRules)) ||
-                        resetGameOfLife
-                    ) {
-                        tilingGenerator.setupGameOfLife($ruleType, $golRule, $golRules);
-                        resetGameOfLife = false;
-                    }
-
-                    if (p5.frameCount % Math.round(frameMod) == 0) {
-                        // Store previous states to calculate changes
-                        const prevStates = tiling.nodes.map(node => node.state);
-                        
-                        tiling.updateGameOfLife();
-                        
-                        // Calculate state changes
-                        const changedCells = tiling.nodes.filter((node, index) => node.state !== prevStates[index]).length;
-                        const totalCells = tiling.nodes.length;
-                        const changeRatio = totalCells > 0 ? changedCells / totalCells : 0;
-                        
-                        // Play state change sound with volume proportional to change ratio
-                        // and subtle variations based on simulation state
-                        if (changedCells > 0) {
-                            // Use behavior data to influence sound variation
-                            const bornCells = tiling.nodes.filter((node, index) => 
-                                prevStates[index] === 0 && node.state === 1).length;
-                            const diedCells = tiling.nodes.filter((node, index) => 
-                                prevStates[index] === 1 && node.state === 0).length;
-                            
-                            // Calculate additional parameters for sound variation
-                            const bornRatio = totalCells > 0 ? bornCells / totalCells : 0;
-                            const diedRatio = totalCells > 0 ? diedCells / totalCells : 0;
-                            const activityLevel = Math.min(1.0, (bornRatio + diedRatio) * 2);
-                            
-                            // Adjust volume based on change ratio but ensure it's audible
-                            const volume = changeRatio / 5;
-                            
-                            // Pass simulation parameters to the sound function
-                            sounds.stateChange(volume, {
-                                bornRatio,
-                                diedRatio,
-                                activityLevel,
-                                iteration: iterationCount
-                            });
-                        }
-                        
-                        alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
-                        
-                        // Update behavior data
-                        const totalNodes = tiling.nodes.length;
-                        const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
-                        const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
-                        const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
-                        
-                        behaviorData = {
-                            increasing: (increasingNodes / totalNodes) * 100,
-                            chaotic: (chaoticNodes / totalNodes) * 100,
-                            decreasing: (decreasingNodes / totalNodes) * 100
-                        };
-                        
-                        iterationCount++;
-                    }
-
-                    tiling.drawGameOfLife(p5);
-                    p5.pop();
+                    p5.showGameOfLife();
                 } else {
-                    if (
-                        prevSelectedTiling.rulestring != $selectedTiling.rulestring || 
-                        parseInt($transformSteps) != parseInt(prevTransformSteps) ||
-                        prevParameter != $parameter
-                    ) {
-                        // tiling = tilingGenerator.generateWithWFC();
-                        tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
-                        tilingGenerator.golEngine.setupGameOfLife(tiling, $ruleType, $golRule, $golRules);
-                        // cr = new Cr($selectedTiling.cr || tiling.crNotation);
-
-                        // crCanvases = Array.from({length: cr.vertexGroups.length}, () => p5.createGraphics(patch.size.x, patch.size.y));
-                    }
-
-                    if ($exportGraphButtonHover) {
-                        tiling.showGraph(p5);
-                    } else {
-                        tiling.show(p5, $showPolygonPoints);
-                    }
-
-                    if ($showConstructionPoints)
-                        tiling.drawConstructionPoints(p5);
-                    
-                    // tiling.showNeighbors(p5, $showPolygonPoints);
-                    // tilingGenerator.showWFCInfo(p5);
-
-                    p5.pop();
-
-                    if ($screenshotButtonHover) {
-                        p5.push();
-                        let sss = 600;
-                        p5.noStroke();
-                        p5.fill(0, 0, 0, 0.5);
-
-                        p5.rect(0, 0, p5.width / 2 - sss / 2, p5.height);
-                        p5.rect(p5.width / 2 + sss / 2, 0, p5.width / 2 - sss / 2, p5.height);
-                        p5.rect(p5.width / 2 - sss / 2, 0, sss, p5.height / 2 - sss / 2);
-                        p5.rect(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, sss, p5.height / 2 - sss / 2);
-
-                        let len = 50;
-                        p5.stroke(255);
-                        p5.strokeWeight(2);
-
-                        p5.line(p5.width / 2 - sss / 2, p5.height / 2 - sss / 2, p5.width / 2 - sss / 2 + len, p5.height / 2 - sss / 2);
-                        p5.line(p5.width / 2 - sss / 2, p5.height / 2 - sss / 2, p5.width / 2 - sss / 2, p5.height / 2 - sss / 2 + len);
-
-                        p5.line(p5.width / 2 + sss / 2, p5.height / 2 - sss / 2, p5.width / 2 + sss / 2 - len, p5.height / 2 - sss / 2);
-                        p5.line(p5.width / 2 + sss / 2, p5.height / 2 - sss / 2, p5.width / 2 + sss / 2, p5.height / 2 - sss / 2 + len);
-
-                        p5.line(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, p5.width / 2 - sss / 2 + len, p5.height / 2 + sss / 2);
-                        p5.line(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, p5.width / 2 - sss / 2, p5.height / 2 + sss / 2 - len);
-
-                        p5.line(p5.width / 2 + sss / 2, p5.height / 2 + sss / 2, p5.width / 2 + sss / 2 - len, p5.height / 2 + sss / 2);
-                        p5.line(p5.width / 2 + sss / 2, p5.height / 2 + sss / 2, p5.width / 2 + sss / 2, p5.height / 2 + sss / 2 - len);
-
-                        p5.pop();
-                    }
-
-                    if ($showCR)
-                        p5.drawCr();
-
-                    if ($exportGraph) {
-                        tiling.exportGraph(p5);
-                        $exportGraph = false;
-                    }
+                    p5.showTiling();
                 }
             } catch (e) {
-                console.error(e);
+                canvasError = e?.message ?? String(e);
+            }
+
+            if (canvasError) {
+                p5.noStroke();
+                p5.background(240, 7, 16);
+                p5.fill(255);
+                p5.textSize(16);
+                p5.textAlign(p5.CENTER, p5.CENTER);
+                p5.text(canvasError, p5.width / 2, p5.height / 2, 32);
             }
 
             if (grab) {
@@ -299,25 +181,138 @@
             prevParameter = $parameter;
         }
 
-        p5.drawCr = () => {
-            for (let i = 0; i < crCanvases.length; i++) {
-                crCanvases[i].push();
-                crCanvases[i].colorMode(p5.HSB, 360, 100, 100);
-                crCanvases[i].fill(240, 7, 24);
-                crCanvases[i].noStroke();
-                crCanvases[i].rect(0, 0, patch.size.x, patch.size.y, patch.borderRadius);
-                crCanvases[i].translate(patch.size.x / 2, patch.size.y / 2);
-
-                cr.show(crCanvases[i], i);
-                p5.image(crCanvases[i], patch.padding + i * (patch.size.x + patch.padding), p5.height - patch.size.y - patch.padding);
-                crCanvases[i].pop();
+        p5.showTiling = () => {
+            if (
+                prevSelectedTiling.rulestring != $selectedTiling.rulestring || 
+                parseInt($transformSteps) != parseInt(prevTransformSteps) ||
+                prevParameter != $parameter
+            ) {
+                tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
+                tilingGenerator.golEngine.setupGameOfLife(tiling, $ruleType, $golRule, $golRules);
+                const regularOnly = tiling?.nodes?.length > 0 && tiling.nodes.every((n) => n instanceof RegularPolygon);
+                isTilingRegularOnly.set(regularOnly);
+                if (!regularOnly) circlePacking.set(false);
             }
 
-            let a = p5.createGraphics(100, 100);
-            a.background(240, 7, 24);
-            p5.image(a, -100, -100);
+            if ($exportGraphButtonHover) {
+                tiling.showGraph(p5);
+            } else {
+                tiling.show(p5, $showPolygonPoints, 1, $circlePacking);
+            }
+
+            if ($showConstructionPoints)
+                tiling.drawConstructionPoints(p5);
+            
+            // tiling.showNeighbors(p5, $showPolygonPoints);
+            // tilingGenerator.showWFCInfo(p5);
+
+            p5.pop();
+
+            if ($screenshotButtonHover) {
+                p5.push();
+                let sss = 600;
+                p5.noStroke();
+                p5.fill(0, 0, 0, 0.5);
+
+                p5.rect(0, 0, p5.width / 2 - sss / 2, p5.height);
+                p5.rect(p5.width / 2 + sss / 2, 0, p5.width / 2 - sss / 2, p5.height);
+                p5.rect(p5.width / 2 - sss / 2, 0, sss, p5.height / 2 - sss / 2);
+                p5.rect(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, sss, p5.height / 2 - sss / 2);
+
+                let len = 50;
+                p5.stroke(255);
+                p5.strokeWeight(2);
+
+                p5.line(p5.width / 2 - sss / 2, p5.height / 2 - sss / 2, p5.width / 2 - sss / 2 + len, p5.height / 2 - sss / 2);
+                p5.line(p5.width / 2 - sss / 2, p5.height / 2 - sss / 2, p5.width / 2 - sss / 2, p5.height / 2 - sss / 2 + len);
+
+                p5.line(p5.width / 2 + sss / 2, p5.height / 2 - sss / 2, p5.width / 2 + sss / 2 - len, p5.height / 2 - sss / 2);
+                p5.line(p5.width / 2 + sss / 2, p5.height / 2 - sss / 2, p5.width / 2 + sss / 2, p5.height / 2 - sss / 2 + len);
+
+                p5.line(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, p5.width / 2 - sss / 2 + len, p5.height / 2 + sss / 2);
+                p5.line(p5.width / 2 - sss / 2, p5.height / 2 + sss / 2, p5.width / 2 - sss / 2, p5.height / 2 + sss / 2 - len);
+
+                p5.line(p5.width / 2 + sss / 2, p5.height / 2 + sss / 2, p5.width / 2 + sss / 2 - len, p5.height / 2 + sss / 2);
+                p5.line(p5.width / 2 + sss / 2, p5.height / 2 + sss / 2, p5.width / 2 + sss / 2, p5.height / 2 + sss / 2 - len);
+
+                p5.pop();
+            }
+
+            if ($exportGraph) {
+                tiling.exportGraph(p5);
+                $exportGraph = false;
+            }
         }
-        
+
+        p5.showGameOfLife = () => {
+            if (
+                prevRuleType != $ruleType || 
+                ($ruleType == "Single" && !p5.isSameRule(prevGolRule, $golRule)) || 
+                ($ruleType == "By Shape" && !p5.isSameRule(prevGolRules, $golRules)) ||
+                resetGameOfLife
+            ) {
+                tilingGenerator.setupGameOfLife($ruleType, $golRule, $golRules);
+                resetGameOfLife = false;
+            }
+
+            if (p5.frameCount % Math.round(frameMod) == 0) {
+                // Store previous states to calculate changes
+                const prevStates = tiling.nodes.map(node => node.state);
+                
+                tiling.updateGameOfLife();
+                
+                // Calculate state changes
+                const changedCells = tiling.nodes.filter((node, index) => node.state !== prevStates[index]).length;
+                const totalCells = tiling.nodes.length;
+                const changeRatio = totalCells > 0 ? changedCells / totalCells : 0;
+                
+                // Play state change sound with volume proportional to change ratio
+                // and subtle variations based on simulation state
+                if (changedCells > 0) {
+                    // Use behavior data to influence sound variation
+                    const bornCells = tiling.nodes.filter((node, index) => 
+                        prevStates[index] === 0 && node.state === 1).length;
+                    const diedCells = tiling.nodes.filter((node, index) => 
+                        prevStates[index] === 1 && node.state === 0).length;
+                    
+                    // Calculate additional parameters for sound variation
+                    const bornRatio = totalCells > 0 ? bornCells / totalCells : 0;
+                    const diedRatio = totalCells > 0 ? diedCells / totalCells : 0;
+                    const activityLevel = Math.min(1.0, (bornRatio + diedRatio) * 2);
+                    
+                    // Adjust volume based on change ratio but ensure it's audible
+                    const volume = changeRatio / 5;
+                    
+                    // Pass simulation parameters to the sound function
+                    sounds.stateChange(volume, {
+                        bornRatio,
+                        diedRatio,
+                        activityLevel,
+                        iteration: iterationCount
+                    });
+                }
+                
+                alivePercentage = tiling.nodes.filter(node => node.state === 1).length / tiling.nodes.length * 100;
+                
+                // Update behavior data
+                const totalNodes = tiling.nodes.length;
+                const increasingNodes = tiling.nodes.filter(node => node.behavior === 'increasing').length;
+                const chaoticNodes = tiling.nodes.filter(node => node.behavior === 'chaotic').length;
+                const decreasingNodes = tiling.nodes.filter(node => node.behavior === 'decreasing').length;
+                
+                behaviorData = {
+                    increasing: (increasingNodes / totalNodes) * 100,
+                    chaotic: (chaoticNodes / totalNodes) * 100,
+                    decreasing: (decreasingNodes / totalNodes) * 100
+                };
+                
+                iterationCount++;
+            }
+
+            tiling.drawGameOfLife(p5, $circlePacking);
+            p5.pop();
+        }
+
         p5.mousePressed = (event) => {
             if (event && event.target !== p5.canvas) return;
 
@@ -337,26 +332,6 @@
             }
 
             grab = true;
-
-            if (!$showCR) return;
-            
-            for (let i = 0; i < crCanvases.length; i++) {
-                const x = patch.padding + i * (patch.size.x + patch.padding);
-                const y = p5.height - patch.size.y - patch.padding;
-                
-                if (p5.mouseX >= x && p5.mouseX <= x + patch.size.x && 
-                    p5.mouseY >= y && p5.mouseY <= y + patch.size.y) {
-                    cr.save(p5, i);
-                    
-                    notificationMessage = `CR image saved as ${cr.vertexGroups[i].getCompactNotation()}.png`;
-                    showNotification = true;
-                    setTimeout(() => {
-                        showNotification = false;
-                    }, 3000);
-                    
-                    break;
-                }
-            }
         }
 
         p5.mouseReleased = () => {
@@ -537,7 +512,8 @@
                 imageDataUrl,
                 filename,
                 rulestring: $selectedTiling.rulestring,
-                groupId
+                groupId,
+                allowSupabaseUpload: true
             });
         }
     };
@@ -549,14 +525,13 @@
 
 <div class="relative h-full w-full">
     <div class="cursor-pointer" bind:this={canvasContainer} oncontextmenu={(e) => e.preventDefault()}></div>
-    
+
     {#if showExtra}
-        <!-- Tiling Info Button - fixed position relative to sidebar -->
         <div 
             class="fixed top-4 z-50 transition-[left] duration-300 ease-in-out"
             style="left: {tilingInfoLeft}px;"
         >
-            <TilingInfo tileCount={tiling?.nodes?.length ?? 0} />
+            <TilingInfo tileCount={tiling?.nodes?.length ?? 0} vcs={tiling?.vcs ?? []} />
         </div>
 
         {#if !showGameOfLife}

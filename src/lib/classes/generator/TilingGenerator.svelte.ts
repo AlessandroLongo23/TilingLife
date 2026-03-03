@@ -1,19 +1,16 @@
 import { tolerance, debugView, offsets, debugManager, updateDebugStore } from '$stores';
 import { angleBetween, isWithinTolerance, getSpatialKey } from '$utils';
-import { vertexConfigurations } from '$lib/const';
-import { DualPolygon, Polygon, Vector, Tiling, GOLEngine } from '$classes';
+import { DualPolygon, Polygon, Vector, Tiling, GOLEngine, TilingChecker } from '$classes';
 
 export class TilingGenerator {
     tiling: Tiling;
     golEngine: GOLEngine;
-    // tilingChecker: TilingChecker;
-    possibleVertexConfigurations: number[][];
+    tilingChecker: TilingChecker;
 
     constructor() {
         this.tiling = new Tiling();
         this.golEngine = new GOLEngine();
-        // this.tilingChecker = new TilingChecker();
-        this.possibleVertexConfigurations = [...vertexConfigurations];
+        this.tilingChecker = new TilingChecker();
     }
 
     computeDual = () => {

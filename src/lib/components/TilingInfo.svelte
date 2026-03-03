@@ -1,10 +1,12 @@
 <script>
 	import * as ls from 'lucide-svelte';
-	
+	import VertexConfigurationThumbnail from '$components/VertexConfigurationThumbnail.svelte';
+
 	let { 
-		tileCount = 0
+		tileCount = 0,
+		vcs = []
 	} = $props();
-	
+
 	let isHovered = $state(false);
 </script>
 
@@ -19,22 +21,41 @@
 	>
 		<ls.Info size={16} />
 	</button>
-	
+
 	{#if isHovered}
 		<div 
-			class="info-tooltip absolute left-0 top-10 min-w-44 bg-zinc-800/95 backdrop-blur-sm rounded-lg border border-zinc-700/50 shadow-xl p-3 z-50"
+			class="info-tooltip absolute left-0 top-10 min-w-44 max-w-[320px] bg-zinc-800/95 backdrop-blur-sm rounded-lg border border-zinc-700/50 shadow-xl p-3 z-50"
 		>
-			<div class="flex flex-col gap-2">
+			<div class="flex flex-col gap-3">
 				<h4 class="text-xs font-medium text-white/60 uppercase tracking-wider">Tiling Info</h4>
-				
+
 				<div class="flex items-center justify-between gap-4">
 					<span class="text-sm text-white/80">Tiles</span>
 					<span class="text-sm font-medium text-green-400/90 bg-green-400/10 px-2 py-0.5 rounded">
 						{tileCount.toLocaleString()}
 					</span>
 				</div>
+
+				{#if vcs.length > 0}
+					<div class="border-t border-zinc-700/50 pt-3">
+						<h4 class="text-xs font-medium text-white/60 uppercase tracking-wider mb-2">Vertex Configurations</h4>
+						<div class="flex flex-wrap gap-3">
+							{#each vcs as { vc, occurrences }}
+								<div class="shrink-0 w-24">
+									<VertexConfigurationThumbnail
+										{vc}
+										size={96}
+										showName={true}
+										showOccurrences={true}
+										{occurrences}
+									/>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
 			</div>
-			
+
 			<div class="tooltip-arrow"></div>
 		</div>
 	{/if}

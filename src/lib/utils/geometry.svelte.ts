@@ -1,5 +1,5 @@
 import { tolerance } from '$stores';
-import { parametricStarRegex, equilateralPolygonRegex, Vector, regularStarRegex, regularPolygonRegex, type PolygonSignatureData, PolygonType, StarVertexTypes, TriangleType, QuadrilateralType, type TriangleSignature, type QuadrilateralSignature, Polygon } from '$classes';
+import { parametricStarRegex, equilateralPolygonRegex, Vector, regularStarRegex, regularPolygonRegex, type PolygonSignatureData, PolygonType, StarVertexTypes, TriangleType, QuadrilateralType, type TriangleSignature, type QuadrilateralSignature, Polygon, genericPolygonRegex } from '$classes';
 import { isWithinTolerance } from './math.svelte';
 
 export const sortPointsByAngleAndDistance = (points: Vector[]): Vector[] => {
@@ -114,7 +114,9 @@ export const extractDataFromPolygonName = (name: string): PolygonSignatureData =
             type: PolygonType.REGULAR,
             n: parseInt(name)
         };
-    } else if (name.match(regularStarRegex)) {
+    } 
+    
+    if (name.match(regularStarRegex)) {
         const [, n, d, suffix] = name.match(regularStarRegex);
         return {
             type: PolygonType.STAR_REGULAR,
@@ -122,7 +124,9 @@ export const extractDataFromPolygonName = (name: string): PolygonSignatureData =
             d: parseInt(d),
             startsWith: suffix === 'i' ? StarVertexTypes.INNER : StarVertexTypes.OUTER,
         };
-    } else if (name.match(parametricStarRegex)) {
+    } 
+    
+    if (name.match(parametricStarRegex)) {
         const [, n, value, suffix] = name.match(parametricStarRegex);
         return {
             type: PolygonType.STAR_PARAMETRIC,
@@ -130,7 +134,9 @@ export const extractDataFromPolygonName = (name: string): PolygonSignatureData =
             alpha: toRadians(parseFloat(value)),
             startsWith: suffix === 'i' ? StarVertexTypes.INNER : StarVertexTypes.OUTER,
         };
-    } else if (name.match(equilateralPolygonRegex)) {
+    } 
+    
+    if (name.match(equilateralPolygonRegex)) {
         const [, n, angles] = name.match(equilateralPolygonRegex);
         return {
             type: PolygonType.EQUILATERAL,
@@ -138,14 +144,23 @@ export const extractDataFromPolygonName = (name: string): PolygonSignatureData =
             angles: angles.split(';').map(a => toRadians(parseInt(a))),
         };
     }
+    
+    if (name.match(genericPolygonRegex)) {
+        const [, n, sides, angles] = name.match(genericPolygonRegex);
+        return {
+            type: PolygonType.GENERIC,
+            n: parseInt(n),
+            sides: sides.split(';').map(s => parseFloat(s)),
+            angles: angles.split(';').map(a => toRadians(parseInt(a))),
+        };
+    }
 }
 
-export const comparePolygonNames = (nameA: string, nameB: string): number => {
+export const comparePolygonNames = (nameA: string, nameB: string, sortOrder: string[] = ['type', 'n', 'd', 'alpha']): number => {
     const dataA: PolygonSignatureData = extractDataFromPolygonName(nameA);
     const dataB: PolygonSignatureData = extractDataFromPolygonName(nameB);
 
-    const sortOrder = ['type', 'n', 'd', 'alpha'];
-    const typesOrder = [PolygonType.REGULAR, PolygonType.STAR_REGULAR, PolygonType.STAR_PARAMETRIC, PolygonType.EQUILATERAL];
+    const typesOrder = [PolygonType.REGULAR, PolygonType.STAR_REGULAR, PolygonType.STAR_PARAMETRIC, PolygonType.EQUILATERAL, PolygonType.GENERIC];
     const typeAIndex = typesOrder.indexOf(dataA.type);
     const typeBIndex = typesOrder.indexOf(dataB.type);
 
@@ -154,7 +169,9 @@ export const comparePolygonNames = (nameA: string, nameB: string): number => {
             if (typeAIndex !== typeBIndex) return typeAIndex - typeBIndex;
             continue;
         }
-        if (dataA[field] !== dataB[field]) return dataA[field] - dataB[field];
+        const valA = (dataA as unknown as Record<string, number | undefined>)[field] ?? -Infinity;
+        const valB = (dataB as unknown as Record<string, number | undefined>)[field] ?? -Infinity;
+        if (valA !== valB) return valA - valB;
     }
     return 0;
 }
@@ -324,4 +341,15 @@ export const deduplicatePolygons = (polygons: Polygon[]): Polygon[] => {
     return polygons.filter((p, idx, self) => {
         return idx === self.findIndex(other => isWithinTolerance(p.centroid, other.centroid));
     });
+}
+
+export const getAngleAtVertex = (vertices: Vector[], coordinate: Vector): number => {
+    const vertex = vertices.find(v => isWithinTolerance(v, coordinate));
+    if (vertex) {
+        const index = vertices.indexOf(vertex);
+        const u = Vector.sub(vertices[(index + 1) % vertices.length], vertex);
+        const v = Vector.sub(vertex, vertices[(index - 1 + vertices.length) % vertices.length]);
+        return (v.heading() - u.heading() + 5 * Math.PI) % (2 * Math.PI);
+    }
+    return 0;
 }

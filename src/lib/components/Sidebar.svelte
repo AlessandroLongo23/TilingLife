@@ -1,5 +1,5 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, showConstructionPoints, showPolygonPoints, showCR, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, islamicAngle, isIslamic, gameOfLifeRules, tilingModalOpen, tilingStore } from '$stores';
+	import { golRule, golRules, selectedTiling, transformSteps, showPolygonPoints, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, islamicAngle, isIslamic, gameOfLifeRules, tilingModalOpen, tilingStore, circlePacking, isTilingRegularOnly } from '$stores';
 
 	let activeTilingRules = $derived(
 		tilingStore.initialized && tilingStore.tilingRules.length > 0
@@ -272,24 +272,13 @@
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
 							<div class="flex flex-col gap-3">
 								<div class="flex flex-row gap-3">
-									<!-- <div class="w-2/3">
-										<Input 
-											id="tilingRule"
-											label="Tiling Rule"
-											bind:value={$selectedTiling.rulestring}
-											placeholder="4/m90/r(h1)"
-										/>
-									</div> -->
-
-									<!-- <div class="w-1/3"> -->
-										<Input
-											id="transformSteps"
-											type="number"
-											label="Layers"
-											bind:value={$transformSteps}
-											min={0}
-										/>
-									<!-- </div> -->
+									<Input
+										id="transformSteps"
+										type="number"
+										label="Layers"
+										bind:value={$transformSteps}
+										min={0}
+									/>
 
 									<Input 
 										id="lineWidth"
@@ -347,12 +336,14 @@
 										bind:checked={$showPolygonPoints}
 									/>
 
-									<Checkbox 
-										id="cr"
-										label="Show Cundy & Rollett's Notation"
-										position="right"
-										bind:checked={$showCR}
-									/>
+									{#if $isTilingRegularOnly}
+										<Checkbox 
+											id="circlePacking"
+											label="Circle Packing"
+											position="right"
+											bind:checked={$circlePacking}
+										/>
+									{/if}
 
 									<Checkbox 
 										id="showDualConnections"

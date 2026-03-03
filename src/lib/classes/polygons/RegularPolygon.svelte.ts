@@ -15,6 +15,8 @@ export class RegularPolygon extends Polygon {
         polygon.angle = angle;
 
         polygon.calculateVerticesFromCentroidAndAngle();
+        polygon.calculateSides();
+        polygon.calculateAngles();
         polygon.calculateHalfways();
         polygon.calculateHue();
 
@@ -31,6 +33,8 @@ export class RegularPolygon extends Polygon {
         polygon.dir = dir.copy();
         
         polygon.calculateVerticesFromAnchorAndDir();
+        polygon.calculateSides();
+        polygon.calculateAngles();
         polygon.calculateHalfways();
         polygon.calculateCentroid();
         polygon.calculateAngle();
@@ -94,7 +98,9 @@ export class RegularPolygon extends Polygon {
     }
 
     clone = (): RegularPolygon => {
-        return RegularPolygon.fromAnchorAndDir(this.n, this.vertices[0].copy(), Vector.sub(this.vertices[1], this.vertices[0]));
+        const anchor = this.vertices[0].copy();
+        const dir = Vector.sub(this.vertices[1], this.vertices[0]).copy().normalize();
+        return RegularPolygon.fromAnchorAndDir(this.n, anchor, dir);
     }
 
     encode = (): Object => {
