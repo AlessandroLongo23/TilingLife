@@ -1,5 +1,4 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import algorithmMd from '$lib/content/theory/algorithm.md?raw';
 import {
 	renderMarkdown,
 	extractTableOfContents,
@@ -7,15 +6,7 @@ import {
 } from '$lib/utils/markdown.svelte';
 
 export function load() {
-	const path = join(process.cwd(), 'static', 'theory', 'algorithm.md');
-	let content = '';
-	let sections: ReturnType<typeof structureTableOfContents> = [];
-	try {
-		const raw = readFileSync(path, 'utf-8');
-		content = renderMarkdown(raw);
-		sections = structureTableOfContents(extractTableOfContents(raw));
-	} catch {
-		content = renderMarkdown('# Algorithm\n\n*Description coming soon.*');
-	}
+	const content = renderMarkdown(algorithmMd);
+	const sections = structureTableOfContents(extractTableOfContents(algorithmMd));
 	return { content, sections };
 }
