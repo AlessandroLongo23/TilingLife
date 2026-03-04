@@ -4,6 +4,7 @@
 - [x] generate polygons
 - [x] compute vertex configuration
 - [x] create compatibility graph
+  - [ ] add self connections (if compatible)
 - [x] extract all seed sets
 - [-] build the seeds
 - [ ] expand the seeds
@@ -56,7 +57,6 @@
   - [ ] gol rules
   - [ ] users tiling findings
 - [ ] add operations (fractalization , rectification, truncation)
-- [ ] generate tilings from the k-uniform-solver output instead of using the GomJau-Hogg notation
 - [x] expand notation to allow rotations of a certain angle around a point
 
 ## Features

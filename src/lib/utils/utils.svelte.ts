@@ -59,6 +59,9 @@ export const isEqualOrChiral = (arrayA: number[], arrayB: number[]): boolean => 
 
 export const compareVCNames = (polygonNamesA: string[], polygonNamesB: string[]): number => {
     for (let i = 0; i < polygonNamesA.length; i++) {
+        if (!polygonNamesB[i]) return 1;
+        if (!polygonNamesA[i]) return -1;
+        
         const result = comparePolygonNames(polygonNamesA[i], polygonNamesB[i]);
         if (result !== 0) return result;
     }

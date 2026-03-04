@@ -160,7 +160,13 @@ export const comparePolygonNames = (nameA: string, nameB: string, sortOrder: str
     const dataA: PolygonSignatureData = extractDataFromPolygonName(nameA);
     const dataB: PolygonSignatureData = extractDataFromPolygonName(nameB);
 
-    const typesOrder = [PolygonType.REGULAR, PolygonType.STAR_REGULAR, PolygonType.STAR_PARAMETRIC, PolygonType.EQUILATERAL, PolygonType.GENERIC];
+    const typesOrder = [
+        PolygonType.REGULAR, 
+        PolygonType.STAR_REGULAR, 
+        PolygonType.STAR_PARAMETRIC, 
+        PolygonType.EQUILATERAL, 
+        PolygonType.GENERIC
+    ];
     const typeAIndex = typesOrder.indexOf(dataA.type);
     const typeBIndex = typesOrder.indexOf(dataB.type);
 
@@ -185,6 +191,7 @@ export const compareVertexConfigurationNames = (nameA: string, nameB: string): n
         const polygonB: string = polygonsB[i];
         if (!polygonB) return 1;
         if (!polygonA) return -1;
+        
         const result = comparePolygonNames(polygonA, polygonB);
         if (result !== 0) return result;
     }

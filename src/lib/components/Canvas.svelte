@@ -116,15 +116,18 @@
             tilingGenerator = new TilingGeneratorFromRule();
             try {
                 if ($debugView) debugManager.reset();
+
+                // generate the tiling
                 // tiling = tilingGenerator.generateWithWFC();
                 tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
                 tilingGenerator.golEngine.setupGameOfLife(tiling, $ruleType, $golRule, $golRules);
+                
+                // check if the tiling is composed only of regular polygons
                 const regularOnly = tiling?.nodes?.length > 0 && tiling.nodes.every((n) => n instanceof RegularPolygon);
                 isTilingRegularOnly.set(regularOnly);
                 if (!regularOnly) circlePacking.set(false);
-                if ($debugView) {
-                    updateDebugStore();
-                }
+                
+                if ($debugView) updateDebugStore();
                 canvasError = null;
             } catch (e) {
                 canvasError = e?.message ?? String(e);
