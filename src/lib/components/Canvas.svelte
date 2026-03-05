@@ -263,6 +263,18 @@
                 p5.drawArrow(origin, Vector.add(origin, v1), 0, 100, 100, arrowSize);
                 p5.drawArrow(origin, Vector.add(origin, v2), 120, 100, 100, arrowSize);
 
+                if (tiling.reflections?.length > 0) {
+                    const lineLength = 3;
+                    p5.stroke(0, 100, 100);
+                    p5.strokeWeight(2 / $controls.zoom);
+                    p5.noFill();
+                    for (const r of tiling.reflections) {
+                        const axis = r.axis.copy().normalize();
+                        const start = Vector.add(r.point, Vector.scale(axis, -lineLength));
+                        const end = Vector.add(r.point, Vector.scale(axis, lineLength));
+                        p5.line(start.x, start.y, end.x, end.y);
+                    }
+                }
                 if (tiling.gyrations?.length > 0) {
                     const pointSize = 8 / $controls.zoom;
                     const offset = new Vector(-12, 12);

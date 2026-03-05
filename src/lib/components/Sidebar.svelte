@@ -377,12 +377,12 @@
 										bind:checked={$showDualConnections}
 									/>
 
-									<Checkbox 
+									<!-- <Checkbox 
 										id="showWallpaperGroup"
 										label="Show Wallpaper Group"
 										position="right"
 										bind:checked={$showWallpaperGroup}
-									/>
+									/> -->
 								</div>
 
 								<div class="flex flex-row gap-2">

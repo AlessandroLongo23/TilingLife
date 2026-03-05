@@ -185,6 +185,18 @@ export class Tiling {
         return rotatedTiling;
     }
 
+    reflect = (axis: Vector, point: Vector): void => {
+        for (let node of this.nodes) {
+            node.mirror(point, axis);
+        }
+    }
+
+    static reflect = (tiling: Tiling, axis: Vector, point: Vector): Tiling => {
+        const reflectedTiling: Tiling = tiling.clone();
+        reflectedTiling.reflect(axis, point);
+        return reflectedTiling;
+    }
+
     translate = (vector: Vector): void => {
         for (let node of this.nodes) {
             node.translate(vector);

@@ -5,6 +5,7 @@ import { Polygon } from "./polygons/Polygon.svelte";
 import { Tiling } from "./Tiling.svelte";
 import { VertexConfiguration } from "./algorithm/VertexConfiguration.svelte";
 import { tolerance } from "$stores";
+import { type Reflection } from "./Transform";
 
 export const gyrationOrders: number[] = [6, 4, 3, 2];
 
@@ -58,6 +59,7 @@ export class TilingChecker {
     computeWallpaperGroup(tiling: Tiling) {
         this.findTranslationalCellBasis(tiling);
         this.findGyrationCenters(tiling);
+        this.findReflections(tiling);
     }
 
     findTranslationalCellBasis(tiling: Tiling): void {
@@ -132,6 +134,33 @@ export class TilingChecker {
                     tiling.gyrations.push({ center: point, order });
                     break;
                 }
+            }
+        }
+    }
+
+    findReflections(tiling: Tiling): void {
+        const points: Vector[] = this.findUniquePointsInCell(
+            tiling, 
+            tiling.originPolygon!.centroid, 
+            tiling.translationalCellBasis![0], 
+            tiling.translationalCellBasis![1]
+        );
+
+        const candidates: Reflection[] = [];
+        for (let i = 0; i < points.length; i++) {
+            for (let j = i + 1; j < points.length; j++) {
+                candidates.push({ 
+                    axis: Vector.sub(points[i], points[j]).normalize(),
+                    point: points[i].copy()
+                });
+            }
+        }
+
+        tiling.reflections = [];
+        for (let candidate of candidates) {
+            const reflectedTiling: Tiling = Tiling.reflect(tiling, candidate.axis, candidate.point);
+            if (tiling.isEquivalent(reflectedTiling)) {
+                tiling.reflections.push(candidate);
             }
         }
     }
