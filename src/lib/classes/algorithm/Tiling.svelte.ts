@@ -6,6 +6,7 @@ export class Tiling {
     fundamentalDomain: FundamentalDomain;
     processedSeed: SeedConfiguration;
     cellStructure: Vector[];
+    // polygons: Polygon[];
 
     constructor(seedConfiguration: SeedConfiguration, wallpaperGroup: WallpaperGroup, fundamentalDomain: FundamentalDomain) {
         this.seedConfiguration = seedConfiguration;
@@ -14,9 +15,17 @@ export class Tiling {
         [this.processedSeed, this.cellStructure] = this.wallpaperGroup.buildCell(this.seedConfiguration, this.fundamentalDomain);
     }
 
+    // static fromPolygons = (polygons: Polygon[]): Tiling => {
+    //     throw new Error("Not implemented");
+    // }
+
     fillPlane = (layers: number): Polygon[] => {
         return this.wallpaperGroup.apply(this.processedSeed, this.fundamentalDomain, layers);
     }
+
+    // rotate = (origin: Vector, angle: number): Tiling => {
+        
+    // }
 
     encode = (): object => {
         return {

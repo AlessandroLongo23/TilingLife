@@ -182,14 +182,6 @@ export class Vector {
         return Math.atan2(v2.y - v1.y, v2.x - v1.x);
     }
 
-    snapToGrid(): void {
-        if (Math.abs(this.x) < tolerance)
-            this.x = 0;
-
-        if (Math.abs(this.y) < tolerance)
-            this.y = 0;
-    }
-
     encode = (): Object => {
         return {
             x: this.x,

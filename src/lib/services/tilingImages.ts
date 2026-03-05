@@ -19,15 +19,15 @@ const BUCKET = 'tilings';
  * Extract storage path from a Supabase public URL for deletion.
  * URL format: https://[project].supabase.co/storage/v1/object/public/[bucket]/[path][?query]
  */
-function extractPathFromSupabaseUrl(url: string): string | null {
-    if (!url) return null;
+function extractPathFromSupabaseUrl(url: string): string {
+    if (!url) return '';
     try {
         const match = url.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/);
-        if (!match) return null;
+        if (!match) return '';
         const path = match[1];
         return path.split('?')[0];
     } catch {
-        return null;
+        return '';
     }
 }
 
@@ -104,7 +104,6 @@ export async function uploadTilingScreenshot(
             const oldPath = extractPathFromSupabaseUrl(currentImageUrl);
             if (oldPath) {
                 await supabase.storage.from(BUCKET).remove([oldPath]);
-                // Ignore delete errors (file might not exist)
             }
         }
 

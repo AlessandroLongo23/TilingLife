@@ -1,10 +1,10 @@
 // Core
 export * from "./Vector.svelte";
 export * from "./Transform";
-export * from "./Transform";
 export * from "./Tiling.svelte";
 export * from "./GameOfLifeRule.svelte";
 export * from "./TilingChecker.svelte";
+
 // Polygons
 export * from "./polygons/Polygon.svelte";
 export * from "./polygons/RegularPolygon.svelte";

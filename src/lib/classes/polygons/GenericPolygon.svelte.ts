@@ -42,7 +42,6 @@ export class GenericPolygon extends Polygon {
             const prev_vertex = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), Vector.scale(current_dir, this.sides[i - 1])));
             current_dir.rotate(Math.PI - this.angles[i]);
-            this.vertices[i].snapToGrid();
         }
     }
 
@@ -52,20 +51,16 @@ export class GenericPolygon extends Polygon {
 
     rotate = (origin: Vector, angle: number): GenericPolygon => {
         this.centroid = Vector.add(origin, Vector.sub(this.centroid, origin).rotate(angle));
-        this.centroid.snapToGrid();
         this.angle = (this.angle + angle) % (Math.PI * 2);
 
         for (let i = 0; i < this.vertices.length; i++) {
             this.vertices[i] = Vector.add(origin, Vector.sub(this.vertices[i], origin).rotate(angle));
-            this.vertices[i].snapToGrid();
         }
         for (let i = 0; i < this.halfways.length; i++) {
             this.halfways[i] = Vector.add(origin, Vector.sub(this.halfways[i], origin).rotate(angle));
-            this.halfways[i].snapToGrid();
         }
         
         this.anchor = Vector.add(origin, Vector.sub(this.anchor, origin).rotate(angle));
-        this.anchor.snapToGrid();
         this.dir = this.dir.copy().rotate(angle);
         
         return this;
@@ -73,18 +68,14 @@ export class GenericPolygon extends Polygon {
 
     translate = (vector: Vector): GenericPolygon => {
         this.centroid.add(vector);
-        this.centroid.snapToGrid();
         for (let i = 0; i < this.vertices.length; i++) {
             this.vertices[i] = Vector.add(this.vertices[i], vector);
-            this.vertices[i].snapToGrid();
         }
         for (let i = 0; i < this.halfways.length; i++) {
             this.halfways[i] = Vector.add(this.halfways[i], vector);
-            this.halfways[i].snapToGrid();
         }
         
         this.anchor = Vector.add(this.anchor, vector);
-        this.anchor.snapToGrid();
         
         return this;
     }
@@ -93,22 +84,18 @@ export class GenericPolygon extends Polygon {
         this.angle = (2 * mirrorDir.heading() - this.angle + 2 * Math.PI) % (2 * Math.PI);
         
         this.centroid.mirrorByPointAndDir(point, mirrorDir);
-        this.centroid.snapToGrid();
         
         for (let i = 0; i < this.vertices.length; i++) {
             this.vertices[i].mirrorByPointAndDir(point, mirrorDir);
-            this.vertices[i].snapToGrid();
         }
         this.vertices.reverse();
 
         for (let i = 0; i < this.halfways.length; i++) {
             this.halfways[i].mirrorByPointAndDir(point, mirrorDir);
-            this.halfways[i].snapToGrid();
         }
         this.halfways.reverse();
         
         this.anchor.mirrorByPointAndDir(point, mirrorDir);
-        this.anchor.snapToGrid();
         this.dir.mirrorByPointAndDir(new Vector(), mirrorDir);
         
         return this;

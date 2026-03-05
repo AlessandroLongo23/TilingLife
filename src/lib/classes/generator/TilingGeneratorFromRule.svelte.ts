@@ -53,6 +53,7 @@ export class TilingGeneratorFromRule extends TilingGenerator {
         // updateDebugStore();
 
         this.tilingChecker.findVertexConfigurations(this.tiling);
+        this.tilingChecker.computeWallpaperGroup(this.tiling);
 
         return this.tiling;
     }

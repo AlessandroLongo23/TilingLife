@@ -1,5 +1,5 @@
 import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic } from '$stores';
-import { isWithinConvexHull, segmentsIntersect, getAngleAtVertex } from '$utils';
+import { isWithinConvexHull, segmentsIntersect, getAngleAtVertex, isWithinTolerance } from '$utils';
 import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
 
@@ -62,15 +62,12 @@ export class Polygon {
         }
         this.centroid.x /= 6 * signed_area;
         this.centroid.y /= 6 * signed_area;
-
-        this.centroid.snapToGrid();
     }
 
     calculateHalfways = () => {
         this.halfways = [];
         for (let i = 0; i < this.vertices.length; i++) {
             this.halfways.push(Vector.midpoint(this.vertices[i], this.vertices[(i + 1) % this.vertices.length]));
-            this.halfways[i].snapToGrid();
         }
     }
 
@@ -80,16 +77,13 @@ export class Polygon {
 
     rotate = (origin: Vector, angle: number): Polygon => {
         this.centroid = Vector.add(origin, Vector.sub(this.centroid, origin).rotate(angle));
-        this.centroid.snapToGrid();
         this.angle = (this.angle + angle) % (Math.PI * 2);
 
         for (let i = 0; i < this.vertices.length; i++) {
             this.vertices[i] = Vector.add(origin, Vector.sub(this.vertices[i], origin).rotate(angle));
-            this.vertices[i].snapToGrid();
         }
         for (let i = 0; i < this.halfways.length; i++) {
             this.halfways[i] = Vector.add(origin, Vector.sub(this.halfways[i], origin).rotate(angle));
-            this.halfways[i].snapToGrid();
         }
 
         return this;
@@ -97,14 +91,11 @@ export class Polygon {
 
     translate = (vector: Vector): Polygon => {
         this.centroid.add(vector);
-        this.centroid.snapToGrid();
         for (let i = 0; i < this.vertices.length; i++) {
             this.vertices[i] = Vector.add(this.vertices[i], vector);
-            this.vertices[i].snapToGrid();
         }
         for (let i = 0; i < this.halfways.length; i++) {
             this.halfways[i] = Vector.add(this.halfways[i], vector);
-            this.halfways[i].snapToGrid();
         }
 
         return this;
@@ -114,17 +105,14 @@ export class Polygon {
         this.angle = (2 * dir.heading() - this.angle + 2 * Math.PI) % (2 * Math.PI);
         
         this.centroid.mirrorByPointAndDir(point.copy(), dir.copy());
-        this.centroid.snapToGrid();
         
         for (let i = 0; i < this.vertices.length; i++) {
             this.vertices[i].mirrorByPointAndDir(point.copy(), dir.copy());
-            this.vertices[i].snapToGrid();
         }
         this.vertices.reverse();
 
         for (let i = 0; i < this.halfways.length; i++) {
             this.halfways[i].mirrorByPointAndDir(point.copy(), dir.copy());
-            this.halfways[i].snapToGrid();
         }
         this.halfways.reverse();
 
@@ -154,7 +142,7 @@ export class Polygon {
         return isWithinConvexHull(this.vertices, point);
     }
 
-    intersects(other: Polygon): boolean {
+    intersects = (other: Polygon): boolean => {
         if (this.containsPoint(other.centroid)) return true;
         if (other.containsPoint(this.centroid)) return true;
 
@@ -292,6 +280,24 @@ export class Polygon {
 
     getName = (coordinate: Vector | null = null): string => {
         throw new Error('Abstract method called');
+    }
+
+    isEquivalent = (other: Polygon): boolean => {
+        for (let vertex of this.vertices) {
+            if (!other.vertices.some(v => isWithinTolerance(v, vertex))) return false;
+        }
+        
+        for (let halfway of this.halfways) {
+            if (!other.halfways.some(h => isWithinTolerance(h, halfway))) return false;
+        }
+        return true;
+    }
+
+    isTranslated = (other: Polygon): boolean => {
+        const translationVector: Vector = Vector.sub(other.centroid, this.centroid);
+        if (isWithinTolerance(translationVector, new Vector())) return false;
+        const translatedPolygon: Polygon = this.clone().translate(translationVector);
+        return translatedPolygon.isEquivalent(other);
     }
 
     clone = (): Polygon => {

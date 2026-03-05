@@ -1,14 +1,46 @@
-<script>
-    import { ruleType, parameter, selectedTiling, debugView, controls, transformSteps, golRule, golRules, showPolygonPoints, showConstructionPoints, showChart, speed, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, openScreenshotPreview, tilingStore, isTilingRegularOnly, circlePacking } from '$stores';
-    import { debugManager, debugStore, updateDebugStore } from '$stores';
-    import { sortPointsByAngleAndDistance } from '$utils';
-    // import { TilingGeneratorWFC } from '$lib/classes/generator/TilingGeneratorWFC.svelte.ts';
-    import { TilingGeneratorFromRule, RegularPolygon } from '$classes';
-    import { isWithinTolerance } from '$utils';
-    import { Vector } from '$classes';
+<script lang="ts">
+    import type p5 from 'p5';
+    import { 
+        ruleType, 
+        parameter, 
+        selectedTiling, 
+        debugView,
+        controls, 
+        transformSteps, 
+        golRule, 
+        golRules, 
+        showPolygonPoints, 
+        showConstructionPoints, 
+        showChart, 
+        speed, 
+        screenshotButtonHover, 
+        takeScreenshot, 
+        exportGraphButtonHover, 
+        exportGraph, 
+        openScreenshotPreview, 
+        tilingStore,
+        isTilingRegularOnly, 
+        circlePacking, 
+        showWallpaperGroup,
+        debugManager,
+        debugStore,
+        updateDebugStore
+    } from '$stores';
+    import { TilingGeneratorFromRule, RegularPolygon, Tiling, Vector, GOLRuleType } from '$classes';
+    import { sortPointsByAngleAndDistance, isWithinTolerance, sounds } from '$utils';
+
     import * as ls from 'lucide-svelte';
     import { onMount } from 'svelte';
-    import { sounds } from '$utils';
+
+    /** p5 instance extended with custom sketch methods and canvas property */
+    interface P5SketchInstance extends p5 {
+        canvas?: HTMLCanvasElement;
+        takeScreenshot(): Promise<void>;
+        showTiling(): void;
+        showGameOfLife(): void;
+        drawArrow(from: { x: number; y: number }, to: { x: number; y: number }, hue: number, sat: number, bright: number, headSize: number): void;
+        isSameRule(prev: string | Record<number, string>, current: string | Record<number, string>): boolean;
+    }
 
     import LiveChart from '$components/LiveChart.svelte';
     import ColorPad from '$components/ui/ColorPad.svelte';
@@ -34,30 +66,29 @@
     let iterationCount = $state(0);
     let behaviorData = $state({ increasing: 0, chaotic: 0, decreasing: 0 });
     
-    let canvasElement = $state(null);
+    let canvasElement = $state<P5SketchInstance | null>(null);
 
-    let prevWidth = width;   
-    let prevHeight = height;
+    let prevWidth: number = width;   
+    let prevHeight: number = height;
     let prevSelectedTiling = $state($selectedTiling);
-    let prevTransformSteps = $state($transformSteps);
-    let prevRuleType = $state($ruleType);
-    let prevGolRule = $state($golRule);
-    let prevGolRules = $state($golRules);
-    let prevParameter = $state($parameter);
+    let prevTransformSteps: number = $state($transformSteps);
+    let prevRuleType: string = $state($ruleType);
+    let prevGolRule: string = $state($golRule);
+    let prevGolRules: { [key: number]: string } = $state($golRules);
+    let prevParameter: number = $state($parameter);
 
-    let tiling = $state();
-    let tilingGenerator = $state();
-    let canvasError = $state(null);
+    let tiling: Tiling | null = $state(null);
+    let tilingGenerator: TilingGeneratorFromRule | null = $state(null);
+    let canvasError: string | null = $state(null);
 
-    let resetGameOfLife = $state(false);
+    let resetGameOfLife: boolean = $state(false);
 
     onMount(async () => {
         if (typeof window !== 'undefined') {
-            p5 = (await import('p5')).default;
-            myp5 = new p5(sketch, canvasContainer);
-            
+            const p5Lib = (await import('p5')).default;
+            myp5 = new p5Lib(sketch, canvasContainer ?? undefined) as P5SketchInstance;
             canvasElement = myp5;
-            
+
             if (width && height && myp5) {
                 myp5.resizeCanvas(width, height);
                 prevWidth = width;
@@ -104,7 +135,7 @@
         }
     });
 
-	let sketch = function(p5) {
+    let sketch = function (p5: P5SketchInstance) {
         p5.setup = () => {
             p5.createCanvas(width, height);
             canvasElement = p5;
@@ -184,10 +215,29 @@
             prevParameter = $parameter;
         }
 
+        p5.drawArrow = (from: Vector, to: Vector, hue: number, sat: number, bright: number, headSize: number) => {
+            p5.stroke(hue, sat, bright);
+            p5.strokeWeight(2 / $controls.zoom);
+            p5.noFill();
+            p5.line(from.x, from.y, to.x, to.y);
+            const dir = Vector.sub(to, from);
+            const len = dir.mag();
+            if (len > 1e-6) {
+                const u = dir.copy().scale(1 / len);
+                const perp = new Vector(-u.y, u.x);
+                const tip = to;
+                const left = Vector.add(tip, Vector.add(Vector.scale(u, -headSize), Vector.scale(perp, headSize * 0.6)));
+                const right = Vector.add(tip, Vector.add(Vector.scale(u, -headSize), Vector.scale(perp, -headSize * 0.6)));
+                p5.fill(hue, sat, bright);
+                p5.noStroke();
+                p5.triangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
+            }
+        };
+
         p5.showTiling = () => {
             if (
                 prevSelectedTiling.rulestring != $selectedTiling.rulestring || 
-                parseInt($transformSteps) != parseInt(prevTransformSteps) ||
+                $transformSteps != prevTransformSteps ||
                 prevParameter != $parameter
             ) {
                 tiling = tilingGenerator.generateFromRule($selectedTiling.rulestring);
@@ -205,6 +255,39 @@
 
             if ($showConstructionPoints)
                 tiling.drawConstructionPoints(p5);
+
+            if ($showWallpaperGroup && tiling.nodes.length > 0 && tiling.translationalCellBasis?.length === 2 && tiling.translationalCellBasis[0] && tiling.translationalCellBasis[1]) {
+                const arrowSize = 0.15;
+                const origin = tiling.originPolygon?.centroid;
+                const [v1, v2] = tiling.translationalCellBasis;
+                p5.drawArrow(origin, Vector.add(origin, v1), 0, 100, 100, arrowSize);
+                p5.drawArrow(origin, Vector.add(origin, v2), 120, 100, 100, arrowSize);
+
+                if (tiling.gyrations?.length > 0) {
+                    const pointSize = 8 / $controls.zoom;
+                    const offset = new Vector(-12, 12);
+                    p5.strokeWeight(1 / $controls.zoom);
+                    p5.stroke(0, 0, 0);
+                    p5.fill(200, 90, 85);
+                    for (const g of tiling.gyrations) {
+                        p5.ellipse(g.center.x, g.center.y, pointSize, pointSize);
+                    }
+                    p5.fill(200, 90, 85);
+                    p5.textSize(18);
+                    p5.textAlign(p5.CENTER, p5.CENTER);
+                    if ($controls.zoom > 50) {
+                        for (const g of tiling.gyrations) {
+                            p5.push();
+                            p5.stroke(0, 0, 0);
+                            p5.strokeWeight(2);
+                            p5.scale(1 / $controls.zoom, -1 / $controls.zoom);
+                            p5.translate(g.center.x * $controls.zoom + offset.x, -(g.center.y * $controls.zoom + offset.y));
+                            p5.text(String(g.order), 0, 0);
+                            p5.pop();
+                        }
+                    }
+                }
+            }
             
             // tiling.showNeighbors(p5, $showPolygonPoints);
             // tilingGenerator.showWFCInfo(p5);
@@ -242,7 +325,7 @@
             }
 
             if ($exportGraph) {
-                tiling.exportGraph(p5);
+                tiling.exportGraph();
                 $exportGraph = false;
             }
         }
@@ -250,11 +333,11 @@
         p5.showGameOfLife = () => {
             if (
                 prevRuleType != $ruleType || 
-                ($ruleType == "Single" && !p5.isSameRule(prevGolRule, $golRule)) || 
-                ($ruleType == "By Shape" && !p5.isSameRule(prevGolRules, $golRules)) ||
+                ($ruleType === GOLRuleType.SINGLE && !p5.isSameRule(prevGolRule, $golRule)) || 
+                ($ruleType === GOLRuleType.BY_SHAPE && !p5.isSameRule(prevGolRules, $golRules)) ||
                 resetGameOfLife
             ) {
-                tilingGenerator.setupGameOfLife($ruleType, $golRule, $golRules);
+                tilingGenerator.golEngine.setupGameOfLife(tiling, $ruleType, $golRule, $golRules);
                 resetGameOfLife = false;
             }
 
@@ -280,8 +363,8 @@
                     
                     // Calculate additional parameters for sound variation
                     const bornRatio = totalCells > 0 ? bornCells / totalCells : 0;
-                    const diedRatio = totalCells > 0 ? diedCells / totalCells : 0;
-                    const activityLevel = Math.min(1.0, (bornRatio + diedRatio) * 2);
+                    const deadRatio = totalCells > 0 ? diedCells / totalCells : 0;
+                    const activityLevel = Math.min(1.0, (bornRatio + deadRatio) * 2);
                     
                     // Adjust volume based on change ratio but ensure it's audible
                     const volume = changeRatio / 5;
@@ -289,7 +372,7 @@
                     // Pass simulation parameters to the sound function
                     sounds.stateChange(volume, {
                         bornRatio,
-                        diedRatio,
+                        deadRatio,
                         activityLevel,
                         iteration: iterationCount
                     });
@@ -316,17 +399,17 @@
             p5.pop();
         }
 
-        p5.mousePressed = (event) => {
+        p5.mousePressed = (event?: MouseEvent) => {
             if (event && event.target !== p5.canvas) return;
 
-            if (event.button === 1) {
+            if (event?.button === 1) {
                 const mouse = new Vector(p5.mouseX - p5.width/2, p5.mouseY - p5.height/2);
                 const worldPoint = Vector.sub(mouse, $controls.targetOffset).scale(1 / $controls.targetZoom);
                 $controls.targetOffset.set(Vector.sub(new Vector(0, 0), Vector.scale(worldPoint, $controls.targetZoom)));
                 return;
             }
 
-            if (event.button === 2) {
+            if (event?.button === 2) {
                 event.preventDefault();
                 event.stopPropagation();
                 $controls.targetOffset.set(new Vector(0, 0));
@@ -342,7 +425,7 @@
         }
 
         p5.isSameRule = (prev, current) => {
-            if ($ruleType === 'Single') {
+            if ($ruleType === GOLRuleType.SINGLE) {
                 return prev === current;
             } else {
                 let isSame = true;
@@ -367,16 +450,16 @@
             }
         }
 
-        p5.mouseWheel = (event) => {
+        p5.mouseWheel = (event?: WheelEvent) => {
             if (event && event.target !== p5.canvas) return;
 
             const mouse = new Vector(p5.mouseX - p5.width / 2, p5.mouseY - p5.height / 2);
             const world = Vector.sub(mouse, $controls.targetOffset).scale(1 / $controls.targetZoom);
-            
-            if (event.deltaY > 0) {
+
+            if (event?.deltaY > 0) {
                 $controls.targetZoom /= 1.10;
                 $controls.targetZoom = Math.max($controls.targetZoom, 10);
-            } else if (event.deltaY < 0) {
+            } else if (event?.deltaY < 0) {
                 $controls.targetZoom *= 1.10;
                 $controls.targetZoom = Math.min($controls.targetZoom, 150);
             }
@@ -521,13 +604,12 @@
         }
     };
 
-    let canvasContainer = $state();
-    let p5;
-    let myp5 = $state();
+    let canvasContainer = $state<HTMLDivElement | null>(null);
+    let myp5 = $state<P5SketchInstance | null>(null);
 </script>
 
 <div class="relative h-full w-full">
-    <div class="cursor-pointer" bind:this={canvasContainer} oncontextmenu={(e) => e.preventDefault()}></div>
+    <div class="cursor-pointer" role="application" bind:this={canvasContainer} oncontextmenu={(e) => e.preventDefault()}></div>
 
     {#if showExtra}
         <div 
@@ -550,6 +632,8 @@
 
                     <Input 
                         id="tilingRule"
+                        disabled={false}
+                        onChangeFunction={() => {}}
                         align="center"
                         bind:value={$selectedTiling.rulestring}
                         placeholder="4/m90/r(h1)"

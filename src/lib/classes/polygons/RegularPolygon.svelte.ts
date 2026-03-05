@@ -61,8 +61,6 @@ export class RegularPolygon extends Polygon {
                 this.centroid.x + radius * Math.cos(i * 2 * Math.PI / this.n + this.angle),
                 this.centroid.y + radius * Math.sin(i * 2 * Math.PI / this.n + this.angle)
             ));
-
-            this.vertices[i].snapToGrid();
         }
     }
 
@@ -77,7 +75,6 @@ export class RegularPolygon extends Polygon {
             const prev_vertex = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.copy()));
             current_dir.rotate(Math.PI - this.interior_angle);
-            this.vertices[i].snapToGrid();
         }
     }
 

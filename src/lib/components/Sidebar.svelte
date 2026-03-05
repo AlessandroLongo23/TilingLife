@@ -1,5 +1,30 @@
 <script>
-	import { golRule, golRules, selectedTiling, transformSteps, showPolygonPoints, speed, ruleType, parameter, activeTab, lineWidth, showDualConnections, screenshotButtonHover, takeScreenshot, exportGraphButtonHover, exportGraph, islamicAngle, isIslamic, gameOfLifeRules, tilingModalOpen, tilingStore, circlePacking, isTilingRegularOnly } from '$stores';
+	import { 
+		golRule,
+		golRules, 
+		selectedTiling, 
+		transformSteps, 
+		showPolygonPoints, 
+		speed, 
+		ruleType, 
+		parameter, 
+		activeTab, 
+		lineWidth, 
+		showDualConnections, 
+		screenshotButtonHover, 
+		takeScreenshot, 
+		exportGraphButtonHover,
+		exportGraph, 
+		islamicAngle, 
+		isIslamic, 
+		gameOfLifeRules, 
+		tilingModalOpen, 
+		tilingStore, 
+		circlePacking, 
+		isTilingRegularOnly, 
+		showWallpaperGroup, 
+		ActiveTab
+	} from '$stores';
 
 	let activeTilingRules = $derived(
 		tilingStore.initialized && tilingStore.tilingRules.length > 0
@@ -266,7 +291,7 @@
 			</button>
 		</div>
 			<div class="flex-1 overflow-hidden">
-				<Tabs tabs={["Tilings", "Game of Life", "Theory"]}>
+				<Tabs tabs={[ActiveTab.TILINGS, ActiveTab.GAME_OF_LIFE, ActiveTab.THEORY]}>
 					<div slot="tab-0" class="h-full flex flex-col">
 						<!-- Fixed options section -->
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
@@ -350,6 +375,13 @@
 										label="Show Dual Connections"
 										position="right"
 										bind:checked={$showDualConnections}
+									/>
+
+									<Checkbox 
+										id="showWallpaperGroup"
+										label="Show Wallpaper Group"
+										position="right"
+										bind:checked={$showWallpaperGroup}
 									/>
 								</div>
 

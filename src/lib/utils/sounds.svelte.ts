@@ -21,6 +21,7 @@ interface AudioOptions {
 
 interface SimulationParams {
 	bornRatio?: number;
+	deadRatio?: number;
 	activityLevel?: number;
 	iteration?: number;
 }

@@ -301,46 +301,64 @@ export const evaluateQuadrilateral = (vertices: Vector[]): QuadrilateralSignatur
 }
 
 export const sortPointsByAngle = (vertices: Vector[]): Vector[] => {
+    if (!vertices || vertices.length === 0) {
+        throw new Error('Vertices array is empty');
+    }
+
     const centroid = vertices.reduce((acc, v) => Vector.add(acc, v), new Vector(0, 0)).scale(1 / vertices.length);
     return vertices.sort((a, b) => Vector.sub(a, centroid).heading() - Vector.sub(b, centroid).heading());
 }
 
 export const isWithinConvexHull = (vertices: Vector[], point: Vector): boolean => {
+    if (!vertices || vertices.length === 0) 
+        throw new Error('Vertices array is empty');
+
+    if (!point) 
+        throw new Error('Point is undefined');
+
+    if (vertices.length < 3) return false;
+
     return sdf(vertices, point) < -tolerance;
 }
 
 export const sdf = (vertices: Vector[], point: Vector): number => {
-    let minDistanceSq = Infinity;
-    let inside = false;
-    const verticesSorted = sortPointsByAngle(vertices);
+    if (!vertices || vertices.length === 0) 
+        throw new Error('Vertices array is empty');
+
+    if (!point) 
+        throw new Error('Point is undefined');
+
+    let minDistanceSq: number = Infinity;
+    let inside: boolean = false;
+    const verticesSorted: Vector[] = sortPointsByAngle(vertices);
 
     for (let i = 0, j = verticesSorted.length - 1; i < verticesSorted.length; j = i++) {
-        const vi = verticesSorted[j];
-        const vj = verticesSorted[i];
-        const ex = vj.x - vi.x;
-        const ey = vj.y - vi.y;
-        const wx = point.x - vi.x;
-        const wy = point.y - vi.y;
-        const eLenSq = ex * ex + ey * ey;
-        let t = Math.max(0, Math.min(1, (wx * ex + wy * ey) / eLenSq));
+        const vi: Vector = verticesSorted[j];
+        const vj: Vector = verticesSorted[i];
+        const ex: number = vj.x - vi.x;
+        const ey: number = vj.y - vi.y;
+        const wx: number = point.x - vi.x;
+        const wy: number = point.y - vi.y;
+        const eLenSq: number = ex * ex + ey * ey;
+        let t: number = Math.max(0, Math.min(1, (wx * ex + wy * ey) / eLenSq));
 
         if (isNaN(t)) t = 0;
-        const cx = vi.x + t * ex;
-        const cy = vi.y + t * ey;
-        const dx = point.x - cx;
-        const dy = point.y - cy;
-        const distSq = dx * dx + dy * dy;
+        const cx: number = vi.x + t * ex;
+        const cy: number = vi.y + t * ey;
+        const dx: number = point.x - cx;
+        const dy: number = point.y - cy;
+        const distSq: number = dx * dx + dy * dy;
         
         if (distSq < minDistanceSq) {
             minDistanceSq = distSq;
         }
-        const intersect = ((vi.y > point.y) !== (vj.y > point.y)) && (point.x < (vj.x - vi.x) * (point.y - vi.y) / (vj.y - vi.y) + vi.x);
+        const intersect: boolean = ((vi.y > point.y) !== (vj.y > point.y)) && (point.x < (vj.x - vi.x) * (point.y - vi.y) / (vj.y - vi.y) + vi.x);
         
         if (intersect) {
             inside = !inside;
         }
     }
-    const distance = Math.sqrt(minDistanceSq);
+    const distance: number = Math.sqrt(minDistanceSq);
     return inside ? -distance : distance;
 }
 

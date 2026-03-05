@@ -1,5 +1,5 @@
 <script>
-    import { speed, activeTab } from '$stores';
+    import { speed, activeTab, ActiveTab } from '$stores';
     import { onMount } from 'svelte';
     import { contentService } from '$services/contentService';
 
@@ -40,8 +40,8 @@
         };
     });
 
-    let showGameOfLife = $derived($activeTab === "Game of Life");
-    let showTheory = $derived($activeTab === "Theory");
+    let showGameOfLife = $derived($activeTab === ActiveTab.GAME_OF_LIFE);
+    let showTheory = $derived($activeTab === ActiveTab.THEORY);
     let showCanvas = $derived(!showTheory);
 
     const handleSectionSelect = (sectionId) => {

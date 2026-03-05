@@ -1,6 +1,6 @@
-import { type GameOfLifeRule, GOLRuleType, Behavior, State, Polygon, Vector } from '$classes';
-import { sortPointsByAngleAndDistance, isWithinTolerance } from '$utils';
-import { lineWidth, showDualConnections, controls, liveChartMode } from '$stores';
+import { type GameOfLifeRule, GOLRuleType, Behavior, State, Polygon, Vector, type Gyration, type Reflection, type GlideReflection } from '$classes';
+import { lineWidth, showDualConnections, controls, liveChartMode, tolerance } from '$stores';
+import { sortPointsByAngleAndDistance, isWithinTolerance, deduplicatePolygons } from '$utils';
 import { get } from 'svelte/store';
 
 export type VCWithOccurrences = { vc: { polygons: Polygon[]; name: string }; occurrences: number };
@@ -15,6 +15,13 @@ export class Tiling {
     newLayerNodes: Polygon[];
     seedNodes: Polygon[];
     coreNode: Polygon | null;
+
+    // tiling check
+    translationalCellBasis: [Vector, Vector] | null = null;
+    originPolygon: Polygon | null = null;
+    gyrations: Gyration[] | null = null;
+    reflections: Reflection[] | null = null;
+    glideReflections: GlideReflection[] | null = null;
 
     constructor() {
         this.nodes = [];
@@ -164,6 +171,62 @@ export class Tiling {
                 );
             }
         }
+    }
+
+    rotate = (origin: Vector, angle: number): void => {
+        for (let node of this.nodes) {
+            node.rotate(origin, angle);
+        }
+    }
+
+    static rotate = (tiling: Tiling, origin: Vector, angle: number): Tiling => {
+        const rotatedTiling: Tiling = tiling.clone();
+        rotatedTiling.rotate(origin, angle);
+        return rotatedTiling;
+    }
+
+    translate = (vector: Vector): void => {
+        for (let node of this.nodes) {
+            node.translate(vector);
+        }
+    }
+
+    static translate = (tiling: Tiling, vector: Vector): Tiling => {
+        const translatedTiling: Tiling = tiling.clone();
+        translatedTiling.translate(vector);
+        return translatedTiling;
+    }
+
+    clone = (): Tiling => {
+        const newTiling: Tiling = new Tiling();
+        newTiling.nodes = this.nodes.map(node => node.clone());
+        newTiling.anchorNodes = this.anchorNodes.map(node => node.clone());
+        return newTiling;
+    }
+
+    static merge = (tilingA: Tiling, tilingB: Tiling): Tiling => {
+        const mergedTiling: Tiling = tilingA.clone();
+        mergedTiling.nodes.push(...tilingB.nodes);
+        mergedTiling.nodes = deduplicatePolygons(mergedTiling.nodes);
+        return mergedTiling;
+    }
+
+    isEquivalent = (other: Tiling): boolean => {
+        if (!other) return false;
+
+        const mergedTiling: Tiling = Tiling.merge(this, other);
+
+        for (let i = 0; i < mergedTiling.nodes.length - 1; i++) {
+            const polygon = mergedTiling.nodes[i];
+            for (let j = i + 1; j < mergedTiling.nodes.length; j++) {
+                const otherPolygon = mergedTiling.nodes[j];
+                if (polygon.intersects(otherPolygon)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     showNeighbors = (ctx, showPolygonPoints: boolean): void => {

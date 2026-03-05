@@ -1,5 +1,11 @@
 import { writable } from 'svelte/store';
-import { Vector } from '$classes';
+import { GOLRuleType, Vector } from '$classes';
+
+export enum ActiveTab {
+	TILINGS = 'Tilings',
+	GAME_OF_LIFE = 'Game of Life',
+	THEORY = 'Theory'
+} 
 
 export let golRule = writable('B3/S23');
 export let golRules = writable({});
@@ -14,7 +20,7 @@ export let selectedTiling = writable({
 	}
 });
 export let isDual = writable(false);
-export let transformSteps = writable(5);
+export let transformSteps = writable<number>(5);
 export let controls = writable({
 	zoom: 50,
 	targetZoom: 50,
@@ -22,16 +28,17 @@ export let controls = writable({
 	targetOffset: new Vector(0, 0),
 	dampening: 0.2
 });
-export let speed = writable(20);
-export let parameter = writable(45);
-export let lineWidth = writable(1);
-export let showDualConnections = writable(false);
-export let ruleType = writable('Single');
-export let activeTab = writable('Tilings');
-export let debugView = writable(false);
+export let speed = writable<number>(20);
+export let parameter = writable<number>(45);
+export let lineWidth = writable<number>(1);
+export let showDualConnections = writable<boolean>(false);
+export let ruleType = writable<GOLRuleType>(GOLRuleType.SINGLE);
+export let activeTab = writable<ActiveTab>(ActiveTab.TILINGS);
+export let debugView = writable<boolean>(false);
 
 export let showPolygonPoints = writable(false);
 export let showConstructionPoints = writable(false);
+export let showWallpaperGroup = writable(false);
 export let showChart = writable(false);
 export let liveChartMode = writable('count');
 

@@ -32,7 +32,6 @@ export class StarPolygon extends Polygon {
             const prev_vertex: Vector = this.vertices[this.vertices.length - 1];
             this.vertices.push(Vector.add(prev_vertex.copy(), current_dir.copy()));
             current_dir.rotate(Math.PI - angles[i % 2]);
-            this.vertices[i].snapToGrid();
         }
     }
 
@@ -56,15 +55,12 @@ export class StarPolygon extends Polygon {
     mirror = (point: Vector, dir: Vector): StarPolygon => {
         this.angle = (2 * dir.heading() - this.angle + 2 * Math.PI) % (2 * Math.PI);
         this.centroid.mirrorByPointAndDir(point.copy(), dir.copy());
-        this.centroid.snapToGrid();
         for (let i = 0; i < this.vertices.length; i++) {
             this.vertices[i].mirrorByPointAndDir(point.copy(), dir.copy());
-            this.vertices[i].snapToGrid();
         }
         this.vertices.reverse();
         for (let i = 0; i < this.halfways.length; i++) {
             this.halfways[i].mirrorByPointAndDir(point.copy(), dir.copy());
-            this.halfways[i].snapToGrid();
         }
         this.halfways.reverse();
         // After vertices.reverse(), the first vertex swaps outer<->inner, so startsWith must flip
