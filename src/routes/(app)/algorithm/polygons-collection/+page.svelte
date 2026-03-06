@@ -18,6 +18,7 @@
     import SearchInput from '$components/ui/SearchInput.svelte';
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
+    import ReloadButton from '$components/ui/ReloadButton.svelte';
 
     const { data } = $props();
 
@@ -575,13 +576,16 @@
             <!-- Stats -->
             <div class="border-t border-zinc-800 pt-5">
                 <div class="flex flex-col gap-1.5 text-xs text-zinc-500">
-                    <div class="flex justify-between">
+                    <div class="flex justify-between items-center">
                         <span>Total in dataset</span>
                         <span class="text-zinc-400">{allPolygonNames.length}</span>
                     </div>
                     <div class="flex justify-between">
                         <span>Matching filters</span>
                         <span class="text-green-400 font-medium">{filteredNames.length}</span>
+                    </div>
+                    <div class="pt-2">
+                        <ReloadButton />
                     </div>
                 </div>
             </div>

@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
-import { GOLRuleType, Vector } from '$classes';
+import { GOLRuleType } from '$lib/classes/GameOfLifeRule.svelte';
+import { Vector } from '$lib/classes/Vector.svelte';
 
 export enum ActiveTab {
 	TILINGS = 'Tilings',
@@ -49,7 +50,7 @@ export let exportGraph = writable(false);
 
 export const colorParams = writable({ a: 180, b: 0 });
 export let possibleAngles = [15, 20, 30, 36, 40, 45, 48, 60, 72, 75, 90, 120, 135, 144, 150, 180, 210, 225, 240, 270, 300, 315, 330];
-export let possibleSides = [0, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 16, 18, 20, 24, 30, 36, 40, 48, 60, 72, 90, 120, 144, 180, 240, 360];
+export let possibleSides = [0, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 16, 18, 20, 24, 30, 36, 40, 48, 60];
 
 export let isIslamic = writable(false);
 export let islamicAngle = writable(90);

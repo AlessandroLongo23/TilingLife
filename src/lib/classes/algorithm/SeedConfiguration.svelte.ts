@@ -47,7 +47,6 @@ export class SeedConfiguration {
     }
 
     isValid = (): boolean => {
-        // check if any polygon conflicts with any other polygon
         for (let i = 0; i < this.polygons.length - 1; i++) {
             const polygon = this.polygons[i];
             for (let j = i + 1; j < this.polygons.length; j++) {
@@ -62,19 +61,21 @@ export class SeedConfiguration {
     }
 
     computeName = (): string => {
-        return this.vertexConfigurations.map(vc => vc.name).join(',');
+        return "[" + this.vertexConfigurations.map(vc => vc.name).join(';') + "]";
     }
 
-    encode = (): Object => {
+    encode = (): {name: string, vcsCenters: { x: number, y: number }[], polygons: Object[]} => {
         return {
-            polygons: this.polygons.map(p => p.encode()),
+            name: this.name,
+            vcsCenters: this.vertexConfigurations.map((vc: VertexConfiguration) => vc.sharedVertex.encode()),
+            polygons: this.polygons.map((p: Polygon) => p.encode()),
         };
     }
 
     /** Compact format: VC name + shared-vertex position + rotation. */
     encodeCompact = (): CompactSeedConfiguration => {
         return {
-            vcs: this.vertexConfigurations.map(vc => {
+            vcs: this.vertexConfigurations.map((vc: VertexConfiguration) => {
                 const edgeDir = Vector.sub(vc.polygons[0].vertices[1], vc.sharedVertex);
                 return {
                     name: vc.name,

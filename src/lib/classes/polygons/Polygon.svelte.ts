@@ -283,6 +283,10 @@ export class Polygon {
     }
 
     isEquivalent = (other: Polygon): boolean => {
+        if (this.vertices.length !== other.vertices.length) return false;
+
+        if (!isWithinTolerance(this.centroid, other.centroid)) return false;
+
         for (let vertex of this.vertices) {
             if (!other.vertices.some(v => isWithinTolerance(v, vertex))) return false;
         }

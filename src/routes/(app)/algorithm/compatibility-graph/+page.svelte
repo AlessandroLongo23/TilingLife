@@ -22,11 +22,12 @@
     import SearchInput from '$components/ui/SearchInput.svelte';
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
 	import Checkbox from '$components/ui/Checkbox.svelte';
+    import ReloadButton from '$components/ui/ReloadButton.svelte';
 
     const { data } = $props();
 
     const allVCNames = data.allVCNames ?? [];
-    const adjacencyList: Record<string, string[]> = data.adjacencyListData ?? {};
+    const adjacencyList = data.adjacencyListData ?? {};
 
     let selectedCategories = $state([PolygonType.REGULAR]);
     let activeSearch = $state('');
@@ -35,7 +36,7 @@
     let showNames = $state(false);
 
     let filteredNames = $derived.by(() => {
-        return allVCNames.filter(name => {
+        return allVCNames.filter((name: string) => {
             if (activeSearch && !name.toLowerCase().includes(activeSearch)) return false;
             
             const parts = name.split(',');
@@ -729,6 +730,9 @@
                         <div class="flex justify-between">
                             <span>Edges</span>
                             <span class="text-green-400 font-medium">{edgeCount}</span>
+                        </div>
+                        <div class="pt-2">
+                            <ReloadButton />
                         </div>
                     </div>
                 </div>

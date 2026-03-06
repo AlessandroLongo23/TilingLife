@@ -90,7 +90,7 @@ export class SeedBuilder {
                 for (const dirCtoV of directions) {
                     for (const nv of newVC.neighboringVertices) {
                         const rotation = dirCtoV - nv.heading() + Math.PI;
-                        const normalizedRot = ((rotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+                        const normalizedRot = (rotation + 2 * Math.PI) % (2 * Math.PI);
                         const rotKey = normalizedRot.toFixed(4);
                         if (triedRotations.has(rotKey)) continue;
                         triedRotations.add(rotKey);

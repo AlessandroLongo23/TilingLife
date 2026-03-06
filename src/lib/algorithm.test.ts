@@ -8,8 +8,10 @@ import {
     SeedSetExtractor, 
     VertexConfiguration, 
     SeedBuilder,
-    TilingGenerator
+    SeedConfiguration
 } from '$classes';
+import { TilingGenerator } from '$classes/algorithm/TilingGenerator.svelte';
+import { Tiling } from '$classes/algorithm/Tiling.svelte';
 import { describe, it } from 'vitest';
 import { comparePolygonNames, compareVertexConfigurationNames, toRadians } from '$utils';
 import { BATCH_SIZE } from '$stores';
@@ -30,31 +32,31 @@ describe('VCGenerator', () => {
             [PolygonType.REGULAR]: {
                 n_max: 12
             },
-            [PolygonType.STAR_REGULAR]: {
-                n_max: 12,
-                // angle: toRadians(30)
-            },
-            [PolygonType.STAR_PARAMETRIC]: {
-                n_max: 12,
-            },
-            [PolygonType.EQUILATERAL]: {
-                n_max: 5,
-                angle: toRadians(30)
-            },
-            [PolygonType.DUAL]: {
-                n_max: 12
-            }
+            // [PolygonType.STAR_REGULAR]: {
+            //     n_max: 12,
+            //     angle: toRadians(30)
+            // },
+            // [PolygonType.STAR_PARAMETRIC]: {
+            //     n_max: 12,
+            // },
+            // [PolygonType.EQUILATERAL]: {
+            //     n_max: 5,
+            //     angle: toRadians(30)
+            // },
+            // [PolygonType.DUAL]: {
+            //     n_max: 12
+            // }
         };
         const additionalPolygons: PolygonSignature[] = [];
 
         if (!fs.existsSync(DATA_FOLDER_PATH)) fs.mkdirSync(DATA_FOLDER_PATH, { recursive: true });
         const polygonSignatures = polygonGeneration(parameters, additionalPolygons);
-        // const vertexConfigurations = vertexConfigurationGeneration(polygonSignatures);
-        // const adjacencyList = compatibilityGraphGeneration(vertexConfigurations);
-        // seedSetExtraction(adjacencyList, vertexConfigurations, maxK);
-        // seedsGeneration(3, 3);
+        const vertexConfigurations = vertexConfigurationGeneration(polygonSignatures);
+        const adjacencyList = compatibilityGraphGeneration(vertexConfigurations);
+        seedSetExtraction(adjacencyList, vertexConfigurations, maxK);
+        seedsGeneration(3, 3);
         // tilingsGeneration(1, 1);
-    }, 15 * 60 * 1000);
+    }, 15 /* min */ * 60 /* sec */ * 1000 /* ms */);
 });
 
 // STEP 1: generate the polygons based on the selected parameters
@@ -154,9 +156,9 @@ const seedSetExtraction = (adjacencyList: Record<string, string[]>, vertexConfig
         if (!fs.existsSync(folderPath)) {
             fs.mkdirSync(folderPath, { recursive: true });
         }
-        const start: number = performance.now();
+        // const start: number = performance.now();
         const seedSets = extractor.findSeedSets(k);
-        const end: number = performance.now();
+        // const end: number = performance.now();
         // console.log(`\nk=${k}: ${seedSets.length} (${(end - start).toFixed(0)}ms)`);
 
         // divide seed sets based on the number of unique vcs in the seed set
@@ -191,17 +193,19 @@ const seedsGeneration = (k: number | null = null, m: number | null = null): void
         fs.mkdirSync(seedConfigurationsFolderPath, { recursive: true });
     }
 
-    const compactData = seedConfigurations.map(sc => sc.encodeCompact());
-    const total = compactData.length;
+    // Use full format (polygon vertices) to avoid decode round-trip precision issues
+    // that cause overlapping polygons when using compact (pos+rot) format.
+    const fullData = seedConfigurations.map((sc: SeedConfiguration) => sc.encode());
+    const total = fullData.length;
 
     for (let i = 0; i < total; i += BATCH_SIZE) {
-        const batch = compactData.slice(i, i + BATCH_SIZE);
+        const batch = fullData.slice(i, i + BATCH_SIZE);
         const batchIndex = Math.floor(i / BATCH_SIZE);
         const filePath = `${seedConfigurationsFolderPath}/seedConfigurations_${String(batchIndex).padStart(4, '0')}.json`;
         fs.writeFileSync(filePath, JSON.stringify(batch));
     }
 
-    const manifest = { format: 'compact', total, batchSize: BATCH_SIZE };
+    const manifest = { format: 'full', total, batchSize: BATCH_SIZE };
     fs.writeFileSync(`${seedConfigurationsFolderPath}/manifest.json`, JSON.stringify(manifest));
     const end: number = performance.now();
     console.log(`Seeds generation: ${(end - start).toFixed(0)}ms`);
@@ -216,7 +220,7 @@ const tilingsGeneration = (k: number, m: number): void => {
     if (!fs.existsSync(tilingsFolderPath)) {
         fs.mkdirSync(tilingsFolderPath, { recursive: true });
     }
-    const encoded = tilings.map(t => t.encode());
+    const encoded = tilings.map((t: Tiling) => t.encode());
     fs.writeFileSync(`${tilingsFolderPath}/tilings.json`, JSON.stringify(encoded));
     const end: number = performance.now();
     console.log(`Tilings generation: ${tilings.length} tilings in ${(end - start).toFixed(0)}ms`);

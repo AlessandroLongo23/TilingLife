@@ -182,7 +182,7 @@ export class Vector {
         return Math.atan2(v2.y - v1.y, v2.x - v1.x);
     }
 
-    encode = (): Object => {
+    encode = (): { x: number, y: number } => {
         return {
             x: this.x,
             y: this.y,

@@ -301,33 +301,15 @@ export const evaluateQuadrilateral = (vertices: Vector[]): QuadrilateralSignatur
 }
 
 export const sortPointsByAngle = (vertices: Vector[]): Vector[] => {
-    if (!vertices || vertices.length === 0) {
-        throw new Error('Vertices array is empty');
-    }
-
     const centroid = vertices.reduce((acc, v) => Vector.add(acc, v), new Vector(0, 0)).scale(1 / vertices.length);
     return vertices.sort((a, b) => Vector.sub(a, centroid).heading() - Vector.sub(b, centroid).heading());
 }
 
 export const isWithinConvexHull = (vertices: Vector[], point: Vector): boolean => {
-    if (!vertices || vertices.length === 0) 
-        throw new Error('Vertices array is empty');
-
-    if (!point) 
-        throw new Error('Point is undefined');
-
-    if (vertices.length < 3) return false;
-
     return sdf(vertices, point) < -tolerance;
 }
 
 export const sdf = (vertices: Vector[], point: Vector): number => {
-    if (!vertices || vertices.length === 0) 
-        throw new Error('Vertices array is empty');
-
-    if (!point) 
-        throw new Error('Point is undefined');
-
     let minDistanceSq: number = Infinity;
     let inside: boolean = false;
     const verticesSorted: Vector[] = sortPointsByAngle(vertices);
@@ -363,8 +345,8 @@ export const sdf = (vertices: Vector[], point: Vector): number => {
 }
 
 export const deduplicatePolygons = (polygons: Polygon[]): Polygon[] => {
-    return polygons.filter((p, idx, self) => {
-        return idx === self.findIndex(other => isWithinTolerance(p.centroid, other.centroid));
+    return polygons.filter((p: Polygon, idx: number, self: Polygon[]) => {
+        return idx === self.findIndex((other: Polygon) => p.isEquivalent(other));
     });
 }
 

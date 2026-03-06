@@ -14,6 +14,7 @@
     import RangeSlider from '$components/ui/RangeSlider.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
     import Checkbox from '$components/ui/Checkbox.svelte';
+    import ReloadButton from '$components/ui/ReloadButton.svelte';
 
     const { data } = $props();
 
@@ -316,6 +317,9 @@
                     <div class="flex justify-between">
                         <span>Matching filters</span>
                         <span class="text-green-400 font-medium">{filteredNames.length}</span>
+                    </div>
+                    <div class="pt-2">
+                        <ReloadButton />
                     </div>
                 </div>
             </div>

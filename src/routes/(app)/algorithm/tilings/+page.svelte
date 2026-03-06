@@ -6,6 +6,7 @@
     import { sounds } from '$utils';
 
     import Pagination from '$components/ui/Pagination.svelte';
+    import ReloadButton from '$components/ui/ReloadButton.svelte';
 
     let { data } = $props();
 
@@ -347,6 +348,9 @@
                     <div class="flex justify-between">
                         <span>Total across all k/m</span>
                         <span class="text-zinc-400">{data.available.reduce((s: number, a: any) => s + a.count, 0).toLocaleString()}</span>
+                    </div>
+                    <div class="pt-2">
+                        <ReloadButton />
                     </div>
                 </div>
             </div>

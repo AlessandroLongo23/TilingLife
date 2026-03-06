@@ -68,6 +68,10 @@ async function loadPageData(
 			const decoded = pageData.map((item: any) => SeedConfiguration.decodeCompact(item).encode());
 			return { data: decoded, total };
 		}
+		if (format === 'full') {
+			// Full format already has the correct structure { name, vcsCenters, polygons }
+			return { data: pageData, total };
+		}
 		return { data: pageData, total };
 	}
 

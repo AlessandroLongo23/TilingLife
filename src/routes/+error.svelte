@@ -62,12 +62,6 @@
 		</div>
 		<h1 class="error-title">{title}</h1>
 		<p class="error-message">{message}</p>
-		{#if status >= 500 && technicalMessage !== 'Something went wrong'}
-			<details class="error-details">
-				<summary>Technical details</summary>
-				<pre>{technicalMessage}</pre>
-			</details>
-		{/if}
 		<p class="error-hint">{hint}</p>
 
 		<div class="error-actions">

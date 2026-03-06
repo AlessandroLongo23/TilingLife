@@ -5,7 +5,9 @@
     import { headerStore, openScreenshotPreview } from '$stores';
     import { sounds } from '$utils';
 
+    import Checkbox from '$components/ui/Checkbox.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
+    import ReloadButton from '$components/ui/ReloadButton.svelte';
 
     let { data } = $props();
 
@@ -16,6 +18,8 @@
     let columnsPerRow = $state(4);
     const COL_MIN = 2;
     const COL_MAX = 6;
+
+    let showVcsCenters = $state(true);
 
     let currentPage = $state(data.page);
 
@@ -73,11 +77,13 @@
         return mapValue(vertexCount / 2, 3, 12, 300, 0) + 300 / 12;
     }
 
-    function initCanvas(canvas: HTMLCanvasElement, seedConfig: any) {
+    function initCanvas(canvas: HTMLCanvasElement, params: { seedConfiguration: any; showVcsCenters: boolean }) {
+        let seedConfiguration = params.seedConfiguration;
+        let showVcsCenters = params.showVcsCenters;
         let resizeObserver: ResizeObserver;
 
         function render() {
-            if (seedConfig) drawSeedConfig(canvas, seedConfig);
+            if (seedConfiguration) drawSeedConfig(canvas, seedConfiguration, showVcsCenters);
         }
 
         requestAnimationFrame(render);
@@ -88,8 +94,9 @@
         resizeObserver.observe(canvas);
 
         return {
-            update(newData: any) {
-                seedConfig = newData;
+            update(newParams: { seedConfiguration: any; showVcsCenters: boolean }) {
+                seedConfiguration = newParams.seedConfiguration;
+                showVcsCenters = newParams.showVcsCenters;
                 requestAnimationFrame(render);
             },
             destroy() {
@@ -98,7 +105,7 @@
         };
     }
 
-    function drawSeedConfig(canvas: HTMLCanvasElement, seedConfig: any) {
+    function drawSeedConfig(canvas: HTMLCanvasElement, seedConfiguration: any, showVcsCenters: boolean) {
         const size = canvas.clientWidth || 220;
         const ctx = canvas.getContext('2d')!;
         const dpr = window.devicePixelRatio || 1;
@@ -110,10 +117,10 @@
         ctx.fillStyle = '#1e1e24';
         ctx.fillRect(0, 0, size, size);
 
-        if (!seedConfig.polygons || seedConfig.polygons.length === 0) return;
+        if (!seedConfiguration.polygons || seedConfiguration.polygons.length === 0) return;
 
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const polygon of seedConfig.polygons) {
+        for (const polygon of seedConfiguration.polygons) {
             if (!polygon.vertices) continue;
             for (const v of polygon.vertices) {
                 minX = Math.min(minX, v.x);
@@ -138,7 +145,7 @@
         ctx.scale(scale, -scale);
         ctx.translate(-centerX, -centerY);
 
-        for (const polygon of seedConfig.polygons) {
+        for (const polygon of seedConfiguration.polygons) {
             if (!polygon.vertices || polygon.vertices.length === 0) continue;
             const hue = getPolygonHue(polygon.type, polygon.vertices.length);
             const hsl = hsbToHsl(hue, 40, 100);
@@ -156,6 +163,30 @@
         }
 
         ctx.restore();
+
+        if (showVcsCenters && seedConfiguration.vcsCenters && seedConfiguration.vcsCenters.length > 0) {
+            ctx.save();
+            ctx.translate(size / 2, size / 2);
+            ctx.scale(scale, -scale);
+            ctx.translate(-centerX, -centerY);
+
+            const dotRadius = 3 / scale;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.lineWidth = 1.2 / scale;
+
+            for (const center of seedConfiguration.vcsCenters) {
+                const x = (center as { x?: number; y?: number }).x;
+                const y = (center as { x?: number; y?: number }).y;
+                if (typeof x !== 'number' || typeof y !== 'number') continue;
+                ctx.beginPath();
+                ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
     }
 </script>
 
@@ -239,6 +270,17 @@
                 </div>
             </div>
 
+            <!-- VC centers toggle -->
+            {#if data.selectedK !== null && data.selectedM !== null}
+                <div class="border-t border-zinc-800 pt-5">
+                    <Checkbox
+                        id="showVcsCenters"
+                        label="Show VC centers"
+                        bind:checked={showVcsCenters}
+                    />
+                </div>
+            {/if}
+
             <!-- Stats -->
             <div class="border-t border-zinc-800 pt-5">
                 <div class="flex flex-col gap-1.5 text-xs text-zinc-500">
@@ -255,6 +297,9 @@
                     <div class="flex justify-between">
                         <span>Total across all k/m</span>
                         <span class="text-zinc-400">{data.available.reduce((s: number, a: any) => s + a.count, 0).toLocaleString()}</span>
+                    </div>
+                    <div class="pt-2">
+                        <ReloadButton />
                     </div>
                 </div>
             </div>
@@ -281,16 +326,16 @@
                     class="grid gap-3"
                     style="grid-template-columns: repeat({columnsPerRow}, minmax(0, 1fr));"
                 >
-                    {#each data.seedConfigurations as seedConfig, i}
+                    {#each data.seedConfigurations as seedConfiguration, i}
                         {@const globalIndex = (data.page - 1) * data.pageSize + i}
                         <div class="sc-card group relative">
                             <div class="sc-card-header">
                                 <span class="sc-index">{globalIndex + 1}</span>
-                                <span class="text-zinc-500">{seedConfig.polygons.length} polygons</span>
+                                <span class="text-zinc-500">{seedConfiguration.name}</span>
                             </div>
                             {#if browser}
                                 <canvas
-                                    use:initCanvas={seedConfig}
+                                    use:initCanvas={{ seedConfiguration, showVcsCenters }}
                                     class="block w-full aspect-square"
                                 ></canvas>
                             {:else}
