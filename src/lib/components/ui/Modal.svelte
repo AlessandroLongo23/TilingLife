@@ -7,6 +7,8 @@
         title = $bindable(""),
         maxWidth = $bindable("max-w-4xl"),
         showHeader = $bindable(true),
+        header,
+        children
     } = $props();
     
     const dispatch = createEventDispatcher();
@@ -28,10 +30,6 @@
             document.removeEventListener('keydown', handleKeydown);
         };
     });
-    
-    const handleModalClick = (e) => {
-        e.stopPropagation();
-    };
 </script>
 
 <style>
@@ -72,24 +70,21 @@
 
 {#if isOpen}
     <div 
-        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center overflow-y-auto p-4 backdrop"
-        onclick={close}
-        onkeydown={handleKeydown}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-title"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4"
     >
+        <button
+            class="fixed inset-0 bg-black/60 backdrop-blur-sm backdrop"
+            onclick={close}
+            aria-label="Close modal"
+        ></button>
         <div 
-            class="bg-zinc-800 border border-zinc-700/50 rounded-lg shadow-xl {maxWidth} w-full modal-content"
-            onclick={handleModalClick}
-            onkeydown={() => {}}
-            role="document"
+            class="relative bg-zinc-800 border border-zinc-700/50 rounded-lg shadow-xl {maxWidth} w-full modal-content"
         >
             {#if showHeader}
                 <div class="flex items-center justify-between p-4 border-b border-zinc-700/50">
                     <h2 id="modal-title" class="text-lg font-medium text-white">{title}</h2>
                     <div class="flex items-center gap-2">
-                        <slot name="header" />
+                        {@render header?.()}
                         <button 
                             class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100"
                             onclick={close}
@@ -102,7 +97,7 @@
             {/if}
             
             <div class="">
-                <slot />
+                {@render children?.()}
             </div>
         </div>
     </div>

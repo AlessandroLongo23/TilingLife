@@ -77,6 +77,9 @@
 	<div class="color-pad-content">
 		<div 
 			class="color-pad" 
+			role="button"
+			tabindex="0"
+			aria-label="Color picker"
 			bind:this={pad}
 			style="width: {padWidth}px; height: {padHeight}px;"
 			onmousedown={startDrag}

@@ -3,7 +3,7 @@ import {
 	renderMarkdown,
 	extractTableOfContents,
 	structureTableOfContents
-} from '$lib/utils/markdown.svelte';
+} from '$lib/utils/markdown';
 
 export function load() {
 	const content = renderMarkdown(algorithmMd);

@@ -38,7 +38,10 @@
 		<div class="max-w-[1600px] mx-auto px-6 py-4">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<svelte:component this={displayIcon} size={20} />
+					{#if displayIcon}
+						{@const IconComponent = displayIcon}
+						<IconComponent size={20} />
+					{/if}
 					<h1 class="text-lg font-semibold text-white/90">{displayTitle}</h1>
 					{#if displayBadge}
 						<span class="count-badge">{displayBadge}</span>
@@ -51,7 +54,7 @@
 							href={item.href}
 							class="nav-link {$page.url.pathname === item.href ? 'nav-link-active' : ''}"
 						>
-							<svelte:component this={NavIcon} size={14} />
+							<NavIcon size={14} />
 							<span>{item.label}</span>
 						</a>
 					{/each}

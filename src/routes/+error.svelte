@@ -132,29 +132,6 @@
 		line-height: 1.5;
 	}
 
-	.error-details {
-		margin: 0 0 1rem 0;
-		text-align: left;
-	}
-
-	.error-details summary {
-		font-size: 0.8rem;
-		color: rgba(113, 113, 122, 1);
-		cursor: pointer;
-	}
-
-	.error-details pre {
-		margin: 0.5rem 0 0 0;
-		padding: 0.75rem;
-		font-size: 0.75rem;
-		color: rgba(161, 161, 170, 1);
-		background: rgba(0, 0, 0, 0.2);
-		border-radius: 0.375rem;
-		overflow-x: auto;
-		white-space: pre-wrap;
-		word-break: break-word;
-	}
-
 	.error-hint {
 		font-size: 0.8rem;
 		color: rgba(113, 113, 122, 1);

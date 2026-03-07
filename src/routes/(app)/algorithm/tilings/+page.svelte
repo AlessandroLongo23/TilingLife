@@ -4,7 +4,7 @@
     import { Search, Minus, Plus, Grid3x3, Layers, Camera } from 'lucide-svelte';
     import { headerStore, openScreenshotPreview } from '$stores';
     import { map, sounds } from '$utils';
-    import { Tiling, type EncodedTiling } from '$classes/algorithm/Tiling.svelte';
+    import { AlgorithmTiling, type EncodedTiling } from '$classes/algorithm/Tiling.svelte';
     
     import Pagination from '$components/ui/Pagination.svelte';
     import ReloadButton from '$components/ui/ReloadButton.svelte';
@@ -81,7 +81,7 @@
 
     function getPolygonsForDrawing(tiling: EncodedTiling): EncodedPolygon[] {
         if (tiling.seed && tiling.generators) {
-            const polygons = Tiling.expandToPolygons(tiling);
+            const polygons = AlgorithmTiling.expandToPolygons(tiling);
             return polygons as EncodedPolygon[];
         }
         return [];

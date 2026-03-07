@@ -2,7 +2,10 @@
 	import { activeTab } from '$stores';
 
 	let { 
-		tabs = []
+		tabs = [],
+		tab0,
+		tab1,
+		tab2
 	} = $props();
 </script>
 
@@ -22,11 +25,11 @@
 	
 	<div class="flex-1 overflow-hidden">
 		{#if $activeTab === tabs[0]}
-			<slot name='tab-0' />
+			{@render tab0?.()}
 		{:else if $activeTab === tabs[1]}
-			<slot name='tab-1' />
+			{@render tab1?.()}
 		{:else if $activeTab === tabs[2]}
-			<slot name='tab-2' />
+			{@render tab2?.()}
 		{/if}
 	</div>
 </div> 

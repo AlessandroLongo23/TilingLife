@@ -49,17 +49,12 @@
 		sliderStyle = `background: linear-gradient(to right, #4ade80 0%, #4ade80 ${percentage}%, #4b5563 ${percentage}%, #4b5563 100%);`;
 	}
 
-	function getVolumeIcon() {
-		if (isMuted || volume === 0) {
-			return VolumeX;
-		} else if (volume < 0.33) {
-			return Volume;
-		} else if (volume < 0.66) {
-			return Volume1;
-		} else {
-			return Volume2;
-		}
-	}
+	let VolumeIconComponent = $derived(
+		isMuted || volume === 0 ? VolumeX
+		: volume < 0.33 ? Volume
+		: volume < 0.66 ? Volume1
+		: Volume2
+	);
 
 	$effect(() => {
 		if (audio) {
@@ -85,6 +80,8 @@
 
 <div 
 	class="fixed top-5 right-5 z-[1000] flex items-center gap-2"
+	role="group"
+	aria-label="Volume control"
 	onmouseenter={() => showVolumeSlider = true}
 	onmouseleave={() => showVolumeSlider = false}
 >
@@ -110,7 +107,7 @@
 		class="flex items-center justify-center w-10 h-10 bg-zinc-800/70 hover:bg-zinc-700/80 text-white/80 hover:text-white rounded-full transition-all duration-200 border border-zinc-700/40 hover:border-zinc-600/60 focus:outline-none focus:ring-1 focus:ring-green-500/40 shadow-md backdrop-blur-sm"
 		aria-label={isMuted ? "Unmute audio" : "Mute audio"}
 	>
-		<svelte:component this={getVolumeIcon()} class="w-5 h-5" />
+		<VolumeIconComponent class="w-5 h-5" />
 	</button>
 </div>
 

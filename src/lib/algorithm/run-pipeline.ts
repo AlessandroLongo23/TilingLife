@@ -15,15 +15,13 @@ import {
 	SeedSetExtractor,
 	VertexConfiguration,
 	SeedBuilder,
-	SeedConfiguration
 } from '$classes';
-import { findGyration, findReflection } from '$lib/algorithm/transformFinder';
 import { deduplicatePoints } from '$utils';
-import { TilingGenerator } from '$classes/algorithm/TilingGenerator.svelte';
-import { Tiling } from '$classes/algorithm/Tiling.svelte';
-import { comparePolygonNames, compareVertexConfigurationNames } from '$utils';
+import { AlgorithmTilingGenerator } from '$classes/algorithm/TilingGenerator.svelte';
+import { comparePolygonNames, compareVertexConfigurationNames, roundNumbersInJson } from '$utils';
 import { BATCH_SIZE } from '$stores';
 import { PipelineLogger } from '$lib/algorithm/PipelineLogger';
+import { buildParamsFolderName } from '$lib/algorithm/paramsFolder';
 import fs from 'fs';
 
 const DATA_FOLDER_PATH = 'src/lib/data';
@@ -36,6 +34,31 @@ const TILINGS_FOLDER_PATH = 'src/lib/data/tilings';
 
 const TOTAL_STEPS = 6;
 const MAX_K = 5;
+
+function loadSeedSets(paramsFolder: string): (k: number, m: number) => string[][] {
+	return (k: number, m: number) => {
+		const filePath = `${SEED_SETS_FOLDER_PATH}/${paramsFolder}/k=${k}/m=${m}.json`;
+		const content = fs.readFileSync(filePath, 'utf8');
+		return JSON.parse(content);
+	};
+}
+
+/** Ensure vcLibrary.json exists for paramsFolder; return the VC name array. */
+function ensureVcLibrary(paramsFolder: string): string[] {
+	const vcLibraryPath = `${SEED_CONFIGURATIONS_FOLDER_PATH}/${paramsFolder}/vcLibrary.json`;
+	const baseFolder = `${SEED_CONFIGURATIONS_FOLDER_PATH}/${paramsFolder}`;
+	if (!fs.existsSync(baseFolder)) {
+		fs.mkdirSync(baseFolder, { recursive: true });
+	}
+	let vcLibrary: string[];
+	if (fs.existsSync(vcLibraryPath)) {
+		vcLibrary = JSON.parse(fs.readFileSync(vcLibraryPath, 'utf8'));
+	} else {
+		vcLibrary = JSON.parse(fs.readFileSync(VCS_FILE_PATH, 'utf8'));
+		fs.writeFileSync(vcLibraryPath, JSON.stringify(vcLibrary));
+	}
+	return vcLibrary;
+}
 
 main();
 
@@ -66,12 +89,15 @@ function main() {
 
 	if (!fs.existsSync(DATA_FOLDER_PATH)) fs.mkdirSync(DATA_FOLDER_PATH, { recursive: true });
 
+	const paramsFolder = buildParamsFolderName(parameters);
+	log.log(`Polygon set: ${paramsFolder}\n`);
+
 	const polygonSignatures = polygonGeneration(parameters, additionalPolygons, log);
 	const vertexConfigurations = vertexConfigurationGeneration(polygonSignatures, log);
 	const adjacencyList = compatibilityGraphGeneration(vertexConfigurations, log);
-	seedSetExtraction(adjacencyList, vertexConfigurations, log);
-	seedsGeneration(5, null, log);
-	// tilingsGeneration(1, 1, log);
+	seedSetExtraction(adjacencyList, vertexConfigurations, paramsFolder, log);
+	seedsGeneration(paramsFolder, null, null, log);
+	// tilingsGeneration(paramsFolder, 1, 1, log);
 
 	log.log('='.repeat(50));
 	log.log('Pipeline complete!');
@@ -177,6 +203,7 @@ function compatibilityGraphGeneration(
 function seedSetExtraction(
 	adjacencyList: Record<string, string[]>,
 	vertexConfigurations: VertexConfiguration[],
+	paramsFolder: string,
 	log: PipelineLogger
 ): void {
 	log.runStep('Seed set extraction', () => {
@@ -186,9 +213,14 @@ function seedSetExtraction(
 		);
 		const extractor = new SeedSetExtractor(compatibilityGraph);
 
+		const baseFolderPath = `${SEED_SETS_FOLDER_PATH}/${paramsFolder}`;
+		if (!fs.existsSync(baseFolderPath)) {
+			fs.mkdirSync(baseFolderPath, { recursive: true });
+		}
+
 		for (let k = 1; k <= MAX_K; k++) {
 			log.progress('k', k, MAX_K);
-			const folderPath = `${SEED_SETS_FOLDER_PATH}/k=${k}`;
+			const folderPath = `${baseFolderPath}/k=${k}`;
 			if (!fs.existsSync(folderPath)) {
 				fs.mkdirSync(folderPath, { recursive: true });
 			}
@@ -204,7 +236,7 @@ function seedSetExtraction(
 			}
 
 			for (const [m, sets] of seedSetsByM.entries()) {
-				const filePath = `${SEED_SETS_FOLDER_PATH}/k=${k}/m=${m}.json`;
+				const filePath = `${baseFolderPath}/k=${k}/m=${m}.json`;
 				if (!fs.existsSync(filePath)) {
 					fs.writeFileSync(filePath, JSON.stringify(sets, null, 4));
 				}
@@ -215,67 +247,73 @@ function seedSetExtraction(
 }
 
 function seedsGeneration(
+	paramsFolder: string,
 	k: number | null,
 	m: number | null,
 	log: PipelineLogger
 ): void {
+	const seedSetLoader = loadSeedSets(paramsFolder);
 	if (k === null) {
-		generateSeeds(1, 1, log);
+		generateSeeds(paramsFolder, seedSetLoader, 1, 1, log);
 
 		for (let k = 2; k <= MAX_K; k++) {
 			for (let m = 2; m <= k; m++) {
-				generateSeeds(k, m, log);	
+				generateSeeds(paramsFolder, seedSetLoader, k, m, log);
 			}
 		}
 	} else {
 		if (m === null) {
 			for (let m = 2; m <= k; m++) {
-				generateSeeds(k, m, log);	
+				generateSeeds(paramsFolder, seedSetLoader, k, m, log);
 			}
 		} else {
-			generateSeeds(k, m, log);
+			generateSeeds(paramsFolder, seedSetLoader, k, m, log);
 		}
 	}
 }
 
-function generateSeeds(k: number, m: number, log: PipelineLogger): void {
+function generateSeeds(
+	paramsFolder: string,
+	seedSetLoader: (k: number, m: number) => string[][],
+	k: number,
+	m: number,
+	log: PipelineLogger
+): void {
 	log.runStep(
 		`Seeds generation for k=${k} and m=${m}`,
 		() => {
+			const vcLibrary = ensureVcLibrary(paramsFolder);
 			const seedBuilder = new SeedBuilder();
-			const seedConfigurations = seedBuilder.buildSeeds(k, m, log.progressForSeeds('Seed sets'));
+			const seedConfigurations = seedBuilder.buildSeeds(k, m, {
+				seedSetLoader,
+				onProgress: log.progressForSeeds('Seed sets')
+			});
 			log.clearLine();
 
-			const seedConfigurationsFolderPath = `${SEED_CONFIGURATIONS_FOLDER_PATH}/k=${k}/m=${m}`;
+			const seedConfigurationsFolderPath = `${SEED_CONFIGURATIONS_FOLDER_PATH}/${paramsFolder}/k=${k}/m=${m}`;
 			if (!fs.existsSync(seedConfigurationsFolderPath)) {
 				fs.mkdirSync(seedConfigurationsFolderPath, { recursive: true });
 			}
 
-			const fullData = log.mapWithProgress(
+			const compactData = log.mapWithProgress(
 				seedConfigurations,
 				'Encoding',
-				(sc) => {
-					const points = deduplicatePoints(
-						sc.polygons.flatMap((p) => [...p.vertices, ...p.halfways, p.centroid])
-					);
-					// findGyration(sc, points);
-					// findReflection(sc);
-					return sc.encode();
-				},
+				(sc) => sc.encodeCompact(vcLibrary, true),
 				1
 			);
 
-			const total = fullData.length;
+			const total = compactData.length;
 			const totalBatches = Math.ceil(total / BATCH_SIZE);
 			for (let i = 0; i < total; i += BATCH_SIZE) {
 				const batchIndex = Math.floor(i / BATCH_SIZE);
 				log.progress('Writing batches', batchIndex + 1, totalBatches);
-				const batch = fullData.slice(i, i + BATCH_SIZE);
+				const batch = compactData.slice(i, i + BATCH_SIZE);
+				const rounded = roundNumbersInJson(batch) as typeof batch;
 				const filePath = `${seedConfigurationsFolderPath}/seedConfigurations_${String(batchIndex).padStart(4, '0')}.json`;
-				fs.writeFileSync(filePath, JSON.stringify(batch));
+				fs.writeFileSync(filePath, JSON.stringify(rounded));
 			}
 
-			const manifest = { format: 'full', total, batchSize: BATCH_SIZE };
+			const manifest = { format: 'compact', vcLibrary: true, shortKeys: true, total, batchSize: BATCH_SIZE };
 			fs.writeFileSync(`${seedConfigurationsFolderPath}/manifest.json`, JSON.stringify(manifest));
 			log.clearLine();
 			return total;
@@ -284,31 +322,41 @@ function generateSeeds(k: number, m: number, log: PipelineLogger): void {
 	);
 }
 
-function tilingsGeneration(k: number, m: number, log: PipelineLogger): void {
+function tilingsGeneration(
+	paramsFolder: string,
+	k: number | null,
+	m: number | null,
+	log: PipelineLogger
+): void {
 	if (k === null) {
-		generateTilings(1, 1, log);
+		generateTilings(paramsFolder, 1, 1, log);
 
 		for (let k = 2; k <= MAX_K; k++) {
 			for (let m = 2; m <= k; m++) {
-				generateTilings(k, m, log);	
+				generateTilings(paramsFolder, k, m, log);
 			}
 		}
 	} else {
 		if (m === null) {
 			for (let m = 2; m <= k; m++) {
-				generateTilings(k, m, log);	
+				generateTilings(paramsFolder, k, m, log);
 			}
 		} else {
-			generateTilings(k, m, log);
+			generateTilings(paramsFolder, k, m, log);
 		}
 	}
 }
 
-function generateTilings(k: number, m: number, log: PipelineLogger): void {
+function generateTilings(
+	paramsFolder: string,
+	k: number,
+	m: number,
+	log: PipelineLogger
+): void {
 	log.runStep(
 		`Tilings generation for k=${k} and m=${m}`,
 		() => {
-			const tilingGenerator = new TilingGenerator();
+			const tilingGenerator = new AlgorithmTilingGenerator(paramsFolder);
 			const tilings = tilingGenerator.generateTilings(
 				k,
 				m,
@@ -320,12 +368,12 @@ function generateTilings(k: number, m: number, log: PipelineLogger): void {
 			);
 			log.clearLine(70, 2);
 
-			const tilingsFolderPath = `${TILINGS_FOLDER_PATH}/k=${k}/m=${m}`;
+			const tilingsFolderPath = `${TILINGS_FOLDER_PATH}/${paramsFolder}/k=${k}/m=${m}`;
 			if (!fs.existsSync(tilingsFolderPath)) {
 				fs.mkdirSync(tilingsFolderPath, { recursive: true });
 			}
 
-			const encoded = log.mapWithProgress(tilings, 'Encoding tilings', (t) => t.encode(), 1);
+			const encoded = log.mapWithProgress(tilings, 'Encoding tilings', (t) => t.encode(true), 1);
 
 			const total = encoded.length;
 			const totalBatches = Math.ceil(total / BATCH_SIZE);
@@ -333,8 +381,9 @@ function generateTilings(k: number, m: number, log: PipelineLogger): void {
 				const batchIndex = Math.floor(i / BATCH_SIZE);
 				log.progress('Writing batches', batchIndex + 1, totalBatches);
 				const batch = encoded.slice(i, i + BATCH_SIZE);
+				const rounded = roundNumbersInJson(batch) as typeof batch;
 				const filePath = `${tilingsFolderPath}/tilings_${String(batchIndex).padStart(4, '0')}.json`;
-				fs.writeFileSync(filePath, JSON.stringify(batch));
+				fs.writeFileSync(filePath, JSON.stringify(rounded));
 			}
 			const manifest = { format: 'full', total, batchSize: BATCH_SIZE };
 			fs.writeFileSync(`${tilingsFolderPath}/manifest.json`, JSON.stringify(manifest));

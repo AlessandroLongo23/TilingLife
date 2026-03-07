@@ -1,5 +1,6 @@
 import { tolerance, debugView, transformSteps, offsets, debugManager } from '$stores';
 import { getClockwiseAngle, getSpatialKey, isWithinTolerance } from '$utils';
+import { TilingGenerator } from './TilingGenerator.svelte';
 import { 
     PolygonType, 
     RegularPolygon, 
@@ -10,7 +11,6 @@ import {
     GenericPolygon, 
     type Polygon, 
     type ShapeSeed, 
-    TilingGenerator, 
     Tiling, 
     Vector, 
     Transformer, 

@@ -5,12 +5,12 @@ import { encodeGenerator, decodeGenerator } from "$lib/algorithm/generatorEncodi
 import type { EncodedGenerator } from "$lib/algorithm/generatorEncoding";
 
 export interface EncodedTiling {
-    seed: FullSeedConfiguration;
-    generators: EncodedGenerator[];
+    seed: FullSeedConfiguration | Record<string, unknown>;
+    generators: (EncodedGenerator | Record<string, unknown>)[];
     iterations: number;
 }
 
-export class Tiling {
+export class AlgorithmTiling {
     seed: SeedConfiguration;
     generators: (Gyration | Reflection)[];
     iterations: number;
@@ -25,11 +25,27 @@ export class Tiling {
         seed: SeedConfiguration,
         generators: (Gyration | Reflection)[],
         iterations: number
-    ): Tiling => {
-        return new Tiling(seed, generators, iterations);
+    ): AlgorithmTiling => {
+        return new AlgorithmTiling(seed, generators, iterations);
     }
 
-    encode = (): EncodedTiling => {
+    encode = (shortKeys = false): EncodedTiling => {
+        if (shortKeys) {
+            return {
+                seed: this.seed.encodeShort(),
+                generators: this.generators.map((g) => {
+                    if ("order" in g) {
+                        return { t: "gyration" as const, c: [g.center.x, g.center.y] as [number, number], o: g.order };
+                    }
+                    return {
+                        t: "reflection" as const,
+                        a: [g.axis.x, g.axis.y] as [number, number],
+                        pt: [g.point.x, g.point.y] as [number, number],
+                    };
+                }),
+                iterations: this.iterations,
+            };
+        }
         return {
             seed: this.seed.encode(),
             generators: this.generators.map((g) => encodeGenerator(g)),

@@ -1,5 +1,4 @@
-import { isWithinTolerance } from "../utils/math.svelte";
-import { compareVCNames, cycleToMinimumLexicographicalOrder, isEqualOrChiral } from "../utils/utils.svelte";
+import { isWithinTolerance, compareVCNames, cycleToMinimumLexicographicalOrder, isEqualOrChiral } from "$utils";
 import { Vector } from "./Vector.svelte";
 import { Polygon } from "./polygons/Polygon.svelte";
 import { Tiling } from "./Tiling.svelte";

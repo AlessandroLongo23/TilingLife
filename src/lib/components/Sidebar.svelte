@@ -292,7 +292,8 @@
 		</div>
 			<div class="flex-1 overflow-hidden">
 				<Tabs tabs={[ActiveTab.TILINGS, ActiveTab.GAME_OF_LIFE, ActiveTab.THEORY]}>
-					<div slot="tab-0" class="h-full flex flex-col">
+					{#snippet tab0()}
+					<div class="h-full flex flex-col">
 						<!-- Fixed options section -->
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
 							<div class="flex flex-col gap-3">
@@ -557,8 +558,9 @@
 							</div>
 						</div>
 					</div>
-
-					<div slot="tab-1" class="h-full flex flex-col">
+					{/snippet}
+					{#snippet tab1()}
+					<div class="h-full flex flex-col">
 						<!-- Fixed options section -->
 						<div class="p-3 flex-shrink-0 border-b border-zinc-700/50 bg-zinc-800/40">
 							<div class="flex flex-col gap-3">
@@ -674,13 +676,15 @@
 							</div>
 						{/if}
 					</div>
-					
-					<div slot="tab-2" class="h-full flex flex-col">
+					{/snippet}
+					{#snippet tab2()}
+					<div class="h-full flex flex-col">
 						<TheorySidebar 
 							activeSection={theoryActiveSection}
 							on:sectionSelect={handleTheorySectionSelect}
 						/>
 					</div>
+					{/snippet}
 				</Tabs>
 			</div>
 	</div>

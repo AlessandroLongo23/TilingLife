@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { drawVertexConfiguration } from '$lib/utils/drawVertexConfiguration.svelte';
+    import { drawVertexConfiguration } from '$utils';
     import type { VertexConfiguration } from '$classes/algorithm/VertexConfiguration.svelte';
 
     let { vc, size = 200, showName = false, showOccurrences = false, occurrences }: {

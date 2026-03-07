@@ -30,18 +30,33 @@
         currentPage = data.page;
     });
 
-    const navigateTo = (k: number | null, m: number | null, pg: number = 1, grouping: string | null = null, search: string | null = null): void => {
+    const navigateTo = (
+        k: number | null,
+        m: number | null,
+        pg: number = 1,
+        grouping: string | null = null,
+        search: string | null = null,
+        polygons: string | null = null
+    ): void => {
         const params = new URLSearchParams();
         if (k !== null) params.set('k', String(k));
         if (m !== null) params.set('m', String(m));
         if (pg > 1) params.set('page', String(pg));
         if (grouping) params.set('grouping', grouping);
         if (search) params.set('search', search);
+        if (polygons && polygons !== 'default') params.set('polygons', polygons);
         goto(`/algorithm/seed-configurations?${params.toString()}`);
     }
 
     function handlePageChange() {
-        navigateTo(data.selectedK, data.selectedM, currentPage, data.selectedGrouping, data.selectedSearch);
+        navigateTo(
+            data.selectedK,
+            data.selectedM,
+            currentPage,
+            data.selectedGrouping,
+            data.selectedSearch,
+            data.selectedParamsFolder ?? null
+        );
     }
 
     let searchInput = $state(data.selectedSearch ?? '');
@@ -52,7 +67,14 @@
 
     function handleSearchSubmit() {
         const q = searchInput.trim();
-        navigateTo(data.selectedK, data.selectedM, 1, data.selectedGrouping, q || null);
+        navigateTo(
+            data.selectedK,
+            data.selectedM,
+            1,
+            data.selectedGrouping,
+            q || null,
+            data.selectedParamsFolder ?? null
+        );
     }
 
     $effect(() => {
@@ -133,8 +155,10 @@
 
         if (!seedConfiguration.polygons || seedConfiguration.polygons.length === 0) return;
 
+        const polygons = seedConfiguration.polygons;
+
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const polygon of seedConfiguration.polygons) {
+        for (const polygon of polygons) {
             if (!polygon.vertices) continue;
             for (const v of polygon.vertices) {
                 minX = Math.min(minX, v.x);
@@ -159,9 +183,9 @@
         ctx.scale(scale, -scale);
         ctx.translate(-centerX, -centerY);
 
-        for (const polygon of seedConfiguration.polygons) {
+        for (const polygon of polygons) {
             if (!polygon.vertices || polygon.vertices.length === 0) continue;
-            const hue = getPolygonHue(polygon.type, polygon.vertices.length);
+            const hue = getPolygonHue(polygon.type ?? 'regular', polygon.vertices.length);
             const hsl = hsbToHsl(hue, 40, 100);
             ctx.fillStyle = `hsla(${hsl.h}, ${hsl.s}%, ${hsl.l}%, 0.85)`;
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
@@ -217,6 +241,25 @@
     <!-- Sidebar filters -->
     <aside class="w-full lg:w-72 xl:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-900/50">
         <div class="p-5 flex flex-col gap-6 lg:sticky lg:top-[65px] lg:max-h-[calc(100vh-65px)] lg:overflow-y-auto scrollbar-hide">
+            <!-- Polygon set selector (when multiple available) -->
+            {#if data.paramsFolderValues?.length > 1}
+                <div>
+                    <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Polygon set</span>
+                    <div class="flex flex-wrap gap-1.5 mt-2.5">
+                        {#each data.paramsFolderValues as pf}
+                            {@const isActive = (data.selectedParamsFolder ?? 'default') === pf}
+                            <button
+                                class="km-btn {isActive ? 'km-btn-active' : ''}"
+                                onclick={() => navigateTo(data.selectedK, data.selectedM, 1, null, null, pf === 'default' ? null : pf)}
+                                title={pf === 'default' ? 'Legacy / default polygon set' : pf}
+                            >
+                                {pf === 'default' ? 'default' : pf}
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+            {/if}
+
             <!-- k selector -->
             <div>
                 <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Set size (k)</span>
@@ -225,7 +268,7 @@
                         {@const isActive = data.selectedK === k}
                         <button
                             class="km-btn {isActive ? 'km-btn-active' : ''}"
-                            onclick={() => navigateTo(k, null)}
+                            onclick={() => navigateTo(k, null, 1, null, null, data.selectedParamsFolder ?? null)}
                         >
                             k={k}
                         </button>
@@ -245,7 +288,7 @@
                             {@const isActive = data.selectedM === m}
                             <button
                                 class="km-btn {isActive ? 'km-btn-active' : ''}"
-                                onclick={() => navigateTo(data.selectedK, m, 1, null)}
+                                onclick={() => navigateTo(data.selectedK, m, 1, null, null, data.selectedParamsFolder ?? null)}
                             >
                                 <span>m={m}</span>
                                 <span class="km-count">{count.toLocaleString()}</span>
@@ -282,7 +325,7 @@
                     <div class="flex flex-wrap gap-1.5 mt-2.5">
                         <button
                             class="km-btn {!data.selectedGrouping ? 'km-btn-active' : ''}"
-                            onclick={() => navigateTo(data.selectedK, data.selectedM, 1, null)}
+                            onclick={() => navigateTo(data.selectedK, data.selectedM, 1, null, null, data.selectedParamsFolder ?? null)}
                         >
                             All
                         </button>
@@ -290,7 +333,7 @@
                             {@const isActive = data.selectedGrouping === label}
                             <button
                                 class="km-btn {isActive ? 'km-btn-active' : ''}"
-                                onclick={() => navigateTo(data.selectedK, data.selectedM, 1, label)}
+                                onclick={() => navigateTo(data.selectedK, data.selectedM, 1, label, null, data.selectedParamsFolder ?? null)}
                             >
                                 <span>{label}</span>
                                 <span class="km-count">{count.toLocaleString()}</span>

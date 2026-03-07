@@ -27,13 +27,11 @@ export * from "./algorithm/PolygonSignature.svelte";
 export * from "./algorithm/SeedConfiguration.svelte";
 export * from "./algorithm/SeedSetExtractor.svelte";
 export * from "./algorithm/SeedBuilder.svelte";
+export * from "./algorithm/Tiling.svelte";
+export * from "./algorithm/TilingGenerator.svelte";
 export * from "./wallpaperGroups";
 export * from "./algorithm/regex";
 export * from "./algorithm/types";
 
 // Generator
-export * from "./generator/TilingGenerator.svelte";
-export * from "./generator/TilingGeneratorFromRule.svelte";
-export * from "./generator/Transformer.svelte";
-export * from "./generator/Parser.svelte";
-export * from "./generator/GOLEngine.svelte";
+export * from "./generator";

@@ -5,14 +5,18 @@ import {
     type CompactSeedConfiguration,
     type FullSeedConfiguration,
 } from "$classes";
-import { Tiling } from "./Tiling.svelte";
+import { AlgorithmTiling } from "./Tiling.svelte";
 import { isConwayValid, hasValidAxisAngles } from "$lib/algorithm/conwayCost";
 import type { PhaseProgressCallback } from "$lib/algorithm/PipelineLogger";
 import { BATCH_SIZE } from "$stores";
 import fs from 'fs';
 
-export class TilingGenerator {
-    constructor() {}
+export class AlgorithmTilingGenerator {
+    private paramsFolder: string;
+
+    constructor(paramsFolder: string = 'reg_12') {
+        this.paramsFolder = paramsFolder;
+    }
 
     // generateTilings = (k: number, m: number): Tiling[] => {
     //     const compactConfigs = this.loadSeedConfigurations(k, m);
@@ -69,9 +73,9 @@ export class TilingGenerator {
         k: number,
         m: number,
         onProgress?: PhaseProgressCallback
-    ): Tiling[] => {
-        const { format, configs } = this.loadSeedConfigurations(k, m, onProgress);
-        const tilings: Tiling[] = [];
+    ): AlgorithmTiling[] => {
+        const { format, configs, vcLibrary } = this.loadSeedConfigurations(k, m, onProgress);
+        const tilings: AlgorithmTiling[] = [];
 
         const configsToProcess = configs;
         for (let configIdx = 0; configIdx < configsToProcess.length; configIdx++) {
@@ -80,7 +84,7 @@ export class TilingGenerator {
 
             const seed = format === 'full'
                 ? SeedConfiguration.decodeFull(config as FullSeedConfiguration)
-                : SeedConfiguration.decodeCompact(config as CompactSeedConfiguration);
+                : SeedConfiguration.decodeCompact(config as CompactSeedConfiguration, vcLibrary);
 
             // Create all triplets of generators whose Conway cost sums to exactly 2
             const generatorsSets: (Gyration | Reflection)[][] = [];
@@ -129,7 +133,7 @@ export class TilingGenerator {
                 }
 
                 if (isValid) {
-                    tilings.push(Tiling.fromSeedAndGenerators(seed.clone(), generators, maxIterations));
+                    tilings.push(AlgorithmTiling.fromSeedAndGenerators(seed.clone(), generators, maxIterations));
                 }
             }
         }
@@ -145,12 +149,22 @@ export class TilingGenerator {
         k: number,
         m: number,
         onProgress?: PhaseProgressCallback
-    ): { format: string; configs: (CompactSeedConfiguration | FullSeedConfiguration)[] } => {
-        const folder = `src/lib/data/seedConfigurations/k=${k}/m=${m}`;
+    ): { format: string; configs: (CompactSeedConfiguration | FullSeedConfiguration)[]; vcLibrary?: string[] } => {
+        const folder = `src/lib/data/seedConfigurations/${this.paramsFolder}/k=${k}/m=${m}`;
         const manifest = JSON.parse(fs.readFileSync(`${folder}/manifest.json`, 'utf8'));
         const total: number = manifest.total;
         const format: string = manifest.format || 'compact';
         const configs: (CompactSeedConfiguration | FullSeedConfiguration)[] = [];
+
+        let vcLibrary: string[] | undefined;
+        if (manifest.vcLibrary) {
+            try {
+                const vcLibraryPath = `src/lib/data/seedConfigurations/${this.paramsFolder}/vcLibrary.json`;
+                vcLibrary = JSON.parse(fs.readFileSync(vcLibraryPath, 'utf8'));
+            } catch {
+                vcLibrary = undefined;
+            }
+        }
 
         const totalBatches = Math.ceil(total / BATCH_SIZE);
         for (let i = 0; i < total; i += BATCH_SIZE) {
@@ -161,6 +175,6 @@ export class TilingGenerator {
             configs.push(...batch);
         }
 
-        return { format, configs };
+        return { format, configs, vcLibrary };
     }
 }

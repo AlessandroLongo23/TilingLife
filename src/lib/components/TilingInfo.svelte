@@ -12,6 +12,8 @@
 
 <div 
 	class="relative"
+	role="group"
+	aria-label="Tiling information"
 	onmouseenter={() => isHovered = true}
 	onmouseleave={() => isHovered = false}
 >

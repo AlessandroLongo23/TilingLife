@@ -81,15 +81,41 @@ export class PipelineLogger {
 		try {
 			const result = fn();
 			const end = performance.now();
-			this.log(`  ✓ ${name}: ${(end - start).toFixed(0)}ms`);
+			const milliseconds = end - start;
+			const timeStr = this.formatTimeString(milliseconds);
+
+			this.log(`  ✓ ${name}: ${timeStr}`);
 			onComplete?.(result);
 			this.log('');
 			return result;
 		} catch (e) {
 			const end = performance.now();
-			this.log(`  ✗ ${name}: failed after ${(end - start).toFixed(0)}ms\n`);
+			const milliseconds = end - start;
+			const timeStr = this.formatTimeString(milliseconds);
+			this.log(`  ✗ ${name}: failed after ${timeStr}\n`);
 			throw e;
 		}
+	}
+
+	formatTimeString(milliseconds: number): string {
+		if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
+		const ms = Math.floor(milliseconds);
+		const totalSeconds = Math.floor(ms / 1000);
+		const seconds = totalSeconds % 60;
+		const minutes = Math.floor(totalSeconds / 60) % 60;
+		const hours = Math.floor(totalSeconds / 3600);
+		const fracMs = ms % 1000;
+		
+		const pad2 = (n: number) => String(n).padStart(2, '0');
+		const pad3 = (n: number) => String(n).padStart(3, '0');
+		
+		const msPart = `.${pad3(fracMs)}`;
+		const suffix = ` (${ms}ms)`;
+		
+		if (hours > 0) return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}${msPart}${suffix}`;
+		if (minutes > 0) return `${pad2(minutes)}:${pad2(seconds)}${msPart}${suffix}`;
+		
+		return `${pad2(seconds)}${msPart}${suffix}`;
 	}
 
 	/** Display progress with rate and ETA (tqdm-style). */

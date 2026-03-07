@@ -1,7 +1,7 @@
 import { Polygon, Vector } from '$classes';
 import { get } from 'svelte/store';
 import { colorParams } from '$stores';
-import { toDegrees } from '$lib/utils/geometry.svelte';
+import { toDegrees } from '$lib/utils/geometry';
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 

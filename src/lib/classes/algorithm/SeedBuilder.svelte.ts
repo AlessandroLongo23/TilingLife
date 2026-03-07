@@ -1,6 +1,5 @@
 import { SeedConfiguration, VertexConfiguration, Vector } from '$classes';
 import { deduplicatePolygons, isWithinTolerance } from '$utils';
-import fs from 'fs';
 
 type PlacedVC = {
     center: Vector;
@@ -23,9 +22,16 @@ export class SeedBuilder {
     buildSeeds = (
         k: number,
         m: number,
-        onProgress?: (current: number, total: number, count: number) => void
+        options?: {
+            seedSetLoader?: (k: number, m: number) => string[][];
+            onProgress?: (current: number, total: number, count: number) => void;
+        }
     ): SeedConfiguration[] => {
-        const seedSets = this.loadSeedSets(k, m);
+        const { seedSetLoader, onProgress } = options ?? {};
+        if (!seedSetLoader) {
+            throw new Error('SeedBuilder.buildSeeds requires options.seedSetLoader (e.g. from run-pipeline)');
+        }
+        const seedSets = seedSetLoader(k, m);
 
         const seedConfigurations: SeedConfiguration[] = [];
         for (let i = 0; i < seedSets.length; i++) {
@@ -248,14 +254,4 @@ export class SeedBuilder {
         return available;
     }
 
-    loadSeedSets = (k: number, m: number): string[][] => {
-        const seedSets: string[][] = [];
-
-        const seedSetsFolder = `src/lib/data/seedSets/k=${k}`;
-        const seedSetsFile = `${seedSetsFolder}/m=${m}.json`;
-        const seedSet = fs.readFileSync(seedSetsFile, 'utf8');
-        
-        seedSets.push(...JSON.parse(seedSet));
-        return seedSets;
-    }
 }

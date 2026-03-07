@@ -196,7 +196,7 @@
     title="Tiling Rules List"
     maxWidth="max-w-7xl"
 >
-    <svelte:fragment slot="header">
+    {#snippet header()}
         <button 
             class="p-1 rounded-md hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100 relative"
             onclick={toggleFilters}
@@ -210,7 +210,7 @@
                 </span>
             {/if}
         </button>
-    </svelte:fragment>
+    {/snippet}
     
     <div class="modal-container">
         <div class="filter-sidebar {showFilters ? 'filters-visible' : 'filters-hidden'}">

@@ -1,4 +1,4 @@
-import { renderMarkdown, extractTableOfContents, structureTableOfContents } from '$lib/utils/markdown.svelte';
+import { renderMarkdown, extractTableOfContents, structureTableOfContents } from '$lib/utils/markdown';
 
 class ContentService {
 	content = null;
