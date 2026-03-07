@@ -1,3 +1,5 @@
+import { BATCH_SIZE } from '$stores';
+
 const PAGE_SIZE = 12;
 
 const tilingModules = import.meta.glob<{ default: unknown }>(
@@ -9,17 +11,56 @@ function getModulePath(suffix: string): string | null {
 	return key ?? null;
 }
 
-async function loadTilingsFile(k: number, m: number): Promise<any[]> {
-	const path = getModulePath(`k=${k}/m=${m}/tilings.json`);
+async function loadManifest(
+	k: number,
+	m: number
+): Promise<{ total: number; format: string; batchSize: number } | null> {
+	const path = getModulePath(`k=${k}/m=${m}/manifest.json`);
+	if (!path) return null;
+	const mod = await tilingModules[path]();
+	const manifest = mod.default as { total: number; format: string; batchSize: number };
+	return manifest;
+}
+
+async function loadBatch(k: number, m: number, batchIndex: number): Promise<any[]> {
+	const path = getModulePath(
+		`k=${k}/m=${m}/tilings_${String(batchIndex).padStart(4, '0')}.json`
+	);
 	if (!path) return [];
 	const mod = await tilingModules[path]();
 	const data = mod.default;
 	return Array.isArray(data) ? data : [];
 }
 
+async function loadPageData(
+	k: number,
+	m: number,
+	page: number
+): Promise<{ data: any[]; total: number }> {
+	const manifest = await loadManifest(k, m);
+	if (!manifest) return { data: [], total: 0 };
+
+	const { total } = manifest;
+	const start = (page - 1) * PAGE_SIZE;
+	const end = Math.min(start + PAGE_SIZE, total);
+	if (start >= total) return { data: [], total };
+
+	const batchStart = Math.floor(start / BATCH_SIZE);
+	const batchEnd = Math.floor((end - 1) / BATCH_SIZE);
+	const allData: any[] = [];
+	for (let i = batchStart; i <= batchEnd; i++) {
+		allData.push(...(await loadBatch(k, m, i)));
+	}
+	const pageData = allData.slice(
+		start - batchStart * BATCH_SIZE,
+		end - batchStart * BATCH_SIZE
+	);
+	return { data: pageData, total };
+}
+
 function discoverAvailable(): { k: number; m: number }[] {
 	const available: { k: number; m: number }[] = [];
-	const regex = /tilings\/k=(\d+)\/m=(\d+)\/tilings\.json$/;
+	const regex = /tilings\/k=(\d+)\/m=(\d+)\/manifest\.json$/;
 
 	for (const key of Object.keys(tilingModules)) {
 		const match = key.match(regex);
@@ -36,8 +77,8 @@ export async function load({ url }) {
 
 	const available: { k: number; m: number; count: number }[] = [];
 	for (const { k, m } of discovered) {
-		const tilings = await loadTilingsFile(k, m);
-		available.push({ k, m, count: tilings.length });
+		const manifest = await loadManifest(k, m);
+		available.push({ k, m, count: manifest?.total ?? 0 });
 	}
 
 	available.sort((a, b) => a.k - b.k || a.m - b.m);
@@ -61,10 +102,9 @@ export async function load({ url }) {
 	let totalItems = 0;
 
 	if (selectedK !== null && selectedM !== null) {
-		const allTilings = await loadTilingsFile(selectedK, selectedM);
-		totalItems = allTilings.length;
-		const start = (page - 1) * PAGE_SIZE;
-		tilings = allTilings.slice(start, start + PAGE_SIZE);
+		const result = await loadPageData(selectedK, selectedM, page);
+		tilings = result.data;
+		totalItems = result.total;
 	}
 
 	return {

@@ -1,15 +1,18 @@
 # Thesis
 
 ## Steps
-- [x] generate polygons
-- [x] compute vertex configuration
-- [x] create compatibility graph
+1. [x] generate polygons
+2. [x] compute vertex configuration
+3. [x] create compatibility graph
   - [ ] add self connections (if compatible)
-- [x] extract all seed sets
-- [-] build the seeds
-- [ ] expand the seeds
-- [ ] apply wallpaper groups
-- [ ] perform final checks
+4. [x] extract all seed sets
+5. [x] build the seeds
+  - [ ] while bfs-ing on the open vertices, if one vertex can't fit any vcs, kill the branch
+6. [ ] expand the seeds
+  - [ ] use orbit WFC to expand the seed
+  - [-] compute transformations on original seed
+  - [-] cycle through 3-tuples and expand even more
+7. [ ] perform final checks
   - [x] add basic automatic vc detection
   - [ ] add automatic vc molteplicity detection, by using rotations, simmetries and translations 
   - [ ] add automatic holes/overlap checks to ensure tiling validity

@@ -3,7 +3,9 @@
     import { browser } from '$app/environment';
     import { Search, Minus, Plus, Puzzle, Camera } from 'lucide-svelte';
     import { headerStore, openScreenshotPreview } from '$stores';
-    import { sounds } from '$utils';
+    import { map, sounds } from '$utils';
+    import { drawTransformations } from '$lib/algorithm/drawTransformations';
+    import { compactSeedName, compactToHtml } from '$lib/utils/compactSeedName';
 
     import Checkbox from '$components/ui/Checkbox.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
@@ -19,7 +21,8 @@
     const COL_MIN = 2;
     const COL_MAX = 6;
 
-    let showVcsCenters = $state(true);
+    let showVcsCenters = $state(false);
+    let showTransformations = $state(false);
 
     let currentPage = $state(data.page);
 
@@ -27,16 +30,29 @@
         currentPage = data.page;
     });
 
-    function navigateTo(k: number | null, m: number | null, pg: number = 1) {
+    const navigateTo = (k: number | null, m: number | null, pg: number = 1, grouping: string | null = null, search: string | null = null): void => {
         const params = new URLSearchParams();
         if (k !== null) params.set('k', String(k));
         if (m !== null) params.set('m', String(m));
         if (pg > 1) params.set('page', String(pg));
+        if (grouping) params.set('grouping', grouping);
+        if (search) params.set('search', search);
         goto(`/algorithm/seed-configurations?${params.toString()}`);
     }
 
     function handlePageChange() {
-        navigateTo(data.selectedK, data.selectedM, currentPage);
+        navigateTo(data.selectedK, data.selectedM, currentPage, data.selectedGrouping, data.selectedSearch);
+    }
+
+    let searchInput = $state(data.selectedSearch ?? '');
+
+    $effect(() => {
+        searchInput = data.selectedSearch ?? '';
+    });
+
+    function handleSearchSubmit() {
+        const q = searchInput.trim();
+        navigateTo(data.selectedK, data.selectedM, 1, data.selectedGrouping, q || null);
     }
 
     $effect(() => {
@@ -58,10 +74,6 @@
         sounds.screenshot();
     }
 
-    function mapValue(value: number, s1: number, e1: number, s2: number, e2: number): number {
-        return s2 + (e2 - s2) * ((value - s1) / (e1 - s1));
-    }
-
     function hsbToHsl(h: number, s: number, b: number) {
         s /= 100;
         b /= 100;
@@ -72,18 +84,19 @@
 
     function getPolygonHue(type: string, vertexCount: number): number {
         if (type === 'regular') {
-            return mapValue(Math.log(vertexCount), Math.log(3), Math.log(40), 0, 300);
+            return map(Math.log(vertexCount), Math.log(3), Math.log(40), 0, 300);
         }
-        return mapValue(vertexCount / 2, 3, 12, 300, 0) + 300 / 12;
+        return map(vertexCount / 2, 3, 12, 300, 0) + 300 / 12;
     }
 
-    function initCanvas(canvas: HTMLCanvasElement, params: { seedConfiguration: any; showVcsCenters: boolean }) {
+    function initCanvas(canvas: HTMLCanvasElement, params: { seedConfiguration: any; showVcsCenters: boolean; showTransformations: boolean }) {
         let seedConfiguration = params.seedConfiguration;
         let showVcsCenters = params.showVcsCenters;
+        let showTransformations = params.showTransformations;
         let resizeObserver: ResizeObserver;
 
         function render() {
-            if (seedConfiguration) drawSeedConfig(canvas, seedConfiguration, showVcsCenters);
+            if (seedConfiguration) drawSeedConfig(canvas, seedConfiguration, showVcsCenters, showTransformations);
         }
 
         requestAnimationFrame(render);
@@ -94,9 +107,10 @@
         resizeObserver.observe(canvas);
 
         return {
-            update(newParams: { seedConfiguration: any; showVcsCenters: boolean }) {
+            update(newParams: { seedConfiguration: any; showVcsCenters: boolean; showTransformations: boolean }) {
                 seedConfiguration = newParams.seedConfiguration;
                 showVcsCenters = newParams.showVcsCenters;
+                showTransformations = newParams.showTransformations;
                 requestAnimationFrame(render);
             },
             destroy() {
@@ -105,7 +119,7 @@
         };
     }
 
-    function drawSeedConfig(canvas: HTMLCanvasElement, seedConfiguration: any, showVcsCenters: boolean) {
+    function drawSeedConfig(canvas: HTMLCanvasElement, seedConfiguration: any, showVcsCenters: boolean, showTransformations: boolean) {
         const size = canvas.clientWidth || 220;
         const ctx = canvas.getContext('2d')!;
         const dpr = window.devicePixelRatio || 1;
@@ -187,6 +201,15 @@
 
             ctx.restore();
         }
+
+        if (showTransformations && (seedConfiguration.gyrations?.length || seedConfiguration.reflections?.length)) {
+            ctx.save();
+            ctx.translate(size / 2, size / 2);
+            ctx.scale(scale, -scale);
+            ctx.translate(-centerX, -centerY);
+            drawTransformations(ctx, seedConfiguration.gyrations, seedConfiguration.reflections, scale);
+            ctx.restore();
+        }
     }
 </script>
 
@@ -222,9 +245,54 @@
                             {@const isActive = data.selectedM === m}
                             <button
                                 class="km-btn {isActive ? 'km-btn-active' : ''}"
-                                onclick={() => navigateTo(data.selectedK, m)}
+                                onclick={() => navigateTo(data.selectedK, m, 1, null)}
                             >
                                 <span>m={m}</span>
+                                <span class="km-count">{count.toLocaleString()}</span>
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Search -->
+            {#if data.selectedK !== null && data.selectedM !== null}
+                <div class="border-t border-zinc-800 pt-5">
+                    <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider block mb-2.5">Search</span>
+                    <form onsubmit={(e) => { e.preventDefault(); handleSearchSubmit(); }} class="flex gap-1.5">
+                        <input
+                            type="text"
+                            bind:value={searchInput}
+                            placeholder="e.g. 3 3 3 4 4 or (3^3.4^2)^2"
+                            class="search-input flex-1 min-w-0"
+                            aria-label="Search seed by name"
+                        />
+                        <button type="submit" class="km-btn km-btn-active shrink-0" title="Search">
+                            <Search size={14} />
+                        </button>
+                    </form>
+                    <p class="text-[0.65rem] text-zinc-500 mt-1.5">Extended or compact notation; spaces ignored</p>
+                </div>
+            {/if}
+
+            <!-- Grouping selector -->
+            {#if data.selectedK !== null && data.selectedM !== null && data.groupings?.length}
+                <div class="border-t border-zinc-800 pt-5">
+                    <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Grouping</span>
+                    <div class="flex flex-wrap gap-1.5 mt-2.5">
+                        <button
+                            class="km-btn {!data.selectedGrouping ? 'km-btn-active' : ''}"
+                            onclick={() => navigateTo(data.selectedK, data.selectedM, 1, null)}
+                        >
+                            All
+                        </button>
+                        {#each data.groupings as { label, count }}
+                            {@const isActive = data.selectedGrouping === label}
+                            <button
+                                class="km-btn {isActive ? 'km-btn-active' : ''}"
+                                onclick={() => navigateTo(data.selectedK, data.selectedM, 1, label)}
+                            >
+                                <span>{label}</span>
                                 <span class="km-count">{count.toLocaleString()}</span>
                             </button>
                         {/each}
@@ -272,11 +340,16 @@
 
             <!-- VC centers toggle -->
             {#if data.selectedK !== null && data.selectedM !== null}
-                <div class="border-t border-zinc-800 pt-5">
+                <div class="border-t border-zinc-800 pt-5 space-y-3">
                     <Checkbox
                         id="showVcsCenters"
                         label="Show VC centers"
                         bind:checked={showVcsCenters}
+                    />
+                    <Checkbox
+                        id="showTransformations"
+                        label="Show gyrations & reflections"
+                        bind:checked={showTransformations}
                     />
                 </div>
             {/if}
@@ -329,13 +402,13 @@
                     {#each data.seedConfigurations as seedConfiguration, i}
                         {@const globalIndex = (data.page - 1) * data.pageSize + i}
                         <div class="sc-card group relative">
-                            <div class="sc-card-header">
+                            <div class="sc-card-header" title={seedConfiguration.name}>
                                 <span class="sc-index">{globalIndex + 1}</span>
-                                <span class="text-zinc-500">{seedConfiguration.name}</span>
+                                <span class="text-zinc-500 sc-name">{@html compactToHtml(compactSeedName(seedConfiguration.name))}</span>
                             </div>
                             {#if browser}
                                 <canvas
-                                    use:initCanvas={{ seedConfiguration, showVcsCenters }}
+                                    use:initCanvas={{ seedConfiguration, showVcsCenters, showTransformations }}
                                     class="block w-full aspect-square"
                                 ></canvas>
                             {:else}
@@ -406,6 +479,26 @@
         color: rgba(74, 222, 128, 0.6);
     }
 
+    .search-input {
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        background-color: rgba(39, 39, 42, 0.5);
+        border: 1px solid rgba(63, 63, 70, 0.4);
+        color: rgba(228, 228, 231, 1);
+        transition: border-color 0.15s ease;
+    }
+
+    .search-input::placeholder {
+        color: rgba(113, 113, 122, 0.7);
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: rgba(74, 222, 128, 0.4);
+    }
+
     .sc-card {
         display: flex;
         flex-direction: column;
@@ -427,7 +520,7 @@
         align-items: center;
         gap: 0.375rem;
         padding: 0.375rem 0.625rem;
-        font-size: 0.7rem;
+        font-size: 0.8rem;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         color: rgba(161, 161, 170, 1);
         background-color: rgba(39, 39, 42, 0.5);
@@ -440,10 +533,15 @@
     }
 
     .sc-index {
-        font-size: 0.6rem;
+        font-size: 0.7rem;
         color: rgba(113, 113, 122, 0.7);
         min-width: 1.25rem;
         text-align: right;
         flex-shrink: 0;
+    }
+
+    .sc-name :global(sup) {
+        font-size: 0.8em;
+        line-height: 0;
     }
 </style>

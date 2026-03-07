@@ -273,12 +273,12 @@ export class VertexConfiguration {
     }
 
     rotate = (origin: Vector, angle: number): void => {
-        this.sharedVertex = this.computeSharedVertex();
+        const shared = this.computeSharedVertex();
         this.current_dir.rotate(angle);
         for (let polygon of this.polygons) {
             polygon.rotate(origin, angle);
         }
-        this.sharedVertex = this.sharedVertex.rotateAround(origin, angle);
+        this.sharedVertex = shared.rotateAround(origin, angle);
     }
 
     static rotate = (vc: VertexConfiguration, origin: Vector, angle: number): VertexConfiguration => {
@@ -382,8 +382,10 @@ export class VertexConfiguration {
      * @returns the shared vertex
      */
     computeSharedVertex = (): Vector => {
+        if (this.polygons.length === 0) return new Vector(0, 0);
         const allVertices = deduplicatePoints(this.polygons.flatMap(p => p.vertices));
-        return allVertices.find(v => this.polygons.every(p => p.vertices.some(v2 => isWithinTolerance(v2, v))))!;
+        const found = allVertices.find(v => this.polygons.every(p => p.vertices.some(v2 => isWithinTolerance(v2, v))));
+        return found ?? this.polygons[0].vertices[0].copy();
     }
 }
 

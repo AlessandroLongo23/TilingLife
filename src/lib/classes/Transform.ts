@@ -1,4 +1,4 @@
-import { Vector } from '$classes';
+import type { Vector } from './Vector.svelte';
 
 export enum TransformType {
     MIRROR = 'm',

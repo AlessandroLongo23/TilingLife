@@ -1,6 +1,7 @@
 <script>
 	import { colorParams } from '$stores';
 	import { onMount } from 'svelte';
+	import { map } from '$utils';
 
 	const MIN_A = 1;
 	const MAX_A = 360;
@@ -14,18 +15,14 @@
 	let pad;
 
 	$effect(() => {
-		position.x = mapValue($colorParams.a, MIN_A, MAX_A, 0, padWidth);
-		position.y = mapValue($colorParams.b, MAX_B, MIN_B, 0, padHeight);
+		position.x = map($colorParams.a, MIN_A, MAX_A, 0, padWidth);
+		position.y = map($colorParams.b, MAX_B, MIN_B, 0, padHeight);
 	});
 
 	function updateColorParams() {
-		const a = mapValue(position.x, 0, padWidth, MIN_A, MAX_A);
-		const b = mapValue(position.y, 0, padHeight, MAX_B, MIN_B);
+		const a = map(position.x, 0, padWidth, MIN_A, MAX_A);
+		const b = map(position.y, 0, padHeight, MAX_B, MIN_B);
 		colorParams.set({ a: Math.round(a), b: Math.round(b) });
-	}
-
-	function mapValue(value, inMin, inMax, outMin, outMax) {
-		return ((value - inMin) / (inMax - inMin)) * (outMax - outMin) + outMin;
 	}
 
 	function startDrag(event) {
@@ -160,13 +157,5 @@
 		transform: translate(-50%, -50%);
 		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
 		z-index: 3;
-	}
-	
-	.mini-preview {
-		width: 24px;
-		height: 24px;
-		margin: 8px;
-		border-radius: 4px;
-		border: 1px solid rgba(255, 255, 255, 0.3);
 	}
 </style> 

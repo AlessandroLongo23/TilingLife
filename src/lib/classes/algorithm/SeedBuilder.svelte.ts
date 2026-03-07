@@ -20,12 +20,18 @@ export class SeedBuilder {
     
     constructor() {}
 
-    buildSeeds = (k: number, m: number | null = null): SeedConfiguration[] => {
+    buildSeeds = (
+        k: number,
+        m: number,
+        onProgress?: (current: number, total: number, count: number) => void
+    ): SeedConfiguration[] => {
         const seedSets = this.loadSeedSets(k, m);
-        
+
         const seedConfigurations: SeedConfiguration[] = [];
-        for (const seedSet of seedSets) {
-            seedConfigurations.push(...this.buildSeedsFromSet(seedSet));
+        for (let i = 0; i < seedSets.length; i++) {
+            const before = seedConfigurations.length;
+            seedConfigurations.push(...this.buildSeedsFromSet(seedSets[i]));
+            onProgress?.(i + 1, seedSets.length, seedConfigurations.length - before);
         }
 
         return seedConfigurations;
@@ -55,7 +61,7 @@ export class SeedBuilder {
             const nextLayer: BFSNode[] = [];
 
             for (const node of currentLayer) {
-                nextLayer.push(...this.expandNode(node));
+                nextLayer.push(...this.expandNode(node, seedSet));
             }
 
             if (nextLayer.length === 0) return [];
@@ -68,11 +74,18 @@ export class SeedBuilder {
         return currentLayer.map(node => node.seed);
     }
 
-    private expandNode = (node: BFSNode): BFSNode[] => {
+    private expandNode = (node: BFSNode, seedSet: string[]): BFSNode[] => {
         const { seed, placedVCs, remaining } = node;
         const children: BFSNode[] = [];
 
         const availableVertices = this.computeAvailableVertices(placedVCs);
+
+        // Forward Checking: if any open vertex has entropy 0 (no VC from the full set can fit), prune this branch
+        for (const { vertex, directions } of availableVertices) {
+            if (!this.canAnyVCFitAtVertex(vertex, directions, seed, seedSet)) {
+                return [];
+            }
+        }
 
         for (const { vertex: v, directions } of availableVertices) {
             const triedNames = new Set<string>();
@@ -126,6 +139,53 @@ export class SeedBuilder {
 
         return children;
     }
+
+    /**
+     * Forward Checking: tests whether at least one of the k original VCs can fit at this open vertex.
+     * Uses the FULL seed set (all k VCs), not just remaining—an open vertex may host another copy
+     * of an already-placed orbit in the infinite tiling.
+     */
+    private canAnyVCFitAtVertex = (
+        vertex: Vector,
+        directions: number[],
+        seed: SeedConfiguration,
+        allVCNames: string[]
+    ): boolean => {
+        const seedCount = seed.polygons.length;
+
+        for (const vcName of allVCNames) {
+            const vc = VertexConfiguration.fromName(vcName);
+            vc.computeNeighboringVertices();
+
+            const triedRotations = new Set<string>();
+
+            for (const dirCtoV of directions) {
+                for (const nv of vc.neighboringVertices) {
+                    const rotation = dirCtoV - nv.heading() + Math.PI;
+                    const normalizedRot = (rotation + 2 * Math.PI) % (2 * Math.PI);
+                    const rotKey = normalizedRot.toFixed(4);
+                    if (triedRotations.has(rotKey)) continue;
+                    triedRotations.add(rotKey);
+
+                    const clonedVC = vc.clone();
+                    clonedVC.rotate(new Vector(0, 0), rotation);
+                    clonedVC.translate(vertex);
+                    clonedVC.computeNeighboringVertices();
+
+                    const vcCount = clonedVC.polygons.length;
+                    const mergedPolygons = deduplicatePolygons([...seed.polygons, ...clonedVC.polygons]);
+
+                    if (mergedPolygons.length === seedCount + vcCount) continue;
+
+                    const newSeed = new SeedConfiguration([...seed.vertexConfigurations, clonedVC]);
+                    if (newSeed.isValid()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
 
     private deduplicateLayer = (nodes: BFSNode[]): BFSNode[] => {
         const seen = new Map<string, BFSNode>();
@@ -188,40 +248,14 @@ export class SeedBuilder {
         return available;
     }
 
-    loadSeedSets = (k: number | null = null, m: number | null = null): string[][] => {
+    loadSeedSets = (k: number, m: number): string[][] => {
         const seedSets: string[][] = [];
 
-        // if k is provided, load only the seed sets for the given k
-        if (k !== null) {
-            const seedSetsFolder = `src/lib/data/seedSets/k=${k}`;
-
-            // if m is provided, load only the seed sets for the given m
-            if (m !== null) {
-                const seedSetsFile = `${seedSetsFolder}/m=${m}.json`;
-                const seedSet = fs.readFileSync(seedSetsFile, 'utf8');
-                seedSets.push(...JSON.parse(seedSet));
-                return seedSets;
-            } 
-            
-            // if m is not provided, load all seed sets for the given k
-            const seedSetsFiles = fs.readdirSync(seedSetsFolder);
-            for (const file of seedSetsFiles) {
-                const seedSet = fs.readFileSync(`${seedSetsFolder}/${file}`, 'utf8');
-                seedSets.push(...JSON.parse(seedSet));
-            }
-            return seedSets;
-        }
-
-        // if k is not provided, load all seed sets
-        const seedSetsFolders = fs.readdirSync('src/lib/data/seedSets');
-        for (const folder of seedSetsFolders) {
-            const seedSetsFolder = `src/lib/data/seedSets/${folder}`;
-            const seedSetsFiles = fs.readdirSync(seedSetsFolder);
-            for (const file of seedSetsFiles) {
-                const seedSet = fs.readFileSync(`${seedSetsFolder}/${file}`, 'utf8');
-                seedSets.push(...JSON.parse(seedSet));
-            }
-        }
+        const seedSetsFolder = `src/lib/data/seedSets/k=${k}`;
+        const seedSetsFile = `${seedSetsFolder}/m=${m}.json`;
+        const seedSet = fs.readFileSync(seedSetsFile, 'utf8');
+        
+        seedSets.push(...JSON.parse(seedSet));
         return seedSets;
     }
 }

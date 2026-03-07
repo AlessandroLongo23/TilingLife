@@ -2,7 +2,7 @@
 
 ## Overview
 
-The objective is to design an algorithm capable of generating valid tilings of the plane starting from a set of polygons. We will classify this tilings based on their $k$-transitivity property and the categories of polygons they contain.
+The objective is to design an algorithm capable of generating valid tilings of the plane starting from a set of polygons. We will classify these tilings based on their $k$-transitivity property and the categories of polygons they contain.
 
 ![[Pasted image 20260220191210.png]]
 

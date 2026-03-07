@@ -6,7 +6,8 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"pipeline": "vite-node src/lib/algorithm/run-pipeline.ts"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.0.0",
@@ -28,6 +29,7 @@
 		"svelte": "^5.0.0",
 		"tailwindcss": "^3.4.9",
 		"vite": "^5.0.3",
+		"vite-node": "^3.2.4",
 		"vitest": "^4.0.18"
 	},
 	"dependencies": {

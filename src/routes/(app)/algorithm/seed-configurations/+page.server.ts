@@ -1,11 +1,24 @@
 import { SeedConfiguration } from '$classes';
 import { BATCH_SIZE } from '$stores';
+import { seedMatchesSearch } from '$lib/utils/compactSeedName';
 
 const PAGE_SIZE = 24;
 
 const seedConfigModules = import.meta.glob<{ default: unknown }>(
 	'$lib/data/seedConfigurations/**/*.json' 
 );
+
+/** Computes grouping label from seed name: e.g. AAABC → "3:1:1", AABBC → "2:2:1". */
+function getGroupingLabel(name: string): string {
+	const inner = name.slice(1, -1);
+	if (!inner) return '';
+	const vcNames = inner.split(';');
+	const counts = new Map<string, number>();
+	for (const vc of vcNames) {
+		counts.set(vc, (counts.get(vc) ?? 0) + 1);
+	}
+	return [...counts.values()].sort((a, b) => b - a).join(':');
+}
 
 function getModulePath(suffix: string): string | null {
 	const key = Object.keys(seedConfigModules).find((k) => k.endsWith(suffix));
@@ -41,45 +54,182 @@ async function loadLegacy(k: number, m: number): Promise<any[] | null> {
 	return Array.isArray(data) ? data : null;
 }
 
+async function loadAllData(k: number, m: number): Promise<{ data: any[]; format: string } | null> {
+	const manifest = await loadManifest(k, m);
+	if (manifest) {
+		const { total, format } = manifest;
+		const allData: any[] = [];
+		const numBatches = Math.ceil(total / BATCH_SIZE);
+		for (let i = 0; i < numBatches; i++) {
+			allData.push(...(await loadBatch(k, m, i)));
+		}
+		if (format === 'compact') {
+			return {
+				data: allData.map((item: any) => SeedConfiguration.decodeCompact(item).encode()),
+				format,
+			};
+		}
+		return { data: allData, format };
+	}
+	const legacyData = await loadLegacy(k, m);
+	if (!legacyData) return null;
+	return { data: legacyData, format: 'full' };
+}
+
 async function loadPageData(
 	k: number,
 	m: number,
-	page: number
-): Promise<{ data: any[]; total: number }> {
+	page: number,
+	grouping: string | null,
+	search: string | null
+): Promise<{ data: any[]; total: number; groupings: { label: string; count: number }[] }> {
 	const manifest = await loadManifest(k, m);
 	if (manifest) {
 		const { total, format } = manifest;
 		const start = (page - 1) * PAGE_SIZE;
 		const end = Math.min(start + PAGE_SIZE, total);
-		if (start >= total) return { data: [], total };
+		if (start >= total) {
+			const all = await loadAllData(k, m);
+			const groupings: { label: string; count: number }[] = [];
+			let filteredTotal = total;
+			if (all) {
+				const byLabel = new Map<string, number>();
+				for (const sc of all.data) {
+					const label = getGroupingLabel(sc.name);
+					byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+				}
+				groupings.push(
+					...[...byLabel.entries()]
+						.sort((a, b) => {
+							const na = a[0].split(':').map(Number);
+							const nb = b[0].split(':').map(Number);
+							for (let i = 0; i < Math.max(na.length, nb.length); i++) {
+								const va = na[i] ?? 0;
+								const vb = nb[i] ?? 0;
+								if (va !== vb) return vb - va;
+							}
+							return 0;
+						})
+						.map(([label, count]) => ({ label, count }))
+				);
+				if (grouping || search) {
+					let f = all.data;
+					if (grouping) f = f.filter((sc: any) => getGroupingLabel(sc.name) === grouping);
+					if (search) f = f.filter((sc: any) => seedMatchesSearch(sc.name, search));
+					filteredTotal = f.length;
+				}
+			}
+			return { data: [], total: filteredTotal, groupings };
+		}
 
-		const batchStart = Math.floor(start / BATCH_SIZE);
-		const batchEnd = Math.floor((end - 1) / BATCH_SIZE);
-		const allData: any[] = [];
-		for (let i = batchStart; i <= batchEnd; i++) {
-			allData.push(...(await loadBatch(k, m, i)));
-		}
-		const pageData = allData.slice(
-			start - batchStart * BATCH_SIZE,
-			end - batchStart * BATCH_SIZE
-		);
+		let data: any[];
+		let filteredTotal: number;
 
-		if (format === 'compact') {
-			const decoded = pageData.map((item: any) => SeedConfiguration.decodeCompact(item).encode());
-			return { data: decoded, total };
+		let groupings: { label: string; count: number }[] = [];
+
+		if (grouping || search) {
+			const all = await loadAllData(k, m);
+			if (!all) return { data: [], total: 0, groupings: [] };
+			let filtered = all.data;
+			if (grouping) {
+				filtered = filtered.filter((sc: any) => getGroupingLabel(sc.name) === grouping);
+			}
+			if (search) {
+				filtered = filtered.filter((sc: any) => seedMatchesSearch(sc.name, search));
+			}
+			filteredTotal = filtered.length;
+			data = filtered.slice(start, start + PAGE_SIZE);
+			// Build groupings from full data
+			const byLabel = new Map<string, number>();
+			for (const sc of all.data) {
+				const label = getGroupingLabel(sc.name);
+				byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+			}
+			groupings = [...byLabel.entries()]
+				.sort((a, b) => {
+					const na = a[0].split(':').map(Number);
+					const nb = b[0].split(':').map(Number);
+					for (let i = 0; i < Math.max(na.length, nb.length); i++) {
+						const va = na[i] ?? 0;
+						const vb = nb[i] ?? 0;
+						if (va !== vb) return vb - va;
+					}
+					return 0;
+				})
+				.map(([label, count]) => ({ label, count }));
+		} else {
+			const batchStart = Math.floor(start / BATCH_SIZE);
+			const batchEnd = Math.floor((end - 1) / BATCH_SIZE);
+			const batchData: any[] = [];
+			for (let i = batchStart; i <= batchEnd; i++) {
+				batchData.push(...(await loadBatch(k, m, i)));
+			}
+			const pageData = batchData.slice(
+				start - batchStart * BATCH_SIZE,
+				end - batchStart * BATCH_SIZE
+			);
+			data = format === 'compact'
+				? pageData.map((item: any) => SeedConfiguration.decodeCompact(item).encode())
+				: pageData;
+			filteredTotal = total;
+			// Load all to compute groupings
+			const all = await loadAllData(k, m);
+			if (all) {
+				const byLabel = new Map<string, number>();
+				for (const sc of all.data) {
+					const label = getGroupingLabel(sc.name);
+					byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+				}
+				groupings = [...byLabel.entries()]
+					.sort((a, b) => {
+						const na = a[0].split(':').map(Number);
+						const nb = b[0].split(':').map(Number);
+						for (let i = 0; i < Math.max(na.length, nb.length); i++) {
+							const va = na[i] ?? 0;
+							const vb = nb[i] ?? 0;
+							if (va !== vb) return vb - va;
+						}
+						return 0;
+					})
+					.map(([label, count]) => ({ label, count }));
+			}
 		}
-		if (format === 'full') {
-			// Full format already has the correct structure { name, vcsCenters, polygons }
-			return { data: pageData, total };
-		}
-		return { data: pageData, total };
+
+		return { data, total: filteredTotal, groupings };
 	}
 
 	const legacyData = await loadLegacy(k, m);
-	if (!legacyData) return { data: [], total: 0 };
-	const total = legacyData.length;
+	if (!legacyData) return { data: [], total: 0, groupings: [] };
+	let data = legacyData;
+	if (grouping) {
+		data = data.filter((sc: any) => getGroupingLabel(sc.name) === grouping);
+	}
+	if (search) {
+		data = data.filter((sc: any) => seedMatchesSearch(sc.name, search));
+	}
+	const total = data.length;
 	const start = (page - 1) * PAGE_SIZE;
-	return { data: legacyData.slice(start, start + PAGE_SIZE), total };
+	const paginated = data.slice(start, start + PAGE_SIZE);
+
+	const byLabel = new Map<string, number>();
+	for (const sc of legacyData) {
+		const label = getGroupingLabel(sc.name);
+		byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+	}
+	const groupings = [...byLabel.entries()]
+		.sort((a, b) => {
+			const na = a[0].split(':').map(Number);
+			const nb = b[0].split(':').map(Number);
+			for (let i = 0; i < Math.max(na.length, nb.length); i++) {
+				const va = na[i] ?? 0;
+				const vb = nb[i] ?? 0;
+				if (va !== vb) return vb - va;
+			}
+			return 0;
+		})
+		.map(([label, count]) => ({ label, count }));
+
+	return { data: paginated, total, groupings };
 }
 
 function discoverAvailable(): { k: number; m: number; count: number }[] {
@@ -138,14 +288,18 @@ export async function load({ url }) {
 		: mValuesForK[0]?.m ?? null;
 
 	const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1'));
+	const selectedGrouping = url.searchParams.get('grouping') || null;
+	const selectedSearch = url.searchParams.get('search') || null;
 
 	let seedConfigurations: any[] = [];
 	let totalItems = 0;
+	let groupings: { label: string; count: number }[] = [];
 
 	if (selectedK !== null && selectedM !== null) {
-		const result = await loadPageData(selectedK, selectedM, page);
+		const result = await loadPageData(selectedK, selectedM, page, selectedGrouping, selectedSearch);
 		seedConfigurations = result.data;
 		totalItems = result.total;
+		groupings = result.groupings;
 	}
 
 	return {
@@ -153,6 +307,9 @@ export async function load({ url }) {
 		kValues,
 		selectedK,
 		selectedM,
+		selectedGrouping,
+		selectedSearch,
+		groupings,
 		page,
 		totalItems,
 		seedConfigurations,

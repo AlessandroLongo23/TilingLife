@@ -1,4 +1,4 @@
-import { tolerance } from "$stores/constants";
+import { tolerance } from "$lib/stores/constants";
 
 export class Vector {
     x: number;
@@ -180,6 +180,32 @@ export class Vector {
 
     static angleBetween(v1: Vector, v2: Vector): number {
         return Math.atan2(v2.y - v1.y, v2.x - v1.x);
+    }
+
+    isParallelTo(other: Vector): boolean {
+        return Math.abs(Vector.cross(this, other)) < tolerance;
+    }
+
+    /**
+     * Checks if a given point belongs to a line.
+     * @param point - The point to check.
+     * @param line - The line to check (axis and point of the line)
+     * @returns True if the point belongs to the line, false otherwise.
+     */
+    static belongsToLine(point: Vector, line: { axis: Vector, point: Vector }): boolean {
+        // Vector from line start to point: (px - x0, py - y0)
+        const dx1 = point.x - line.point.x;
+        const dy1 = point.y - line.point.y;
+    
+        // Line direction vector: (dx2, dy2)
+        const dx2 = line.axis.x;
+        const dy2 = line.axis.y;
+    
+        // 2D Cross Product (Determinant): x1*y2 - y1*x2
+        // If this is 0, the vectors are collinear.
+        const crossProduct2D = dx1 * dy2 - dy1 * dx2;
+    
+        return Math.abs(crossProduct2D) < tolerance;
     }
 
     encode = (): { x: number, y: number } => {

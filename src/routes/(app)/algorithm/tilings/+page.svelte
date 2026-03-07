@@ -3,8 +3,9 @@
     import { browser } from '$app/environment';
     import { Search, Minus, Plus, Grid3x3, Layers, Camera } from 'lucide-svelte';
     import { headerStore, openScreenshotPreview } from '$stores';
-    import { sounds } from '$utils';
-
+    import { map, sounds } from '$utils';
+    import { Tiling, type EncodedTiling } from '$classes/algorithm/Tiling.svelte';
+    
     import Pagination from '$components/ui/Pagination.svelte';
     import ReloadButton from '$components/ui/ReloadButton.svelte';
 
@@ -30,7 +31,7 @@
         if (m !== null) params.set('m', String(m));
         if (pg > 1) params.set('page', String(pg));
         if (ly !== 2) params.set('layers', String(ly));
-        goto(`/tilings?${params.toString()}`);
+        goto(`/algorithm/tilings?${params.toString()}`);
     }
 
     function handlePageChange() {
@@ -58,10 +59,6 @@
         sounds.screenshot();
     }
 
-    function mapValue(value: number, s1: number, e1: number, s2: number, e2: number): number {
-        return s2 + (e2 - s2) * ((value - s1) / (e1 - s1));
-    }
-
     function hsbToHsl(h: number, s: number, b: number) {
         s /= 100;
         b /= 100;
@@ -72,54 +69,22 @@
 
     function getPolygonHue(type: string, vertexCount: number): number {
         if (type === 'regular') {
-            return mapValue(Math.log(vertexCount), Math.log(3), Math.log(40), 0, 300);
+            return map(Math.log(vertexCount), Math.log(3), Math.log(40), 0, 300);
         }
-        return mapValue(vertexCount / 2, 3, 12, 300, 0) + 300 / 12;
+        return map(vertexCount / 2, 3, 12, 300, 0) + 300 / 12;
     }
 
-    // ─── Plane-filling ───
+    // ─── Polygon expansion (seed + generators format) ───
 
     interface Vertex { x: number; y: number }
     interface EncodedPolygon { type: string; n: number; vertices: Vertex[] }
-    interface EncodedTiling {
-        seedConfiguration: { polygons: EncodedPolygon[] };
-        wallpaperGroup: { name: string; sides: number };
-        fundamentalDomain: any;
-        processedSeed?: { polygons: EncodedPolygon[] };
-        cellStructure?: Vertex[];
-    }
 
-    function fillPlane(tiling: EncodedTiling, numLayers: number): EncodedPolygon[] {
-        const cell = tiling.cellStructure;
-        const source = tiling.processedSeed ?? tiling.seedConfiguration;
-
-        if (!cell || cell.length < 3 || !source?.polygons?.length) {
-            return source?.polygons ?? [];
+    function getPolygonsForDrawing(tiling: EncodedTiling): EncodedPolygon[] {
+        if (tiling.seed && tiling.generators) {
+            const polygons = Tiling.expandToPolygons(tiling);
+            return polygons as EncodedPolygon[];
         }
-
-        const b0x = cell[1].x - cell[0].x;
-        const b0y = cell[1].y - cell[0].y;
-        const b1x = cell[2].x - cell[0].x;
-        const b1y = cell[2].y - cell[0].y;
-
-        const filled: EncodedPolygon[] = [];
-
-        for (let i = -numLayers; i <= numLayers; i++) {
-            for (let j = -numLayers; j <= numLayers; j++) {
-                const dx = i * b0x + j * b1x;
-                const dy = i * b0y + j * b1y;
-                for (const poly of source.polygons) {
-                    if (!poly.vertices?.length) continue;
-                    filled.push({
-                        type: poly.type,
-                        n: poly.n,
-                        vertices: poly.vertices.map(v => ({ x: v.x + dx, y: v.y + dy })),
-                    });
-                }
-            }
-        }
-
-        return filled;
+        return [];
     }
 
     // ─── Canvas ───
@@ -158,7 +123,7 @@
         ctx.fillStyle = '#1e1e24';
         ctx.fillRect(0, 0, size, size);
 
-        const polygons = fillPlane(tiling, layers);
+        const polygons = getPolygonsForDrawing(tiling);
         if (!polygons.length) return;
 
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -382,8 +347,8 @@
                         <div class="tiling-card group relative">
                             <div class="tiling-card-header">
                                 <span class="tiling-index">{globalIndex + 1}</span>
-                                <span class="text-zinc-500">{tiling.wallpaperGroup?.name ?? '?'}</span>
-                                <span class="text-zinc-600">{tiling.seedConfiguration?.polygons?.length ?? 0} polys</span>
+                                <span class="text-zinc-500 truncate" title={tiling.seed?.name ?? ''}>{tiling.seed?.name ?? '?'}</span>
+                                <span class="text-zinc-600">{tiling.generators?.length ?? 0} gens</span>
                             </div>
                             {#if browser}
                                 <canvas
@@ -399,7 +364,7 @@
                                 <button
                                     type="button"
                                     class="absolute bottom-2 right-2 p-1.5 rounded-md bg-zinc-800/90 border border-zinc-600/60 text-zinc-400 hover:text-white hover:bg-zinc-700/90 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onclick={(e) => handleCardScreenshot(e, `tiling-${(tiling.wallpaperGroup?.name ?? 'unknown').replace(/[/\\?%*:|"<>]/g, '-')}-${globalIndex + 1}.png`)}
+                                    onclick={(e) => handleCardScreenshot(e, `tiling-${(tiling.seed?.name ?? 'unknown').replace(/[/\\?%*:|"<>]/g, '-')}-${globalIndex + 1}.png`)}
                                     title="Screenshot"
                                     aria-label="Take screenshot"
                                 >
