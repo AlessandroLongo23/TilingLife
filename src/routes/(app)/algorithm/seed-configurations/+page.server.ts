@@ -5,9 +5,10 @@ import { deduplicateEncodedPolygons } from '$utils';
 
 const PAGE_SIZE = 24;
 
-const seedConfigModules = import.meta.glob<{ default: unknown }>(
-	'$lib/data/seedConfigurations/**/*.json' 
-);
+const seedConfigModules: Record<string, () => Promise<{ default: unknown }>> = {
+	...import.meta.glob<{ default: unknown }>('$lib/data/seedConfigurations/**/*.json'),
+	...import.meta.glob<{ default: unknown }>('$lib/data/seedConfigurations/**/*.json.gz'),
+};
 
 /** Computes grouping label from seed name: e.g. AAABC → "3:1:1", AABBC → "2:2:1". */
 function getGroupingLabel(name: string): string {
@@ -21,16 +22,21 @@ function getGroupingLabel(name: string): string {
 	return [...counts.values()].sort((a, b) => b - a).join(':');
 }
 
-/** Find module path. Handles both legacy (seedConfigurations/k=X/m=Y) and new (seedConfigurations/paramsFolder/k=X/m=Y) layouts. */
+/** Find module path. Handles both legacy and new layouts. Prefers .json.gz over .json for batch files. */
 function getModulePath(k: number, m: number, file: string, paramsFolder: string | null): string | null {
-	const suffix = paramsFolder
+	const baseSuffix = paramsFolder
 		? `seedConfigurations/${paramsFolder}/k=${k}/m=${m}/${file}`
 		: `seedConfigurations/k=${k}/m=${m}/${file}`;
-	const key = Object.keys(seedConfigModules).find((key) => {
-		const normalized = key.replace(/\\/g, '/');
-		return normalized.endsWith(suffix);
-	});
-	return key ?? null;
+	const keys = Object.keys(seedConfigModules);
+	const normalizedKeys = keys.map((k) => ({ orig: k, norm: k.replace(/\\/g, '/') }));
+	// Prefer .json.gz for batch files (seedConfigurations_*.json, tilings_*.json)
+	if (file.includes('_') && file.endsWith('.json') && !file.endsWith('.json.gz')) {
+		const gzSuffix = baseSuffix + '.gz';
+		const gzMatch = normalizedKeys.find(({ norm }) => norm.endsWith(gzSuffix));
+		if (gzMatch) return gzMatch.orig;
+	}
+	const match = normalizedKeys.find(({ norm }) => norm.endsWith(baseSuffix));
+	return match?.orig ?? null;
 }
 
 async function loadManifest(

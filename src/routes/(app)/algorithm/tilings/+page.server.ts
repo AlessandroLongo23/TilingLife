@@ -2,13 +2,19 @@ import { BATCH_SIZE } from '$stores';
 
 const PAGE_SIZE = 12;
 
-const tilingModules = import.meta.glob<{ default: unknown }>(
-	'$lib/data/tilings/**/*.json'
-);
+const tilingModules: Record<string, () => Promise<{ default: unknown }>> = {
+	...import.meta.glob<{ default: unknown }>('$lib/data/tilings/**/*.json'),
+	...import.meta.glob<{ default: unknown }>('$lib/data/tilings/**/*.json.gz'),
+};
 
 function getModulePath(suffix: string): string | null {
-	const key = Object.keys(tilingModules).find((k) => k.endsWith(suffix));
-	return key ?? null;
+	const keys = Object.keys(tilingModules);
+	// Prefer .json.gz for batch files (tilings_*.json)
+	if (suffix.includes('tilings_') && suffix.endsWith('.json') && !suffix.endsWith('.json.gz')) {
+		const gzKey = keys.find((k) => k.endsWith(suffix + '.gz'));
+		if (gzKey) return gzKey;
+	}
+	return keys.find((k) => k.endsWith(suffix)) ?? null;
 }
 
 async function loadManifest(

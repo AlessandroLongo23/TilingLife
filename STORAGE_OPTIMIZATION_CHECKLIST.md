@@ -45,8 +45,10 @@ Summary of completed and remaining optimizations for vertex configurations, seed
 ### 8. Integer coordinates
 - Scale coordinates to integers (e.g. × 10000).
 
-### 9. Compression
-- Store `.json.gz`; use streaming decompression.
+### 9. Compression ✓
+- **What:** Store batch files as `.json.gz` (gzip level 9).
+- **Where:** Pipeline writes `.json.gz`; Vite plugin decompresses on import; pipeline's `loadSeedConfigBatches` for TilingGenerator.
+- **Impact:** ~70–90% size reduction for batch files.
 
 ### 10. Binary format
 - MessagePack, CBOR, or custom binary.

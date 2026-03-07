@@ -16,13 +16,14 @@ import {
 	VertexConfiguration,
 	SeedBuilder,
 } from '$classes';
-import { deduplicatePoints } from '$utils';
 import { AlgorithmTilingGenerator } from '$classes/algorithm/TilingGenerator.svelte';
-import { comparePolygonNames, compareVertexConfigurationNames, roundNumbersInJson } from '$utils';
+import { comparePolygonNames, compareVertexConfigurationNames, roundNumbersInJson, toRadians } from '$utils';
 import { BATCH_SIZE } from '$stores';
 import { PipelineLogger } from '$lib/algorithm/PipelineLogger';
 import { buildParamsFolderName } from '$lib/algorithm/paramsFolder';
 import fs from 'fs';
+
+import zlib from 'zlib';
 
 const DATA_FOLDER_PATH = 'src/lib/data';
 const POLYGONS_FILE_PATH = 'src/lib/data/polygons.json';
@@ -67,10 +68,10 @@ function main() {
 		[PolygonType.REGULAR]: {
 			n_max: 12
 		},
-		// [PolygonType.STAR_REGULAR]: {
-		//     n_max: 12,
-		//     angle: toRadians(30)
-		// },
+		[PolygonType.STAR_REGULAR]: {
+		    n_max: 12,
+		    angle: toRadians(30)
+		},
 		// [PolygonType.STAR_PARAMETRIC]: {
 		//     n_max: 12,
 		// },
@@ -309,11 +310,13 @@ function generateSeeds(
 				log.progress('Writing batches', batchIndex + 1, totalBatches);
 				const batch = compactData.slice(i, i + BATCH_SIZE);
 				const rounded = roundNumbersInJson(batch) as typeof batch;
-				const filePath = `${seedConfigurationsFolderPath}/seedConfigurations_${String(batchIndex).padStart(4, '0')}.json`;
-				fs.writeFileSync(filePath, JSON.stringify(rounded));
+				const json = JSON.stringify(rounded);
+				const compressed = zlib.gzipSync(json, { level: 9 });
+				const filePath = `${seedConfigurationsFolderPath}/seedConfigurations_${String(batchIndex).padStart(4, '0')}.json.gz`;
+				fs.writeFileSync(filePath, compressed);
 			}
 
-			const manifest = { format: 'compact', vcLibrary: true, shortKeys: true, total, batchSize: BATCH_SIZE };
+			const manifest = { format: 'compact', vcLibrary: true, shortKeys: true, compressed: true, total, batchSize: BATCH_SIZE };
 			fs.writeFileSync(`${seedConfigurationsFolderPath}/manifest.json`, JSON.stringify(manifest));
 			log.clearLine();
 			return total;
@@ -347,6 +350,44 @@ function tilingsGeneration(
 	}
 }
 
+function loadSeedConfigBatches(
+	paramsFolder: string,
+	k: number,
+	m: number,
+	onProgress?: (phase: string, current: number, total: number, msg?: string) => void
+): { format: string; configs: any[]; vcLibrary?: string[] } {
+	const folder = `${SEED_CONFIGURATIONS_FOLDER_PATH}/${paramsFolder}/k=${k}/m=${m}`;
+	const manifest = JSON.parse(fs.readFileSync(`${folder}/manifest.json`, 'utf8'));
+	const total = manifest.total;
+	const format = manifest.format || 'compact';
+	const configs: any[] = [];
+	let vcLibrary: string[] | undefined;
+	if (manifest.vcLibrary) {
+		try {
+			const vcLibraryPath = `${SEED_CONFIGURATIONS_FOLDER_PATH}/${paramsFolder}/vcLibrary.json`;
+			vcLibrary = JSON.parse(fs.readFileSync(vcLibraryPath, 'utf8'));
+		} catch {
+			vcLibrary = undefined;
+		}
+	}
+	const totalBatches = Math.ceil(total / BATCH_SIZE);
+	for (let i = 0; i < total; i += BATCH_SIZE) {
+		const batchIndex = Math.floor(i / BATCH_SIZE);
+		onProgress?.('load', batchIndex + 1, totalBatches, `Loading batch ${batchIndex + 1}/${totalBatches}`);
+		const baseName = `seedConfigurations_${String(batchIndex).padStart(4, '0')}`;
+		const gzPath = `${folder}/${baseName}.json.gz`;
+		const jsonPath = `${folder}/${baseName}.json`;
+		let batch: any[];
+		if (fs.existsSync(gzPath)) {
+			batch = JSON.parse(zlib.gunzipSync(fs.readFileSync(gzPath)).toString('utf8'));
+		} else {
+			batch = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+		}
+		configs.push(...batch);
+	}
+	return { format, configs, vcLibrary };
+}
+
 function generateTilings(
 	paramsFolder: string,
 	k: number,
@@ -356,15 +397,18 @@ function generateTilings(
 	log.runStep(
 		`Tilings generation for k=${k} and m=${m}`,
 		() => {
+			const progress = log.progressForPhases({
+				load: 'Loading seed configs',
+				seed: 'Processing seeds',
+				generators: 'Testing generator sets'
+			});
+			const seedConfigs = loadSeedConfigBatches(paramsFolder, k, m, progress);
 			const tilingGenerator = new AlgorithmTilingGenerator(paramsFolder);
 			const tilings = tilingGenerator.generateTilings(
 				k,
 				m,
-				log.progressForPhases({
-					load: 'Loading seed configs',
-					seed: 'Processing seeds',
-					generators: 'Testing generator sets'
-				})
+				progress,
+				seedConfigs
 			);
 			log.clearLine(70, 2);
 
@@ -382,10 +426,12 @@ function generateTilings(
 				log.progress('Writing batches', batchIndex + 1, totalBatches);
 				const batch = encoded.slice(i, i + BATCH_SIZE);
 				const rounded = roundNumbersInJson(batch) as typeof batch;
-				const filePath = `${tilingsFolderPath}/tilings_${String(batchIndex).padStart(4, '0')}.json`;
-				fs.writeFileSync(filePath, JSON.stringify(rounded));
+				const json = JSON.stringify(rounded);
+				const compressed = zlib.gzipSync(json, { level: 9 });
+				const filePath = `${tilingsFolderPath}/tilings_${String(batchIndex).padStart(4, '0')}.json.gz`;
+				fs.writeFileSync(filePath, compressed);
 			}
-			const manifest = { format: 'full', total, batchSize: BATCH_SIZE };
+			const manifest = { format: 'full', compressed: true, total, batchSize: BATCH_SIZE };
 			fs.writeFileSync(`${tilingsFolderPath}/manifest.json`, JSON.stringify(manifest));
 			log.clearLine();
 			return tilings.length;

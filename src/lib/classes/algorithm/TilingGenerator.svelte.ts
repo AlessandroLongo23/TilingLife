@@ -72,9 +72,10 @@ export class AlgorithmTilingGenerator {
     generateTilings = (
         k: number,
         m: number,
-        onProgress?: PhaseProgressCallback
+        onProgress?: PhaseProgressCallback,
+        seedConfigs?: { format: string; configs: (CompactSeedConfiguration | FullSeedConfiguration)[]; vcLibrary?: string[] }
     ): AlgorithmTiling[] => {
-        const { format, configs, vcLibrary } = this.loadSeedConfigurations(k, m, onProgress);
+        const { format, configs, vcLibrary } = seedConfigs ?? this.loadSeedConfigurations(k, m, onProgress);
         const tilings: AlgorithmTiling[] = [];
 
         const configsToProcess = configs;
@@ -170,8 +171,15 @@ export class AlgorithmTilingGenerator {
         for (let i = 0; i < total; i += BATCH_SIZE) {
             const batchIndex = Math.floor(i / BATCH_SIZE);
             onProgress?.('load', batchIndex + 1, totalBatches, `Loading batch ${batchIndex + 1}/${totalBatches}`);
-            const filePath = `${folder}/seedConfigurations_${String(batchIndex).padStart(4, '0')}.json`;
-            const batch = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            const baseName = `seedConfigurations_${String(batchIndex).padStart(4, '0')}`;
+            const gzPath = `${folder}/${baseName}.json.gz`;
+            const jsonPath = `${folder}/${baseName}.json`;
+            let batch: (CompactSeedConfiguration | FullSeedConfiguration)[];
+            if (fs.existsSync(gzPath)) {
+                // zlib is Node-only; when .gz exists, caller must pass pre-loaded configs via generateTilings(,,, seedConfigs)
+                throw new Error('Compressed .json.gz batches require pre-loading. Use pipeline or pass seedConfigs.');
+            }
+            batch = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
             configs.push(...batch);
         }
 
