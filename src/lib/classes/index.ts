@@ -27,6 +27,8 @@ export * from "./algorithm/PolygonSignature.svelte";
 export * from "./algorithm/SeedConfiguration.svelte";
 export * from "./algorithm/SeedSetExtractor.svelte";
 export * from "./algorithm/SeedBuilder.svelte";
+export * from "./algorithm/SeedExpander.svelte";
+export * from "./algorithm/TranslationalCellExtractor.svelte";
 export * from "./algorithm/Tiling.svelte";
 export * from "./algorithm/TilingGenerator.svelte";
 export * from "./wallpaperGroups";

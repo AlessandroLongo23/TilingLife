@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { BookOpen, Hexagon, Grid2x2, GitFork, Puzzle, Grid3x3 } from 'lucide-svelte';
+	import { goto } from '$app/navigation';
+	import { BookOpen, Hexagon, Grid2x2, GitFork, Puzzle, Layers, Grid3x3, FolderOpen } from 'lucide-svelte';
 	import { headerStore } from '$stores';
 	import ScreenshotPreviewModal from '$components/ScreenshotPreviewModal.svelte';
+	import PipelineProgressDialog from '$components/PipelineProgressDialog.svelte';
 
-	let { children } = $props();
+	let { data, children } = $props();
 
 	const ROUTE_TITLES: Record<string, { title: string; icon: typeof Hexagon }> = {
 		'/algorithm/theory': { title: 'Theory', icon: BookOpen },
@@ -12,6 +14,7 @@
 		'/algorithm/vertex-configurations': { title: 'Vertex Configurations', icon: Grid2x2 },
 		'/algorithm/compatibility-graph': { title: 'Compatibility Graph', icon: GitFork },
 		'/algorithm/seed-configurations': { title: 'Seed Configurations', icon: Puzzle },
+		'/algorithm/expanded-seeds': { title: 'Expanded Seeds', icon: Layers },
 		'/algorithm/tilings': { title: 'Tilings', icon: Grid3x3 },
 	};
 
@@ -21,11 +24,12 @@
 		{ href: '/algorithm/vertex-configurations', label: 'Vertex Configs', icon: Grid2x2 },
 		{ href: '/algorithm/compatibility-graph', label: 'Compat. Graph', icon: GitFork },
 		{ href: '/algorithm/seed-configurations', label: 'Seed Configs', icon: Puzzle },
+		{ href: '/algorithm/expanded-seeds', label: 'Expanded Seeds', icon: Layers },
 		{ href: '/algorithm/tilings', label: 'Tilings', icon: Grid3x3 }
 	];
 
 	let displayTitle = $derived(
-		$headerStore.title || ROUTE_TITLES[$page.url.pathname]?.title || 'TilingLife'
+		$headerStore.title || ROUTE_TITLES[$page.url.pathname]?.title || 'Tiling Atlas'
 	);
 	let displayIcon = $derived(ROUTE_TITLES[$page.url.pathname]?.icon ?? Puzzle);
 	let displayBadge = $derived($headerStore.badge);
@@ -45,6 +49,32 @@
 					<h1 class="text-lg font-semibold text-white/90">{displayTitle}</h1>
 					{#if displayBadge}
 						<span class="count-badge">{displayBadge}</span>
+					{/if}
+					{#if data.paramsFolderValues?.length > 1}
+						<div class="flex items-center gap-1.5 ml-2">
+							<FolderOpen size={14} class="text-zinc-500" />
+							<select
+								class="params-folder-select"
+								value={data.currentParamsFolder === 'default' ? '' : data.currentParamsFolder}
+								onchange={(e) => {
+									const val = (e.target as HTMLSelectElement).value;
+									const u = new URL($page.url);
+									if (val) {
+										u.searchParams.set('polygons', val);
+									} else {
+										u.searchParams.delete('polygons');
+									}
+									goto(u.toString());
+								}}
+								aria-label="Select dataset"
+							>
+								{#each data.paramsFolderValues as folder}
+									<option value={folder === 'default' ? '' : folder}>
+										{folder}
+									</option>
+								{/each}
+							</select>
+						</div>
 					{/if}
 				</div>
 				<nav class="flex items-center gap-1">
@@ -70,6 +100,7 @@
 		{@render children()}
 	</div>
 	<ScreenshotPreviewModal />
+	<PipelineProgressDialog />
 </div>
 
 <style>
@@ -109,5 +140,25 @@
 	.nav-link-active:hover {
 		color: rgba(74, 222, 128, 1);
 		background-color: rgba(74, 222, 128, 0.12);
+	}
+
+	.params-folder-select {
+		font-size: 0.75rem;
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.375rem;
+		border: 1px solid rgba(63, 63, 70, 0.5);
+		background-color: rgba(39, 39, 42, 0.8);
+		color: rgba(228, 228, 231, 1);
+		font-family: ui-monospace, monospace;
+		cursor: pointer;
+	}
+
+	.params-folder-select:hover {
+		border-color: rgba(113, 113, 122, 0.6);
+	}
+
+	.params-folder-select:focus {
+		outline: none;
+		border-color: rgba(74, 222, 128, 0.4);
 	}
 </style>

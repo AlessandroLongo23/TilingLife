@@ -70,8 +70,9 @@ export const toDegrees = (radians: number): number => {
     return degrees;
 }
 
-export const segmentsIntersect = (p1: Vector, p2: Vector, p3: Vector, p4: Vector): boolean => {
-    const isPointEqual = (a: Vector, b: Vector) => Math.abs(a.x - b.x) < tolerance && Math.abs(a.y - b.y) < tolerance;
+export const segmentsIntersect = (p1: Vector, p2: Vector, p3: Vector, p4: Vector, tol: number = tolerance): boolean => {
+    const isPointEqual = (a: Vector, b: Vector) => Math.abs(a.x - b.x) < tol && Math.abs(a.y - b.y) < tol;
+    
     const p1p3 = isPointEqual(p1, p3);
     const p1p4 = isPointEqual(p1, p4);
     const p2p3 = isPointEqual(p2, p3);
@@ -81,28 +82,28 @@ export const segmentsIntersect = (p1: Vector, p2: Vector, p3: Vector, p4: Vector
     const denom = (p4.y - p3.y) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.y - p1.y);
     const numT = (p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x);
     const numU = (p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x);
-    if (Math.abs(denom) < tolerance) {
-        if (Math.abs(numT) < tolerance && Math.abs(numU) < tolerance) {
+    if (Math.abs(denom) < tol) {
+        if (Math.abs(numT) < tol && Math.abs(numU) < tol) {
             const dx = p2.x - p1.x;
             const dy = p2.y - p1.y;
             const lenSq = dx * dx + dy * dy;
-            if (lenSq < tolerance) return false;
+            if (lenSq < tol) return false;
             const t3 = ((p3.x - p1.x) * dx + (p3.y - p1.y) * dy) / lenSq;
             const t4 = ((p4.x - p1.x) * dx + (p4.y - p1.y) * dy) / lenSq;
             const tMin = Math.min(t3, t4);
             const tMax = Math.max(t3, t4);
-            if (tMin < 1 - tolerance && tMax > tolerance) return true;
+            if (tMin < 1 - tol && tMax > tol) return true;
         }
         return false;
     }
     const t = numT / denom;
     const u = numU / denom;
-    const tInterior = t > tolerance && t < 1 - tolerance;
-    const uInterior = u > tolerance && u < 1 - tolerance;
+    const tInterior = t > tol && t < 1 - tol;
+    const uInterior = u > tol && u < 1 - tol;
     if (tInterior && uInterior) return true;
     if (sharedPoints === 0) {
-        const tOnSegment = t > -tolerance && t < 1 + tolerance;
-        const uOnSegment = u > -tolerance && u < 1 + tolerance;
+        const tOnSegment = t > -tol && t < 1 + tol;
+        const uOnSegment = u > -tol && u < 1 + tol;
         if (tOnSegment && uOnSegment) return true;
     }
     return false;
@@ -156,7 +157,7 @@ export const extractDataFromPolygonName = (name: string): PolygonSignatureData =
     }
 }
 
-export const comparePolygonNames = (nameA: string, nameB: string, sortOrder: string[] = ['type', 'n', 'd', 'alpha']): number => {
+export const comparePolygonNames = (nameA: string, nameB: string, sortOrder: string[] = ['type', 'n', 'd', 'alpha', 'startsWith']): number => {
     const dataA: PolygonSignatureData = extractDataFromPolygonName(nameA);
     const dataB: PolygonSignatureData = extractDataFromPolygonName(nameB);
 
@@ -173,6 +174,13 @@ export const comparePolygonNames = (nameA: string, nameB: string, sortOrder: str
     for (const field of sortOrder) {
         if (field === 'type') {
             if (typeAIndex !== typeBIndex) return typeAIndex - typeBIndex;
+            continue;
+        }
+        if (field === 'startsWith') {
+            const ord = (v: StarVertexTypes | undefined) => (v === StarVertexTypes.INNER ? 0 : 1);
+            const a = ord(dataA.startsWith);
+            const b = ord(dataB.startsWith);
+            if (a !== b) return a - b;
             continue;
         }
         const valA = (dataA as unknown as Record<string, number | undefined>)[field] ?? -Infinity;
@@ -305,8 +313,8 @@ export const sortPointsByAngle = (vertices: Vector[]): Vector[] => {
     return vertices.sort((a, b) => Vector.sub(a, centroid).heading() - Vector.sub(b, centroid).heading());
 }
 
-export const isWithinConvexHull = (vertices: Vector[], point: Vector): boolean => {
-    return sdf(vertices, point) < -tolerance;
+export const isWithinConvexHull = (vertices: Vector[], point: Vector, tol: number = tolerance): boolean => {
+    return sdf(vertices, point) < -tol;
 }
 
 export const sdf = (vertices: Vector[], point: Vector): number => {
@@ -344,10 +352,73 @@ export const sdf = (vertices: Vector[], point: Vector): number => {
     return inside ? -distance : distance;
 }
 
-export const deduplicatePolygons = (polygons: Polygon[]): Polygon[] => {
+export const deduplicatePolygons = (polygons: Polygon[], tol: number = tolerance): Polygon[] => {
     return polygons.filter((p: Polygon, idx: number, self: Polygon[]) => {
-        return idx === self.findIndex((other: Polygon) => p.isEquivalent(other));
+        return idx === self.findIndex((other: Polygon) => p.isEquivalent(other, tol));
     });
+}
+
+/** Grid size for polygon spatial bucketing (same as SeedExpander). */
+const POLYGON_BUCKET_GRID = 1;
+const POLYGON_SEARCH_RADIUS = 5;
+
+/** Fast deduplication using centroid spatial hash. O(n·k) vs O(n²) for small buckets. */
+export const deduplicatePolygonsSpatial = (polygons: Polygon[], tol: number = tolerance): Polygon[] => {
+    if (polygons.length <= 1) return polygons;
+    const buckets = new Map<string, Polygon[]>();
+    for (const p of polygons) {
+        const cx = Math.round(p.centroid.x / POLYGON_BUCKET_GRID);
+        const cy = Math.round(p.centroid.y / POLYGON_BUCKET_GRID);
+        const key = `${cx},${cy}`;
+        const list = buckets.get(key) ?? [];
+        list.push(p);
+        buckets.set(key, list);
+    }
+    const result: Polygon[] = [];
+    for (const list of buckets.values()) {
+        for (let i = 0; i < list.length; i++) {
+            const p = list[i];
+            if (list.findIndex((o) => p.isEquivalent(o, tol)) === i) result.push(p);
+        }
+    }
+    return result;
+};
+
+function getNearbyFromBuckets(buckets: Map<string, Polygon[]>, p: Polygon): Polygon[] {
+    const cx = Math.round(p.centroid.x / POLYGON_BUCKET_GRID);
+    const cy = Math.round(p.centroid.y / POLYGON_BUCKET_GRID);
+    const result: Polygon[] = [];
+    for (let dx = -POLYGON_SEARCH_RADIUS; dx <= POLYGON_SEARCH_RADIUS; dx++) {
+        for (let dy = -POLYGON_SEARCH_RADIUS; dy <= POLYGON_SEARCH_RADIUS; dy++) {
+            result.push(...(buckets.get(`${cx + dx},${cy + dy}`) ?? []));
+        }
+    }
+    return result;
+}
+
+/** Fast validity check: any two polygons intersect? Uses spatial hash to avoid O(n²) all-pairs. */
+export const polygonsHaveIntersection = (polygons: Polygon[]): boolean => {
+    if (polygons.length <= 1) return false;
+    const buckets = new Map<string, Polygon[]>();
+    for (const p of polygons) {
+        const cx = Math.round(p.centroid.x / POLYGON_BUCKET_GRID);
+        const cy = Math.round(p.centroid.y / POLYGON_BUCKET_GRID);
+        const key = `${cx},${cy}`;
+        const list = buckets.get(key) ?? [];
+        list.push(p);
+        buckets.set(key, list);
+    }
+    const seen = new Set<Polygon>();
+    for (const p of polygons) {
+        const nearby = getNearbyFromBuckets(buckets, p);
+        for (const other of nearby) {
+            if (p === other) continue;
+            if (seen.has(other)) continue;
+            if (p.intersects(other)) return true;
+        }
+        seen.add(p);
+    }
+    return false;
 }
 
 /** Tolerance for encoded polygon comparison. 1e-3 handles float drift from different decode paths. */

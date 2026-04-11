@@ -7,7 +7,7 @@
   - [ ] add self connections (if compatible)
 4. [x] extract all seed sets
 5. [x] build the seeds
-  - [ ] while bfs-ing on the open vertices, if one vertex can't fit any vcs, kill the branch
+  - [x] while bfs-ing and at the end, check the open vertices, if one vertex can't fit any vcs, kill the branch
 6. [ ] expand the seeds
   - [ ] use orbit WFC to expand the seed
   - [-] compute transformations on original seed

@@ -127,17 +127,17 @@ export class Vector {
     }
 
     static mirrorByPointAndDir(v: Vector, point: Vector, dir: Vector): Vector {
-        const vector = v.copy();
+        const vector: Vector = v.copy();
         vector.mirrorByPointAndDir(point.copy(), dir.copy());
         return vector;
     }
 
     mirrorByPointAndDir(point: Vector, dir: Vector): void {
-        const pointVector = Vector.sub(this, point);
-        const dirMagSq = dir.dot(dir); 
-        const scalar = pointVector.dot(dir) / dirMagSq;
-        const projection = Vector.scale(dir, scalar);
-        const perpendicular = Vector.sub(pointVector, projection);
+        const pointVector: Vector = Vector.sub(this, point);
+        const dirMagSq: number = dir.dot(dir); 
+        const scalar: number = pointVector.dot(dir) / dirMagSq;
+        const projection: Vector = Vector.scale(dir, scalar);
+        const perpendicular: Vector = Vector.sub(pointVector, projection);
 
         this.set(Vector.sub(Vector.add(point, projection), perpendicular));
     }
@@ -147,10 +147,10 @@ export class Vector {
     }
 
     rotate(angle: number): Vector {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        const newX = this.x * cos - this.y * sin;
-        const newY = this.x * sin + this.y * cos;
+        const cos: number = Math.cos(angle);
+        const sin: number = Math.sin(angle);
+        const newX: number = this.x * cos - this.y * sin;
+        const newY: number = this.x * sin + this.y * cos;
 
         this.x = newX;
         this.y = newY;
@@ -182,6 +182,11 @@ export class Vector {
         return Math.atan2(v2.y - v1.y, v2.x - v1.x);
     }
 
+    /**
+     * Checks if this vector is parallel to another vector
+     * @param other 
+     * @returns True if the vectors are parallel, false otherwise.
+     */
     isParallelTo(other: Vector): boolean {
         return Math.abs(Vector.cross(this, other)) < tolerance;
     }
@@ -194,16 +199,16 @@ export class Vector {
      */
     static belongsToLine(point: Vector, line: { axis: Vector, point: Vector }): boolean {
         // Vector from line start to point: (px - x0, py - y0)
-        const dx1 = point.x - line.point.x;
-        const dy1 = point.y - line.point.y;
+        const dx1: number = point.x - line.point.x;
+        const dy1: number = point.y - line.point.y;
     
         // Line direction vector: (dx2, dy2)
-        const dx2 = line.axis.x;
-        const dy2 = line.axis.y;
+        const dx2: number = line.axis.x;
+        const dy2: number = line.axis.y;
     
         // 2D Cross Product (Determinant): x1*y2 - y1*x2
         // If this is 0, the vectors are collinear.
-        const crossProduct2D = dx1 * dy2 - dy1 * dx2;
+        const crossProduct2D: number = dx1 * dy2 - dy1 * dx2;
     
         return Math.abs(crossProduct2D) < tolerance;
     }

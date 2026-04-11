@@ -1,11 +1,35 @@
-export async function load() {
-    let allVCNames: string[] = [];
-    try {
-        const mod = await import('$lib/data/vcs.json');
-        const data = mod.default;
-        if (Array.isArray(data)) allVCNames = data;
-    } catch {
-        // Return empty array if file missing or invalid
-    }
-    return { allVCNames };
+/**
+ * Vertex configurations page - loads VCs from Supabase pipeline-data bucket.
+ * Uses list-folders API for paramsFolder discovery.
+ */
+
+import { getVCsUrl } from '$lib/services/pipelineStorage';
+import { fetchPipelineJsonArray } from '$lib/services/pipelineFetch';
+
+export async function load({ url, depends, fetch }) {
+	depends('app:polygons-filter');
+
+	let supabaseFolders: string[] = [];
+	try {
+		const res = await fetch(`${url.origin}/api/pipeline/list-folders`);
+		const json = await res.json();
+		supabaseFolders = json.folders ?? [];
+	} catch {
+		// Ignore
+	}
+
+	const paramsFolderValues = supabaseFolders.length > 0 ? supabaseFolders : ['default'];
+	const selectedParamsFolder = url.searchParams.get('polygons') || paramsFolderValues[0] || null;
+	const effectiveFolder = selectedParamsFolder === 'default' ? null : selectedParamsFolder;
+
+	let allVCNames: string[] = [];
+	if (effectiveFolder) {
+		allVCNames = await fetchPipelineJsonArray<string>(getVCsUrl(effectiveFolder));
+	}
+
+	return {
+		allVCNames,
+		paramsFolderValues,
+		selectedParamsFolder: effectiveFolder ?? 'default',
+	};
 }

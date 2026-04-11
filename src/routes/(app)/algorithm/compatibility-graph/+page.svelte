@@ -1,21 +1,12 @@
 <script lang="ts">
-    import { 
-        VertexConfiguration, 
-        CompatibilityGraph, 
-        VCNode, 
-        regularPolygonRegex, 
-        regularStarRegex, 
-        parametricStarRegex, 
-        equilateralPolygonRegex, 
-        genericPolygonRegex,
-        PolygonType 
-    } from '$classes';
+    import { goto, invalidate } from '$app/navigation';
+    import { VertexConfiguration, CompatibilityGraph, VCNode, PolygonType } from '$classes';
     import { browser } from '$app/environment';
     import { Vector } from '$classes/Vector.svelte';
     import { onMount } from 'svelte';
-    import { ChevronRight, SlidersHorizontal } from 'lucide-svelte';
+    import { ChevronRight, SlidersHorizontal, Grid2X2, List } from 'lucide-svelte';
     import { headerStore } from '$stores';
-    import { isValidMultiple } from '$utils/filterHelpers';
+    import { vcPassesPolygonFilter } from '$utils/filterHelpers';
     import { categoryOptions } from '$stores';
 
     import MultiSelect from '$components/ui/MultiSelect.svelte';
@@ -23,6 +14,7 @@
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
 	import Checkbox from '$components/ui/Checkbox.svelte';
     import ReloadButton from '$components/ui/ReloadButton.svelte';
+    import VCListItem from '$components/VCListItem.svelte';
 
     const { data } = $props();
 
@@ -33,53 +25,21 @@
     let activeSearch = $state('');
     let filterAngleEnabled = $state(false);
     let filterAngle = $state(30);
+    let filterNMaxEnabled = $state(false);
+    let filterNMax = $state(12);
     let showNames = $state(false);
+    let viewMode = $state<'graph' | 'list'>('graph');
+    let selectedVCNames = $state<Set<string>>(new Set());
 
     let filteredNames = $derived.by(() => {
+        const polygonFilter = {
+            categories: selectedCategories,
+            n_max: filterNMaxEnabled ? filterNMax : undefined,
+            angle: filterAngleEnabled ? filterAngle : undefined,
+        };
         return allVCNames.filter((name: string) => {
             if (activeSearch && !name.toLowerCase().includes(activeSearch)) return false;
-            
-            const parts = name.split(',');
-            for (const p of parts) {
-                if (p.match(regularPolygonRegex) && selectedCategories.includes(PolygonType.REGULAR)) {
-                    return true;
-                }
-                
-                if (p.match(regularStarRegex) && selectedCategories.includes(PolygonType.STAR_REGULAR)) {
-                    const regularStarMatch = p.match(regularStarRegex);
-                    const n = parseInt(regularStarMatch[1]);
-                    const d = parseInt(regularStarMatch[2]);
-                    const a = 180 * (1 - 2 * d / n);
-                    const b = 180 * (1 + 2 * (d - 1) / n);
-                    if (!filterAngleEnabled || (isValidMultiple(a, filterAngle) && isValidMultiple(b, filterAngle))) 
-                        return true;
-                } 
-            
-                if (p.match(parametricStarRegex) && selectedCategories.includes(PolygonType.STAR_PARAMETRIC)) {
-                    const parametricStarMatch = p.match(parametricStarRegex);
-                    const n = parseInt(parametricStarMatch[1]);
-                    const alpha = parseInt(parametricStarMatch[2]);
-                    const b = 360 * (1 - 1 / n) - alpha;
-                    if (!filterAngleEnabled || (isValidMultiple(alpha, filterAngle) && isValidMultiple(b, filterAngle))) 
-                        return true;
-                } 
-                
-                if (p.match(equilateralPolygonRegex) && selectedCategories.includes(PolygonType.EQUILATERAL)) {
-                    const equilateralPolygonMatch = p.match(equilateralPolygonRegex);
-                    const angles = equilateralPolygonMatch[2].split(';').map(a => parseInt(a));
-                    if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
-                        return true;
-                }
-
-                if (p.match(genericPolygonRegex) && selectedCategories.includes(PolygonType.GENERIC)) {
-                    const genericPolygonMatch = p.match(genericPolygonRegex);
-                    const sides = genericPolygonMatch[2].split(';').map(s => parseFloat(s));
-                    const angles = genericPolygonMatch[3].split(';').map(a => parseInt(a));
-                    if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
-                        return true;
-                }
-            }
-            return false;
+            return vcPassesPolygonFilter(name, polygonFilter);
         });
     });
 
@@ -142,6 +102,7 @@
     let isPanning = false;
     let lastMouse = new Vector(0, 0);
     let hoveredNode = null;
+    let clickedNodeAtDown = null;
 
     // --- Graph data ---
     let graph: CompatibilityGraph | null = null;
@@ -457,6 +418,7 @@
             const isHov = hoveredNode === node;
             const isNb = hoveredNode !== null && hoveredNode.neighbors.includes(node);
             const dim = hoveredNode !== null && !isHov && !isNb;
+            const isSel = selectedVCNames.has(node.vertexConfiguration.name);
 
             ctx.save();
             if (dim) ctx.globalAlpha = 0.25;
@@ -466,8 +428,8 @@
                 ctx.drawImage(node.thumbnail, node.pos.x - node.radius, node.pos.y - node.radius, sz, sz);
             }
 
-            ctx.strokeStyle = isHov ? '#4ade80' : isNb ? '#86efac' : 'rgba(161,161,170,0.4)';
-            ctx.lineWidth = (isHov ? 3 : isNb ? 2 : 1.5) / zoom;
+            ctx.strokeStyle = isSel ? '#4ade80' : isHov ? '#4ade80' : isNb ? '#86efac' : 'rgba(161,161,170,0.4)';
+            ctx.lineWidth = (isSel || isHov ? 3 : isNb ? 2 : 1.5) / zoom;
             ctx.beginPath();
             ctx.arc(node.pos.x, node.pos.y, node.radius, 0, Math.PI * 2);
             ctx.stroke();
@@ -543,6 +505,7 @@
         if (e.button === 0) {
             const world = screenToWorld(screen);
             const node = findNodeAt(world);
+            clickedNodeAtDown = node;
             if (node) {
                 draggedNode = node;
                 node.pinned = true;
@@ -575,7 +538,22 @@
         }
     }
 
-    function handleMouseUp() {
+    function handleMouseUp(e) {
+        if (clickedNodeAtDown && draggedNode === clickedNodeAtDown) {
+            const rect = canvasEl?.getBoundingClientRect();
+            if (rect) {
+                const screen = new Vector(e.clientX - rect.left, e.clientY - rect.top);
+                const dist = Math.hypot(screen.x - lastMouse.x, screen.y - lastMouse.y);
+                if (dist < 6) {
+                    const vcName = clickedNodeAtDown.vertexConfiguration.name;
+                    const next = new Set(selectedVCNames);
+                    if (next.has(vcName)) next.delete(vcName);
+                    else next.add(vcName);
+                    selectedVCNames = next;
+                }
+            }
+        }
+        clickedNodeAtDown = null;
         if (draggedNode) { draggedNode.pinned = false; draggedNode = null; }
         isDragging = false;
         isPanning = false;
@@ -635,6 +613,19 @@
                         <AngleFilterBlock bind:enabled={filterAngleEnabled} bind:angle={filterAngle} />
                     </div>
                 {/if}
+
+                <div class="border-t border-zinc-800 pt-5">
+                    <Checkbox id="filterNMaxEnabled" label="Max sides (n ≤)" bind:checked={filterNMaxEnabled} />
+                    {#if filterNMaxEnabled}
+                        <input
+                            type="number"
+                            min="3"
+                            max="24"
+                            class="w-20 px-2 py-1 rounded border border-zinc-600/60 bg-zinc-800 text-zinc-200 text-sm mt-2"
+                            bind:value={filterNMax}
+                        />
+                    {/if}
+                </div>
 
                 <div class="border-t border-zinc-800 pt-5">
                     <div class="flex flex-col gap-3">
@@ -739,20 +730,120 @@
             </div>
         </aside>
 
-        <!-- Graph canvas -->
-        <main class="flex-1 min-w-0 relative" bind:this={containerEl}>
-            <canvas
-                bind:this={canvasEl}
-                onmousedown={handleMouseDown}
-                onmousemove={handleMouseMove}
-                onmouseup={handleMouseUp}
-                onmouseleave={handleMouseUp}
-                oncontextmenu={(e) => e.preventDefault()}
-            ></canvas>
+        <!-- Graph / List -->
+        <main class="flex-1 min-w-0 flex flex-col">
+            <div class="flex flex-wrap items-center gap-3 p-3 border-b border-zinc-800 shrink-0">
+                <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">View</span>
+                <div class="flex gap-1">
+                    <button
+                        class="p-2 rounded-md border transition-all {viewMode === 'graph' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                        onclick={() => viewMode = 'graph'}
+                        title="Graph view"
+                    >
+                        <Grid2X2 size={16} />
+                    </button>
+                    <button
+                        class="p-2 rounded-md border transition-all {viewMode === 'list' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                        onclick={() => viewMode = 'list'}
+                        title="List view"
+                    >
+                        <List size={16} />
+                    </button>
+                </div>
+                {#if viewMode === 'list' && filteredNames.length > 0}
+                    <div class="flex items-center gap-2 ml-auto">
+                        <span class="text-xs text-zinc-500">{selectedVCNames.size} selected</span>
+                        <button
+                            class="text-xs px-2 py-1 rounded border border-zinc-600/60 bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50"
+                            onclick={() => selectedVCNames = new Set(filteredNames)}
+                        >
+                            Select all
+                        </button>
+                        <button
+                            class="text-xs px-2 py-1 rounded border border-zinc-600/60 bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50"
+                            onclick={() => selectedVCNames = new Set()}
+                        >
+                            Deselect all
+                        </button>
+                    </div>
+                {/if}
+            </div>
+            {#if viewMode === 'list'}
+                <div class="flex-1 overflow-y-auto p-4">
+                    {#if filteredNames.length === 0}
+                        <div class="flex flex-col items-center justify-center h-48 text-zinc-600">
+                            <p class="text-sm">No vertex configurations match your filters.</p>
+                            <p class="text-xs mt-1">Run Generate Seed Configurations from the Vertex Configurations page to create the compatibility graph.</p>
+                        </div>
+                    {:else}
+                        <div class="flex flex-col gap-1.5">
+                            {#each filteredNames as name, i}
+                                {@const vc = vcCache.get(name)}
+                                <VCListItem
+                                    id={i + 1}
+                                    name={name}
+                                    vc={vc ?? null}
+                                    vertexCount={name.split(',').length}
+                                    showCheckbox={true}
+                                    checked={selectedVCNames.has(name)}
+                                    onToggle={() => {
+                                        const next = new Set(selectedVCNames);
+                                        if (next.has(name)) next.delete(name);
+                                        else next.add(name);
+                                        selectedVCNames = next;
+                                    }}
+                                />
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
+            {:else}
+                <div class="flex-1 min-w-0 relative" bind:this={containerEl}>
+                    <canvas
+                        bind:this={canvasEl}
+                        onmousedown={handleMouseDown}
+                        onmousemove={handleMouseMove}
+                        onmouseup={handleMouseUp}
+                        onmouseleave={handleMouseUp}
+                        oncontextmenu={(e) => e.preventDefault()}
+                    ></canvas>
+                </div>
+            {/if}
         </main>
 </div>
 
 <style>
+    .km-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border: 1px solid rgba(63, 63, 70, 0.4);
+        background-color: rgba(39, 39, 42, 0.5);
+        color: rgba(161, 161, 170, 1);
+        transition: all 0.15s ease;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .km-btn:hover {
+        background-color: rgba(63, 63, 70, 0.5);
+        color: rgba(228, 228, 231, 1);
+    }
+
+    .km-btn-active {
+        background-color: rgba(74, 222, 128, 0.12);
+        color: rgba(74, 222, 128, 0.9);
+        border-color: rgba(74, 222, 128, 0.25);
+    }
+
+    .km-btn-active:hover {
+        background-color: rgba(74, 222, 128, 0.2);
+        color: rgba(74, 222, 128, 1);
+    }
+
     .sim-param {
         display: flex;
         flex-direction: column;

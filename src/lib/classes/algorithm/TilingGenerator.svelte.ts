@@ -151,7 +151,7 @@ export class AlgorithmTilingGenerator {
         m: number,
         onProgress?: PhaseProgressCallback
     ): { format: string; configs: (CompactSeedConfiguration | FullSeedConfiguration)[]; vcLibrary?: string[] } => {
-        const folder = `src/lib/data/seedConfigurations/${this.paramsFolder}/k=${k}/m=${m}`;
+        const folder = `src/lib/data/${this.paramsFolder}/seedConfigurations/k=${k}/m=${m}`;
         const manifest = JSON.parse(fs.readFileSync(`${folder}/manifest.json`, 'utf8'));
         const total: number = manifest.total;
         const format: string = manifest.format || 'compact';
@@ -160,7 +160,7 @@ export class AlgorithmTilingGenerator {
         let vcLibrary: string[] | undefined;
         if (manifest.vcLibrary) {
             try {
-                const vcLibraryPath = `src/lib/data/seedConfigurations/${this.paramsFolder}/vcLibrary.json`;
+                const vcLibraryPath = `src/lib/data/${this.paramsFolder}/seedConfigurations/vcLibrary.json`;
                 vcLibrary = JSON.parse(fs.readFileSync(vcLibraryPath, 'utf8'));
             } catch {
                 vcLibrary = undefined;

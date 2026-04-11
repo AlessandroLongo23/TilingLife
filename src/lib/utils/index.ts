@@ -7,5 +7,6 @@ export * from "./optimizing";
 export * from "./sounds.svelte.js";
 export * from "./filterHelpers";
 export * from "./compactSeedName";
+export * from "./vcChiral";
 export * from "./drawVertexConfiguration";
 export * from "./markdown";

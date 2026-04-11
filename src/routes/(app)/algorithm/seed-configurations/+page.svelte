@@ -1,15 +1,20 @@
 <script lang="ts">
-    import { goto } from '$app/navigation';
+    import { goto, invalidate } from '$app/navigation';
+    import { fetchPipelineWithProgress } from '$lib/utils/fetchPipelineWithProgress';
     import { browser } from '$app/environment';
-    import { Search, Minus, Plus, Puzzle, Camera } from 'lucide-svelte';
+    import { Search, Minus, Plus, Puzzle, Camera, Grid2X2, List } from 'lucide-svelte';
     import { headerStore, openScreenshotPreview } from '$stores';
     import { map, sounds } from '$utils';
     import { drawTransformations } from '$lib/algorithm/drawTransformations';
     import { compactSeedName, compactToHtml } from '$lib/utils/compactSeedName';
+    import { categoryOptions } from '$stores';
+    import { PolygonType } from '$classes';
 
     import Checkbox from '$components/ui/Checkbox.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
     import ReloadButton from '$components/ui/ReloadButton.svelte';
+    import MultiSelect from '$components/ui/MultiSelect.svelte';
+    import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
 
     let { data } = $props();
 
@@ -23,6 +28,10 @@
 
     let showVcsCenters = $state(false);
     let showTransformations = $state(false);
+    let expandSeedsLoading = $state(false);
+    let expandSeedsError = $state<string | null>(null);
+    let viewMode = $state<'grid' | 'list'>('grid');
+    let selectedSeedNames = $state<Set<string>>(new Set());
 
     let currentPage = $state(data.page);
 
@@ -36,7 +45,8 @@
         pg: number = 1,
         grouping: string | null = null,
         search: string | null = null,
-        polygons: string | null = null
+        polygons: string | null = null,
+        filterParams?: { categories: string[]; nmaxEnabled: boolean; nmax: number; angleEnabled: boolean; angle: number }
     ): void => {
         const params = new URLSearchParams();
         if (k !== null) params.set('k', String(k));
@@ -45,8 +55,39 @@
         if (grouping) params.set('grouping', grouping);
         if (search) params.set('search', search);
         if (polygons && polygons !== 'default') params.set('polygons', polygons);
+        if (filterParams && filterParams.categories.length > 0) {
+            params.set('categories', filterParams.categories.join(','));
+            if (filterParams.nmaxEnabled) params.set('nmaxEnabled', '1');
+            params.set('nmax', String(filterParams.nmax));
+            if (filterParams.angleEnabled) params.set('angleEnabled', '1');
+            params.set('angle', String(filterParams.angle));
+        }
         goto(`/algorithm/seed-configurations?${params.toString()}`);
     }
+
+    let selectedCategories = $state<string[]>(
+        data.selectedCategories?.length ? data.selectedCategories : categoryOptions.map((c) => c.id)
+    );
+    let filterNMaxEnabled = $state(data.filterNMaxEnabled ?? false);
+    let filterNMax = $state(data.filterNMax ?? 12);
+    let filterAngleEnabled = $state(data.filterAngleEnabled ?? false);
+    let filterAngle = $state(data.filterAngle ?? 30);
+
+    $effect(() => {
+        selectedCategories = data.selectedCategories ?? categoryOptions.map((c) => c.id);
+        filterNMaxEnabled = data.filterNMaxEnabled ?? false;
+        filterNMax = data.filterNMax ?? 12;
+        filterAngleEnabled = data.filterAngleEnabled ?? false;
+        filterAngle = data.filterAngle ?? 30;
+    });
+
+    const filterParams = $derived({
+        categories: selectedCategories,
+        nmaxEnabled: filterNMaxEnabled,
+        nmax: filterNMax,
+        angleEnabled: filterAngleEnabled,
+        angle: filterAngle,
+    });
 
     function handlePageChange() {
         navigateTo(
@@ -55,7 +96,20 @@
             currentPage,
             data.selectedGrouping,
             data.selectedSearch,
-            data.selectedParamsFolder ?? null
+            data.selectedParamsFolder ?? null,
+            filterParams.categories.length > 0 ? filterParams : undefined
+        );
+    }
+
+    function handleFilterChange() {
+        navigateTo(
+            data.selectedK,
+            data.selectedM,
+            1,
+            data.selectedGrouping,
+            data.selectedSearch,
+            data.selectedParamsFolder ?? null,
+            filterParams.categories.length > 0 ? filterParams : undefined
         );
     }
 
@@ -73,7 +127,8 @@
             1,
             data.selectedGrouping,
             q || null,
-            data.selectedParamsFolder ?? null
+            data.selectedParamsFolder ?? null,
+            filterParams.categories.length > 0 ? filterParams : undefined
         );
     }
 
@@ -241,25 +296,6 @@
     <!-- Sidebar filters -->
     <aside class="w-full lg:w-72 xl:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-900/50">
         <div class="p-5 flex flex-col gap-6 lg:sticky lg:top-[65px] lg:max-h-[calc(100vh-65px)] lg:overflow-y-auto scrollbar-hide">
-            <!-- Polygon set selector (when multiple available) -->
-            {#if data.paramsFolderValues?.length > 1}
-                <div>
-                    <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Polygon set</span>
-                    <div class="flex flex-wrap gap-1.5 mt-2.5">
-                        {#each data.paramsFolderValues as pf}
-                            {@const isActive = (data.selectedParamsFolder ?? 'default') === pf}
-                            <button
-                                class="km-btn {isActive ? 'km-btn-active' : ''}"
-                                onclick={() => navigateTo(data.selectedK, data.selectedM, 1, null, null, pf === 'default' ? null : pf)}
-                                title={pf === 'default' ? 'Legacy / default polygon set' : pf}
-                            >
-                                {pf === 'default' ? 'default' : pf}
-                            </button>
-                        {/each}
-                    </div>
-                </div>
-            {/if}
-
             <!-- k selector -->
             <div>
                 <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Set size (k)</span>
@@ -280,6 +316,42 @@
             </div>
 
             <!-- m selector -->
+            <!-- Polygon composition filter (Phase 3.4) -->
+            <div class="border-t border-zinc-800 pt-5">
+                <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Filter by composition</span>
+                <div class="flex flex-col gap-3 mt-2.5">
+                    <MultiSelect
+                        label="Category"
+                        options={categoryOptions}
+                        bind:selected={selectedCategories}
+                    />
+                    {#if selectedCategories.includes('Star Regular') || selectedCategories.includes('Star Parametric') || selectedCategories.includes('Equilateral')}
+                        <AngleFilterBlock bind:enabled={filterAngleEnabled} bind:angle={filterAngle} />
+                    {/if}
+                    <div>
+                        <Checkbox id="filterNMaxEnabled" label="Max sides (n ≤)" bind:checked={filterNMaxEnabled} />
+                        {#if filterNMaxEnabled}
+                            <input
+                                type="number"
+                                min="3"
+                                max="24"
+                                class="w-20 px-2 py-1 rounded border border-zinc-600/60 bg-zinc-800 text-zinc-200 text-sm mt-2"
+                                bind:value={filterNMax}
+                                onchange={() => handleFilterChange()}
+                            />
+                        {/if}
+                    </div>
+                    {#if selectedCategories.length > 0}
+                        <button
+                            class="km-btn km-btn-active text-xs"
+                            onclick={() => handleFilterChange()}
+                        >
+                            Apply filter
+                        </button>
+                    {/if}
+                </div>
+            </div>
+
             {#if data.selectedK !== null}
                 <div class="border-t border-zinc-800 pt-5">
                     <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Unique VCs (m)</span>
@@ -288,7 +360,7 @@
                             {@const isActive = data.selectedM === m}
                             <button
                                 class="km-btn {isActive ? 'km-btn-active' : ''}"
-                                onclick={() => navigateTo(data.selectedK, m, 1, null, null, data.selectedParamsFolder ?? null)}
+                                onclick={() => navigateTo(data.selectedK, m, 1, null, null, data.selectedParamsFolder ?? null, filterParams.categories.length > 0 ? filterParams : undefined)}
                             >
                                 <span>m={m}</span>
                                 <span class="km-count">{count.toLocaleString()}</span>
@@ -325,7 +397,7 @@
                     <div class="flex flex-wrap gap-1.5 mt-2.5">
                         <button
                             class="km-btn {!data.selectedGrouping ? 'km-btn-active' : ''}"
-                            onclick={() => navigateTo(data.selectedK, data.selectedM, 1, null, null, data.selectedParamsFolder ?? null)}
+                            onclick={() => navigateTo(data.selectedK, data.selectedM, 1, null, null, data.selectedParamsFolder ?? null, filterParams.categories.length > 0 ? filterParams : undefined)}
                         >
                             All
                         </button>
@@ -333,7 +405,7 @@
                             {@const isActive = data.selectedGrouping === label}
                             <button
                                 class="km-btn {isActive ? 'km-btn-active' : ''}"
-                                onclick={() => navigateTo(data.selectedK, data.selectedM, 1, label, null, data.selectedParamsFolder ?? null)}
+                                onclick={() => navigateTo(data.selectedK, data.selectedM, 1, label, null, data.selectedParamsFolder ?? null, filterParams.categories.length > 0 ? filterParams : undefined)}
                             >
                                 <span>{label}</span>
                                 <span class="km-count">{count.toLocaleString()}</span>
@@ -436,18 +508,184 @@
             </div>
         {:else}
             <div class="p-5 flex flex-col gap-4">
-                <Pagination totalItems={data.totalItems} pageSize={data.pageSize} bind:currentPage />
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <Pagination totalItems={data.totalItems} pageSize={data.pageSize} bind:currentPage />
+                        <div class="flex gap-1 border-l border-zinc-700 pl-3">
+                            <button
+                                class="p-2 rounded-md border transition-all {viewMode === 'grid' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                                onclick={() => viewMode = 'grid'}
+                                title="Grid view"
+                            >
+                                <Grid2X2 size={16} />
+                            </button>
+                            <button
+                                class="p-2 rounded-md border transition-all {viewMode === 'list' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                                onclick={() => viewMode = 'list'}
+                                title="List view"
+                            >
+                                <List size={16} />
+                            </button>
+                        </div>
+                        {#if data.seedConfigurations.length > 0}
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-zinc-500">{selectedSeedNames.size} selected</span>
+                                <button
+                                    class="text-xs px-2 py-1 rounded border border-zinc-600/60 bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50"
+                                    onclick={() => selectedSeedNames = new Set(data.seedConfigurations.map((sc: any) => sc.name ?? '').filter(Boolean))}
+                                >
+                                    Select all
+                                </button>
+                                <button
+                                    class="text-xs px-2 py-1 rounded border border-zinc-600/60 bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50"
+                                    onclick={() => selectedSeedNames = new Set()}
+                                >
+                                    Deselect all
+                                </button>
+                            </div>
+                        {/if}
+                    </div>
+                    <div class="flex gap-2">
+                        {#if expandSeedsError}
+                            <span class="text-xs text-red-400">{expandSeedsError}</span>
+                        {/if}
+                        <button
+                            class="px-4 py-2 rounded-md font-medium text-sm bg-green-500/20 text-green-400 border border-green-500/40 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={expandSeedsLoading || !data.selectedParamsFolder || data.selectedParamsFolder === 'default'}
+                            onclick={async () => {
+                                const pf = data.selectedParamsFolder;
+                                if (!pf || pf === 'default' || data.selectedK === null || data.selectedM === null) return;
+                                expandSeedsError = null;
+                                expandSeedsLoading = true;
+                                try {
+                                    await fetchPipelineWithProgress({
+                                        url: '/api/pipeline/expand-seeds',
+                                        body: {
+                                            paramsFolder: pf,
+                                            k: data.selectedK,
+                                            m: data.selectedM,
+                                        },
+                                        title: 'Expand Seeds',
+                                        initialMessage: 'Loading seed configurations…',
+                                    });
+                                    await invalidate('app:polygons-filter');
+                                    await goto(`/algorithm/expanded-seeds?polygons=${pf}&k=${data.selectedK}&m=${data.selectedM}`);
+                                } catch (e) {
+                                    expandSeedsError = e instanceof Error ? e.message : 'Unknown error';
+                                } finally {
+                                    expandSeedsLoading = false;
+                                }
+                            }}
+                        >
+                            {expandSeedsLoading ? 'Expanding…' : 'Expand Seeds'}
+                        </button>
+                    </div>
+                </div>
 
+                {#if viewMode === 'list'}
+                    <div class="flex flex-col gap-1.5">
+                        {#each data.seedConfigurations as seedConfiguration, i}
+                            {@const globalIndex = (data.page - 1) * data.pageSize + i}
+                            <div
+                                class="sc-card sc-card-list group relative flex flex-row items-center gap-3 cursor-pointer"
+                                role="button"
+                                tabindex="0"
+                                onclick={() => {
+                                    const next = new Set(selectedSeedNames);
+                                    if (next.has(seedConfiguration.name)) next.delete(seedConfiguration.name);
+                                    else next.add(seedConfiguration.name);
+                                    selectedSeedNames = next;
+                                }}
+                                onkeydown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        const next = new Set(selectedSeedNames);
+                                        if (next.has(seedConfiguration.name)) next.delete(seedConfiguration.name);
+                                        else next.add(seedConfiguration.name);
+                                        selectedSeedNames = next;
+                                    }
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border border-zinc-600/60 bg-zinc-800/50 checked:bg-green-500/90 shrink-0"
+                                    checked={selectedSeedNames.has(seedConfiguration.name)}
+                                    onclick={(e) => e.stopPropagation()}
+                                    onchange={() => {
+                                        const next = new Set(selectedSeedNames);
+                                        if (next.has(seedConfiguration.name)) next.delete(seedConfiguration.name);
+                                        else next.add(seedConfiguration.name);
+                                        selectedSeedNames = next;
+                                    }}
+                                />
+                                <span class="sc-index w-8 text-right shrink-0">{globalIndex + 1}</span>
+                                {#if browser}
+                                    <div class="w-16 h-16 shrink-0 rounded overflow-hidden border border-zinc-700/50 bg-zinc-900">
+                                        <canvas
+                                            use:initCanvas={{ seedConfiguration, showVcsCenters, showTransformations }}
+                                            class="block w-full h-full"
+                                        ></canvas>
+                                    </div>
+                                {:else}
+                                    <div class="w-16 h-16 shrink-0 rounded bg-zinc-800 flex items-center justify-center text-zinc-600 text-xs">—</div>
+                                {/if}
+                                <span class="text-zinc-500 sc-name truncate flex-1 min-w-0" title={seedConfiguration.name}>{@html compactToHtml(compactSeedName(seedConfiguration.name))}</span>
+                                {#if browser}
+                                    <button
+                                        type="button"
+                                        class="p-1.5 rounded-md bg-zinc-800/90 border border-zinc-600/60 text-zinc-400 hover:text-white hover:bg-zinc-700/90 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                        onclick={(e) => { e.stopPropagation(); handleCardScreenshot(e, `seed-k${data.selectedK}-m${data.selectedM}-${globalIndex + 1}.png`); }}
+                                        title="Screenshot"
+                                        aria-label="Take screenshot"
+                                    >
+                                        <Camera size={14} />
+                                    </button>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                {:else}
                 <div
                     class="grid gap-3"
                     style="grid-template-columns: repeat({columnsPerRow}, minmax(0, 1fr));"
                 >
                     {#each data.seedConfigurations as seedConfiguration, i}
                         {@const globalIndex = (data.page - 1) * data.pageSize + i}
-                        <div class="sc-card group relative">
-                            <div class="sc-card-header" title={seedConfiguration.name}>
+                        <div
+                            class="sc-card group relative cursor-pointer"
+                            role="button"
+                            tabindex="0"
+                            onclick={() => {
+                                const next = new Set(selectedSeedNames);
+                                if (next.has(seedConfiguration.name)) next.delete(seedConfiguration.name);
+                                else next.add(seedConfiguration.name);
+                                selectedSeedNames = next;
+                            }}
+                            onkeydown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    const next = new Set(selectedSeedNames);
+                                    if (next.has(seedConfiguration.name)) next.delete(seedConfiguration.name);
+                                    else next.add(seedConfiguration.name);
+                                    selectedSeedNames = next;
+                                }
+                            }}
+                        >
+                            <div class="sc-card-header flex items-center gap-3" title={seedConfiguration.name}>
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border border-zinc-600/60 bg-zinc-800/50 checked:bg-green-500/90 shrink-0"
+                                    checked={selectedSeedNames.has(seedConfiguration.name)}
+                                    onclick={(e) => e.stopPropagation()}
+                                    onchange={() => {
+                                        const next = new Set(selectedSeedNames);
+                                        if (next.has(seedConfiguration.name)) next.delete(seedConfiguration.name);
+                                        else next.add(seedConfiguration.name);
+                                        selectedSeedNames = next;
+                                    }}
+                                />
                                 <span class="sc-index">{globalIndex + 1}</span>
-                                <span class="text-zinc-500 sc-name">{@html compactToHtml(compactSeedName(seedConfiguration.name))}</span>
+                                <span class="text-zinc-500 sc-name truncate flex-1 min-w-0">{@html compactToHtml(compactSeedName(seedConfiguration.name))}</span>
                             </div>
                             {#if browser}
                                 <canvas
@@ -473,6 +711,7 @@
                         </div>
                     {/each}
                 </div>
+                {/if}
 
                 <Pagination totalItems={data.totalItems} pageSize={data.pageSize} bind:currentPage />
             </div>
@@ -555,6 +794,14 @@
 
     .sc-card:hover {
         border-color: rgba(113, 113, 122, 0.4);
+    }
+
+    .sc-card-list {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .sc-card-list .sc-index {
+        min-width: 2rem;
     }
 
     .sc-card-header {

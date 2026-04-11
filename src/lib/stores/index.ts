@@ -8,4 +8,5 @@ export * from "./audio";
 export * from "./vertexTypes";
 export * from "./gameOfLifeRules";
 export * from "./tilingStore.svelte";
-export * from "./algorithm.svelte"
+export * from "./algorithm.svelte";
+export * from "./pipelineProgress.svelte";

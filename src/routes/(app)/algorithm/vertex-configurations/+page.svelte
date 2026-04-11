@@ -1,11 +1,13 @@
-<script>
+<script lang="ts">
+    import { goto, invalidate } from '$app/navigation';
+    import { fetchPipelineWithProgress } from '$lib/utils/fetchPipelineWithProgress';
     import { VertexConfiguration } from '$classes/algorithm';
     import { browser } from '$app/environment';
-    import { regularStarRegex, parametricStarRegex, regularPolygonRegex, equilateralPolygonRegex, PolygonType, genericPolygonRegex } from '$classes';
-    import { Search, Minus, Plus, Camera } from 'lucide-svelte';
+    import { PolygonType } from '$classes';
+    import { Search, Minus, Plus, Camera, Grid2X2, List } from 'lucide-svelte';
     import { headerStore, openScreenshotPreview } from '$stores';
     import { sounds } from '$utils';
-    import { isValidMultiple } from '$utils/filterHelpers';
+    import { vcPassesPolygonFilter } from '$utils/filterHelpers';
     import { categoryOptions } from '$stores';
 
     import MultiSelect from '$components/ui/MultiSelect.svelte';
@@ -15,8 +17,14 @@
     import Pagination from '$components/ui/Pagination.svelte';
     import Checkbox from '$components/ui/Checkbox.svelte';
     import ReloadButton from '$components/ui/ReloadButton.svelte';
+    import VCListItem from '$components/VCListItem.svelte';
 
     const { data } = $props();
+
+    let viewMode = $state<'grid' | 'list'>('grid');
+    let selectedVCNames = $state<Set<string>>(new Set());
+    let generateSeedConfigsLoading = $state(false);
+    let generateSeedConfigsError = $state<string | null>(null);
 
     const allVCNames = data.allVCNames ?? [];
 
@@ -33,7 +41,7 @@
     let filterAngleEnabled = $state(false);
     let filterAngle = $state(30);
     let filterVertexCountEnabled = $state(false);
-    let filterVertexCountRange = $state([3, 12]);
+    let filterVertexCountRange = $state<[number, number]>([3, 12]);
 
     const vertexCountBounds = $derived.by(() => {
         if (allVCNames.length === 0) return { min: 3, max: 12 };
@@ -43,7 +51,15 @@
 
     const vcCache = new Map();
 
+    let filterNMaxEnabled = $state(false);
+    let filterNMax = $state(12);
+
     let filteredNames = $derived.by(() => {
+        const polygonFilter = {
+            categories: selectedCategories,
+            n_max: filterNMaxEnabled ? filterNMax : undefined,
+            angle: filterAngleEnabled ? filterAngle : undefined,
+        };
         return allVCNames.filter(name => {
             if (activeSearch && !name.toLowerCase().includes(activeSearch)) return false;
             const vertexCount = name.split(',').length;
@@ -51,48 +67,7 @@
                 const [minV, maxV] = filterVertexCountRange;
                 if (vertexCount < minV || vertexCount > maxV) return false;
             }
-            const parts = name.split(',');
-
-            for (const p of parts) {
-                if (p.match(regularPolygonRegex) && selectedCategories.includes(PolygonType.REGULAR)) {
-                    return true;
-                }
-                
-                if (p.match(regularStarRegex) && selectedCategories.includes(PolygonType.STAR_REGULAR)) {
-                    const regularStarMatch = p.match(regularStarRegex);
-                    const n = parseInt(regularStarMatch[1]);
-                    const d = parseInt(regularStarMatch[2]);
-                    const a = 180 * (1 - 2 * d / n);
-                    const b = 180 * (1 + 2 * (d - 1) / n);
-                    if (!filterAngleEnabled || (isValidMultiple(a, filterAngle) && isValidMultiple(b, filterAngle))) 
-                        return true;
-                } 
-            
-                if (p.match(parametricStarRegex) && selectedCategories.includes(PolygonType.STAR_PARAMETRIC)) {
-                    const parametricStarMatch = p.match(parametricStarRegex);
-                    const n = parseInt(parametricStarMatch[1]);
-                    const alpha = parseInt(parametricStarMatch[2]);
-                    const b = 360 * (1 - 1 / n) - alpha;
-                    if (!filterAngleEnabled || (isValidMultiple(alpha, filterAngle) && isValidMultiple(b, filterAngle))) 
-                        return true;
-                } 
-                
-                if (p.match(equilateralPolygonRegex) && selectedCategories.includes(PolygonType.EQUILATERAL)) {
-                    const equilateralPolygonMatch = p.match(equilateralPolygonRegex);
-                    const angles = equilateralPolygonMatch[2].split(';').map(a => parseInt(a));
-                    if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
-                        return true;
-                }
-
-                if (p.match(genericPolygonRegex) && selectedCategories.includes(PolygonType.GENERIC)) {
-                    const genericPolygonMatch = p.match(genericPolygonRegex);
-                    const sides = genericPolygonMatch[2].split(';').map(s => parseFloat(s));
-                    const angles = genericPolygonMatch[3].split(';').map(a => parseInt(a));
-                    if (!filterAngleEnabled || angles.every(a => isValidMultiple(a, filterAngle))) 
-                        return true;
-                }
-            }
-            return false;
+            return vcPassesPolygonFilter(name, polygonFilter);
         });
     });
 
@@ -106,6 +81,8 @@
     });
 
     let paginatedNames = $derived(filteredNames.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
+
+    const paramsFolder = data.selectedParamsFolder ?? 'default';
 
     let displayedVCs = $derived.by(() => {
         if (!browser) return [];
@@ -245,6 +222,26 @@
                 </div>
             {/if}
 
+            <!-- Max sides (n) filter -->
+            <div class="border-t border-zinc-800 pt-5">
+                <div class="flex flex-col gap-2">
+                    <Checkbox
+                        id="filterNMaxEnabled"
+                        label="Max sides (n ≤)"
+                        bind:checked={filterNMaxEnabled}
+                    />
+                    {#if filterNMaxEnabled}
+                        <input
+                            type="number"
+                            min="3"
+                            max="24"
+                            class="w-20 px-2 py-1 rounded border border-zinc-600/60 bg-zinc-800 text-zinc-200 text-sm"
+                            bind:value={filterNMax}
+                        />
+                    {/if}
+                </div>
+            </div>
+
             <!-- Vertex count filter -->
             <div class="border-t border-zinc-800 pt-5">
                 <div class="flex flex-col gap-2">
@@ -336,16 +333,139 @@
             </div>
         {:else}
             <div class="p-5 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">View</span>
+                        <div class="flex gap-1">
+                            <button
+                                class="p-2 rounded-md border transition-all {viewMode === 'grid' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                                onclick={() => viewMode = 'grid'}
+                                title="Grid view"
+                            >
+                                <Grid2X2 size={16} />
+                            </button>
+                            <button
+                                class="p-2 rounded-md border transition-all {viewMode === 'list' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                                onclick={() => viewMode = 'list'}
+                                title="List view"
+                            >
+                                <List size={16} />
+                            </button>
+                        </div>
+                        <span class="text-xs text-zinc-500">
+                            {selectedVCNames.size} of {filteredNames.length} selected
+                        </span>
+                        <button
+                            class="km-btn text-xs"
+                            onclick={() => selectedVCNames = new Set(filteredNames)}
+                        >
+                            Select all
+                        </button>
+                        <button
+                            class="km-btn text-xs"
+                            onclick={() => selectedVCNames = new Set()}
+                        >
+                            Deselect all
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
+                        {#if generateSeedConfigsError}
+                            <span class="text-xs text-red-400">{generateSeedConfigsError}</span>
+                        {/if}
+                        <button
+                            class="px-4 py-2 rounded-md font-medium text-sm bg-green-500/20 text-green-400 border border-green-500/40 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={selectedVCNames.size === 0 || generateSeedConfigsLoading || paramsFolder === 'default'}
+                            onclick={async () => {
+                                if (paramsFolder === 'default' || selectedVCNames.size === 0) return;
+                                generateSeedConfigsError = null;
+                                generateSeedConfigsLoading = true;
+                                try {
+                                    await fetchPipelineWithProgress({
+                                        url: '/api/pipeline/generate-seed-configurations',
+                                        body: {
+                                            paramsFolder,
+                                            vcNames: [...selectedVCNames],
+                                        },
+                                        title: 'Generate Seed Configurations',
+                                        initialMessage: 'Computing compatibility graph…',
+                                    });
+                                    await invalidate('app:polygons-filter');
+                                    await goto('/algorithm/seed-configurations?polygons=' + paramsFolder);
+                                } catch (e) {
+                                    generateSeedConfigsError = e instanceof Error ? e.message : 'Unknown error';
+                                } finally {
+                                    generateSeedConfigsLoading = false;
+                                }
+                            }}
+                        >
+                            {generateSeedConfigsLoading ? 'Generating…' : 'Generate Seed Configurations'}
+                        </button>
+                    </div>
+                </div>
+
                 <Pagination totalItems={filteredNames.length} pageSize={PAGE_SIZE} bind:currentPage />
 
+                {#if viewMode === 'list'}
+                <div class="flex flex-col gap-1.5">
+                    {#each displayedVCs as { name, vc }, i (name + i)}
+                        {@const globalIndex = (currentPage - 1) * PAGE_SIZE + i}
+                        {@const vertexCount = name.split(',').length}
+                        <VCListItem
+                            id={globalIndex + 1}
+                            name={name}
+                            vc={vc}
+                            vertexCount={vertexCount}
+                            showCheckbox={true}
+                            checked={selectedVCNames.has(name)}
+                            onToggle={() => {
+                                const next = new Set(selectedVCNames);
+                                if (next.has(name)) next.delete(name);
+                                else next.add(name);
+                                selectedVCNames = next;
+                            }}
+                        />
+                    {/each}
+                </div>
+                {:else}
                 <div
                     class="grid gap-3"
                     style="grid-template-columns: repeat({columnsPerRow}, minmax(0, 1fr));"
                 >
                     {#each displayedVCs as { name, vc }, i (name + i)}
                         {@const globalIndex = (currentPage - 1) * PAGE_SIZE + i}
-                        <div class="vc-card group relative">
-                            <div class="vc-card-header">
+                        <div
+                            class="vc-card group relative cursor-pointer"
+                            role="button"
+                            tabindex="0"
+                            onclick={() => {
+                                const next = new Set(selectedVCNames);
+                                if (next.has(name)) next.delete(name);
+                                else next.add(name);
+                                selectedVCNames = next;
+                            }}
+                            onkeydown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    const next = new Set(selectedVCNames);
+                                    if (next.has(name)) next.delete(name);
+                                    else next.add(name);
+                                    selectedVCNames = next;
+                                }
+                            }}
+                        >
+                            <div class="vc-card-header flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border border-zinc-600/60 bg-zinc-800/50 checked:bg-green-500/90 shrink-0"
+                                    checked={selectedVCNames.has(name)}
+                                    onclick={(e) => e.stopPropagation()}
+                                    onchange={() => {
+                                        const next = new Set(selectedVCNames);
+                                        if (next.has(name)) next.delete(name);
+                                        else next.add(name);
+                                        selectedVCNames = next;
+                                    }}
+                                />
                                 <span class="vc-index">{globalIndex + 1}</span>
                                 <span class="truncate" title={name}>{name}</span>
                             </div>
@@ -375,6 +495,7 @@
                         </div>
                     {/each}
                 </div>
+                {/if}
 
                 <Pagination totalItems={filteredNames.length} pageSize={PAGE_SIZE} bind:currentPage />
             </div>
@@ -383,6 +504,26 @@
 </div>
 
 <style>
+    .km-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border: 1px solid rgba(63, 63, 70, 0.4);
+        background-color: rgba(39, 39, 42, 0.5);
+        color: rgba(161, 161, 170, 1);
+        transition: all 0.15s ease;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .km-btn:hover {
+        background-color: rgba(63, 63, 70, 0.5);
+        color: rgba(228, 228, 231, 1);
+    }
+
     .vc-card {
         display: flex;
         flex-direction: column;

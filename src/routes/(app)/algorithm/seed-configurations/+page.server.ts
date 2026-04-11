@@ -1,88 +1,59 @@
 import { SeedConfiguration } from '$classes';
 import { BATCH_SIZE } from '$stores';
 import { seedMatchesSearch } from '$lib/utils/compactSeedName';
-import { deduplicateEncodedPolygons } from '$utils';
+import { seedPassesPolygonFilter } from '$lib/utils/filterHelpers';
+import type { PolygonCompositionFilter } from '$lib/utils/filterHelpers';
+import { deduplicateEncodedPolygons, getEffectiveGrouping } from '$utils';
+import {
+	getSeedConfigurationsManifestUrl,
+	getSeedConfigurationsVcLibraryUrl,
+	getSeedConfigurationsBatchUrl,
+} from '$lib/services/pipelineStorage';
+import { fetchPipelineJson } from '$lib/services/pipelineFetch';
 
 const PAGE_SIZE = 24;
 
-const seedConfigModules: Record<string, () => Promise<{ default: unknown }>> = {
-	...import.meta.glob<{ default: unknown }>('$lib/data/seedConfigurations/**/*.json'),
-	...import.meta.glob<{ default: unknown }>('$lib/data/seedConfigurations/**/*.json.gz'),
-};
-
-/** Computes grouping label from seed name: e.g. AAABC → "3:1:1", AABBC → "2:2:1". */
+/** Computes grouping label from seed name (chiral-aware): e.g. AAABC → "3:1:1", AABBC → "2:2:1". */
 function getGroupingLabel(name: string): string {
 	const inner = name.slice(1, -1);
 	if (!inner) return '';
 	const vcNames = inner.split(';');
-	const counts = new Map<string, number>();
-	for (const vc of vcNames) {
-		counts.set(vc, (counts.get(vc) ?? 0) + 1);
-	}
-	return [...counts.values()].sort((a, b) => b - a).join(':');
-}
-
-/** Find module path. Handles both legacy and new layouts. Prefers .json.gz over .json for batch files. */
-function getModulePath(k: number, m: number, file: string, paramsFolder: string | null): string | null {
-	const baseSuffix = paramsFolder
-		? `seedConfigurations/${paramsFolder}/k=${k}/m=${m}/${file}`
-		: `seedConfigurations/k=${k}/m=${m}/${file}`;
-	const keys = Object.keys(seedConfigModules);
-	const normalizedKeys = keys.map((k) => ({ orig: k, norm: k.replace(/\\/g, '/') }));
-	// Prefer .json.gz for batch files (seedConfigurations_*.json, tilings_*.json)
-	if (file.includes('_') && file.endsWith('.json') && !file.endsWith('.json.gz')) {
-		const gzSuffix = baseSuffix + '.gz';
-		const gzMatch = normalizedKeys.find(({ norm }) => norm.endsWith(gzSuffix));
-		if (gzMatch) return gzMatch.orig;
-	}
-	const match = normalizedKeys.find(({ norm }) => norm.endsWith(baseSuffix));
-	return match?.orig ?? null;
+	return getEffectiveGrouping(vcNames);
 }
 
 async function loadManifest(
 	k: number,
 	m: number,
-	paramsFolder: string | null
+	paramsFolder: string
 ): Promise<{ total: number; format: string; batchSize: number; vcLibrary?: string[] } | null> {
-	const path = getModulePath(k, m, 'manifest.json', paramsFolder);
-	if (!path) return null;
-	const mod = await seedConfigModules[path]();
-	const manifest = mod.default as { total: number; format: string; batchSize: number; vcLibrary?: boolean };
+	const manifest = await fetchPipelineJson(
+		getSeedConfigurationsManifestUrl(paramsFolder, k, m)
+	) as { total: number; format: string; batchSize: number; vcLibrary?: boolean } | null;
+	if (!manifest) return null;
+
 	const result: { total: number; format: string; batchSize: number; vcLibrary?: string[] } = {
 		total: manifest.total,
 		format: manifest.format ?? 'compact',
 		batchSize: manifest.batchSize ?? 1000,
 	};
-	if (manifest.vcLibrary && paramsFolder) {
-		const vcLibPath = getVcLibraryPath(paramsFolder);
-		if (vcLibPath) {
-			const vcMod = await seedConfigModules[vcLibPath]();
-			result.vcLibrary = vcMod.default as string[];
-		}
+	if (manifest.vcLibrary) {
+		const vcLibrary = await fetchPipelineJson(
+			getSeedConfigurationsVcLibraryUrl(paramsFolder)
+		) as string[] | null;
+		result.vcLibrary = Array.isArray(vcLibrary) ? vcLibrary : undefined;
 	}
 	return result;
-}
-
-function getVcLibraryPath(paramsFolder: string): string | null {
-	const suffix = `seedConfigurations/${paramsFolder}/vcLibrary.json`;
-	const key = Object.keys(seedConfigModules).find((k) => {
-		const normalized = k.replace(/\\/g, '/');
-		return normalized.endsWith(suffix);
-	});
-	return key ?? null;
 }
 
 async function loadBatch(
 	k: number,
 	m: number,
 	batchIndex: number,
-	paramsFolder: string | null
+	paramsFolder: string
 ): Promise<any[]> {
-	const file = `seedConfigurations_${String(batchIndex).padStart(4, '0')}.json`;
-	const path = getModulePath(k, m, file, paramsFolder);
-	if (!path) return [];
-	const mod = await seedConfigModules[path]();
-	const data = mod.default;
+	const data = await fetchPipelineJson(
+		getSeedConfigurationsBatchUrl(paramsFolder, k, m, batchIndex)
+	);
 	return Array.isArray(data) ? data : [];
 }
 
@@ -116,51 +87,38 @@ function sortGroupings(byLabel: Map<string, number>): { label: string; count: nu
 		.map(([label, count]) => ({ label, count }));
 }
 
-/** Load raw batches and compute groupings only (no decode/encode). Much faster than loadAllData. */
 async function loadGroupingsOnly(
 	k: number,
 	m: number,
-	paramsFolder: string | null
+	paramsFolder: string
 ): Promise<{ groupings: { label: string; count: number }[] }> {
 	const manifest = await loadManifest(k, m, paramsFolder);
-	if (manifest) {
-		const { total, format, vcLibrary } = manifest;
-		const numBatches = Math.ceil(total / BATCH_SIZE);
-		const byLabel = new Map<string, number>();
-		for (let i = 0; i < numBatches; i++) {
-			const batch = await loadBatch(k, m, i, paramsFolder);
-			for (const item of batch) {
-				const name = getNameFromRaw(item, format, vcLibrary);
-				if (name) {
-					const label = getGroupingLabel(name);
-					byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
-				}
-			}
-		}
-		return { groupings: sortGroupings(byLabel) };
-	}
-	const legacy = await loadLegacy(k, m, paramsFolder);
-	if (!legacy) return { groupings: [] };
+	if (!manifest) return { groupings: [] };
+	const { total, format, vcLibrary } = manifest;
+	const numBatches = Math.ceil(total / BATCH_SIZE);
 	const byLabel = new Map<string, number>();
-	for (const item of legacy) {
-		const name = getNameFromRaw(item, 'full');
-		if (name) {
-			const label = getGroupingLabel(name);
-			byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+	for (let i = 0; i < numBatches; i++) {
+		const batch = await loadBatch(k, m, i, paramsFolder);
+		for (const item of batch) {
+			const name = getNameFromRaw(item, format, vcLibrary);
+			if (name) {
+				const label = getGroupingLabel(name);
+				byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+			}
 		}
 	}
 	return { groupings: sortGroupings(byLabel) };
 }
 
-/** Load raw batches once, return groupings and filtered count. */
 async function loadGroupingsAndFilteredCount(
 	k: number,
 	m: number,
-	paramsFolder: string | null,
+	paramsFolder: string,
 	format: string,
 	grouping: string | null,
 	search: string | null,
-	total: number
+	total: number,
+	polygonFilter: PolygonCompositionFilter | null
 ): Promise<{ groupings: { label: string; count: number }[]; filteredTotal: number }> {
 	const manifest = await loadManifest(k, m, paramsFolder);
 	if (!manifest) return { groupings: [], filteredTotal: 0 };
@@ -173,6 +131,7 @@ async function loadGroupingsAndFilteredCount(
 		for (const item of batch) {
 			const name = getNameFromRaw(item, format, vcLibrary);
 			if (!name) continue;
+			if (polygonFilter && !seedPassesPolygonFilter(name, polygonFilter)) continue;
 			const label = getGroupingLabel(name);
 			byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
 			if (grouping && label !== grouping) continue;
@@ -180,55 +139,32 @@ async function loadGroupingsAndFilteredCount(
 			filteredTotal++;
 		}
 	}
-	return { groupings: sortGroupings(byLabel), filteredTotal: grouping || search ? filteredTotal : total };
-}
-
-async function loadLegacy(
-	k: number,
-	m: number,
-	paramsFolder: string | null
-): Promise<any[] | null> {
-	const path = getModulePath(k, m, 'seedConfigurations.json', paramsFolder);
-	if (!path) return null;
-	const mod = await seedConfigModules[path]();
-	const data = mod.default;
-	return Array.isArray(data) ? data : null;
+	return { groupings: sortGroupings(byLabel), filteredTotal: grouping || search || polygonFilter ? filteredTotal : total };
 }
 
 async function loadAllData(
 	k: number,
 	m: number,
-	paramsFolder: string | null
+	paramsFolder: string
 ): Promise<{ data: any[]; format: string } | null> {
 	const manifest = await loadManifest(k, m, paramsFolder);
-	if (manifest) {
-		const { total, format, vcLibrary } = manifest;
-		const allData: any[] = [];
-		const numBatches = Math.ceil(total / BATCH_SIZE);
-		for (let i = 0; i < numBatches; i++) {
-			allData.push(...(await loadBatch(k, m, i, paramsFolder)));
-		}
-		return {
-			data: allData.map((item: any) => {
-				const seed = format === 'compact'
-					? SeedConfiguration.decodeCompact(item, vcLibrary)
-					: SeedConfiguration.decodeFull(item);
-				const encoded = seed.encode();
-				encoded.polygons = deduplicateEncodedPolygons(encoded.polygons);
-				return encoded;
-			}),
-			format,
-		};
+	if (!manifest) return null;
+	const { total, format, vcLibrary } = manifest;
+	const allData: any[] = [];
+	const numBatches = Math.ceil(total / BATCH_SIZE);
+	for (let i = 0; i < numBatches; i++) {
+		allData.push(...(await loadBatch(k, m, i, paramsFolder)));
 	}
-	const legacyData = await loadLegacy(k, m, paramsFolder);
-	if (!legacyData) return null;
 	return {
-		data: legacyData.map((item: any) => {
-			const encoded = SeedConfiguration.decodeFull(item).encode();
+		data: allData.map((item: any) => {
+			const seed = format === 'compact'
+				? SeedConfiguration.decodeCompact(item, vcLibrary)
+				: SeedConfiguration.decodeFull(item);
+			const encoded = seed.encode();
 			encoded.polygons = deduplicateEncodedPolygons(encoded.polygons);
 			return encoded;
 		}),
-		format: 'full',
+		format,
 	};
 }
 
@@ -238,216 +174,120 @@ async function loadPageData(
 	page: number,
 	grouping: string | null,
 	search: string | null,
-	paramsFolder: string | null
+	paramsFolder: string,
+	polygonFilter: PolygonCompositionFilter | null
 ): Promise<{ data: any[]; total: number; groupings: { label: string; count: number }[] }> {
 	const manifest = await loadManifest(k, m, paramsFolder);
-	if (manifest) {
-		const { total, format } = manifest;
-		const start = (page - 1) * PAGE_SIZE;
-		const end = Math.min(start + PAGE_SIZE, total);
-		if (start >= total) {
-			const { groupings: g, filteredTotal } = await loadGroupingsAndFilteredCount(
-				k,
-				m,
-				paramsFolder,
-				format,
-				grouping,
-				search,
-				total
-			);
-			return { data: [], total: filteredTotal, groupings: g };
-		}
-
-		let data: any[];
-		let filteredTotal: number;
-
-		let groupings: { label: string; count: number }[] = [];
-
-		if (grouping || search) {
-			const all = await loadAllData(k, m, paramsFolder);
-			if (!all) return { data: [], total: 0, groupings: [] };
-			let filtered = all.data;
-			if (grouping) {
-				filtered = filtered.filter((sc: any) => getGroupingLabel(sc.name) === grouping);
-			}
-			if (search) {
-				filtered = filtered.filter((sc: any) => seedMatchesSearch(sc.name, search));
-			}
-			filteredTotal = filtered.length;
-			data = filtered.slice(start, start + PAGE_SIZE);
-			// Build groupings from full data
-			const byLabel = new Map<string, number>();
-			for (const sc of all.data) {
-				const label = getGroupingLabel(sc.name);
-				byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
-			}
-			groupings = [...byLabel.entries()]
-				.sort((a, b) => {
-					const na = a[0].split(':').map(Number);
-					const nb = b[0].split(':').map(Number);
-					for (let i = 0; i < Math.max(na.length, nb.length); i++) {
-						const va = na[i] ?? 0;
-						const vb = nb[i] ?? 0;
-						if (va !== vb) return vb - va;
-					}
-					return 0;
-				})
-				.map(([label, count]) => ({ label, count }));
-		} else {
-			const batchStart = Math.floor(start / BATCH_SIZE);
-			const batchEnd = Math.floor((end - 1) / BATCH_SIZE);
-			const batchData: any[] = [];
-			for (let i = batchStart; i <= batchEnd; i++) {
-				batchData.push(...(await loadBatch(k, m, i, paramsFolder)));
-			}
-			const pageData = batchData.slice(
-				start - batchStart * BATCH_SIZE,
-				end - batchStart * BATCH_SIZE
-			);
-			data = pageData.map((item: any) => {
-				const seed = format === 'compact'
-					? SeedConfiguration.decodeCompact(item, manifest.vcLibrary)
-					: SeedConfiguration.decodeFull(item);
-				const encoded = seed.encode();
-				encoded.polygons = deduplicateEncodedPolygons(encoded.polygons);
-				return encoded;
-			});
-			filteredTotal = total;
-			const { groupings: g } = await loadGroupingsOnly(k, m, paramsFolder);
-			groupings = g;
-		}
-
-		return { data, total: filteredTotal, groupings };
-	}
-
-	const legacyData = await loadLegacy(k, m, paramsFolder);
-	if (!legacyData) return { data: [], total: 0, groupings: [] };
-	let data = legacyData;
-	if (grouping) {
-		data = data.filter((sc: any) => getGroupingLabel(sc.name) === grouping);
-	}
-	if (search) {
-		data = data.filter((sc: any) => seedMatchesSearch(sc.name, search));
-	}
-	const total = data.length;
+	if (!manifest) return { data: [], total: 0, groupings: [] };
+	const { total, format } = manifest;
 	const start = (page - 1) * PAGE_SIZE;
-	const paginated = data.slice(start, start + PAGE_SIZE);
-
-	const byLabel = new Map<string, number>();
-	for (const sc of legacyData) {
-		const label = getGroupingLabel(sc.name);
-		byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+	const end = Math.min(start + PAGE_SIZE, total);
+	if (start >= total) {
+		const { groupings: g, filteredTotal } = await loadGroupingsAndFilteredCount(
+			k,
+			m,
+			paramsFolder,
+			format,
+			grouping,
+			search,
+			total,
+			polygonFilter
+		);
+		return { data: [], total: filteredTotal, groupings: g };
 	}
-	const groupings = [...byLabel.entries()]
-		.sort((a, b) => {
-			const na = a[0].split(':').map(Number);
-			const nb = b[0].split(':').map(Number);
-			for (let i = 0; i < Math.max(na.length, nb.length); i++) {
-				const va = na[i] ?? 0;
-				const vb = nb[i] ?? 0;
-				if (va !== vb) return vb - va;
-			}
-			return 0;
-		})
-		.map(([label, count]) => ({ label, count }));
 
-	return { data: paginated, total, groupings };
+	let data: any[];
+	let filteredTotal: number;
+	let groupings: { label: string; count: number }[] = [];
+
+	if (grouping || search || polygonFilter) {
+		const all = await loadAllData(k, m, paramsFolder);
+		if (!all) return { data: [], total: 0, groupings: [] };
+		let filtered = all.data;
+		if (polygonFilter) filtered = filtered.filter((sc: any) => seedPassesPolygonFilter(sc.name, polygonFilter));
+		if (grouping) filtered = filtered.filter((sc: any) => getGroupingLabel(sc.name) === grouping);
+		if (search) filtered = filtered.filter((sc: any) => seedMatchesSearch(sc.name, search));
+		filteredTotal = filtered.length;
+		data = filtered.slice(start, start + PAGE_SIZE);
+		const byLabel = new Map<string, number>();
+		for (const sc of filtered) {
+			const label = getGroupingLabel(sc.name);
+			byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+		}
+		groupings = sortGroupings(byLabel);
+	} else {
+		const batchStart = Math.floor(start / BATCH_SIZE);
+		const batchEnd = Math.floor((end - 1) / BATCH_SIZE);
+		const batchData: any[] = [];
+		for (let i = batchStart; i <= batchEnd; i++) {
+			batchData.push(...(await loadBatch(k, m, i, paramsFolder)));
+		}
+		const pageData = batchData.slice(
+			start - batchStart * BATCH_SIZE,
+			end - batchStart * BATCH_SIZE
+		);
+		data = pageData.map((item: any) => {
+			const seed = format === 'compact'
+				? SeedConfiguration.decodeCompact(item, manifest.vcLibrary)
+				: SeedConfiguration.decodeFull(item);
+			const encoded = seed.encode();
+			encoded.polygons = deduplicateEncodedPolygons(encoded.polygons);
+			return encoded;
+		});
+		filteredTotal = total;
+		const { groupings: g } = await loadGroupingsOnly(k, m, paramsFolder);
+		groupings = g;
+	}
+
+	return { data, total: filteredTotal, groupings };
 }
 
-type DiscoveredEntry = { paramsFolder: string | null; k: number; m: number; count: number };
+type DiscoveredEntry = { paramsFolder: string; k: number; m: number; count: number };
 
-function discoverAvailable(): DiscoveredEntry[] {
+export async function load({ url, fetch }) {
+	let supabaseFolders: string[] = [];
+	try {
+		const res = await fetch(`${url.origin}/api/pipeline/list-folders`);
+		const json = await res.json();
+		supabaseFolders = json.folders ?? [];
+	} catch {
+		// Ignore
+	}
+
 	const available: DiscoveredEntry[] = [];
-	// New format: seedConfigurations/reg_12/k=5/m=3/manifest.json
-	const newManifestRegex = /seedConfigurations\/([^/]+)\/k=(\d+)\/m=(\d+)\/manifest\.json$/;
-	const newLegacyRegex = /seedConfigurations\/([^/]+)\/k=(\d+)\/m=(\d+)\/seedConfigurations\.json$/;
-	// Legacy format (no paramsFolder): seedConfigurations/k=5/m=3/manifest.json
-	const legacyManifestRegex = /seedConfigurations\/k=(\d+)\/m=(\d+)\/manifest\.json$/;
-	const legacyLegacyRegex = /seedConfigurations\/k=(\d+)\/m=(\d+)\/seedConfigurations\.json$/;
-
-	for (const key of Object.keys(seedConfigModules)) {
-		const normalized = key.replace(/\\/g, '/');
-		// New format: has paramsFolder (must not match k=\d+ to avoid legacy collision)
-		let match = normalized.match(newManifestRegex);
-		if (match) {
-			const paramsFolder = match[1];
-			const k = parseInt(match[2]);
-			const m = parseInt(match[3]);
-			// Skip if paramsFolder looks like "k=5" (legacy path misclassified)
-			if (!paramsFolder.startsWith('k=')) {
-				available.push({ paramsFolder, k, m, count: 0 });
-				continue;
+	for (const folder of supabaseFolders) {
+		try {
+			const res = await fetch(`${url.origin}/api/pipeline/structure?folder=${encodeURIComponent(folder)}`);
+			const structure = await res.json();
+			const entries = structure.seedConfigurations ?? [];
+			for (const e of entries) {
+				available.push({
+					paramsFolder: folder,
+					k: e.k,
+					m: e.m,
+					count: e.total ?? 0,
+				});
 			}
-		}
-		match = normalized.match(newLegacyRegex);
-		if (match) {
-			const paramsFolder = match[1];
-			const k = parseInt(match[2]);
-			const m = parseInt(match[3]);
-			if (!paramsFolder.startsWith('k=')) {
-				available.push({ paramsFolder, k, m, count: 0 });
-				continue;
-			}
-		}
-		// Legacy format
-		match = normalized.match(legacyManifestRegex);
-		if (match) {
-			const k = parseInt(match[1]);
-			const m = parseInt(match[2]);
-			available.push({ paramsFolder: null, k, m, count: 0 });
-			continue;
-		}
-		match = normalized.match(legacyLegacyRegex);
-		if (match) {
-			const k = parseInt(match[1]);
-			const m = parseInt(match[2]);
-			available.push({ paramsFolder: null, k, m, count: 0 });
+		} catch {
+			// Skip folder
 		}
 	}
 
-	// Dedupe by paramsFolder+k+m
-	return [...new Map(available.map((a) => [`${a.paramsFolder ?? 'legacy'}-${a.k}-${a.m}`, a])).values()];
-}
+	available.sort((a, b) => a.paramsFolder.localeCompare(b.paramsFolder) || a.k - b.k || a.m - b.m);
 
-export async function load({ url }) {
-	const discovered = discoverAvailable();
-
-	// Get counts for each - load manifest or legacy
-	const available: DiscoveredEntry[] = [];
-	for (const { paramsFolder, k, m } of discovered) {
-		const manifest = await loadManifest(k, m, paramsFolder);
-		if (manifest) {
-			available.push({ paramsFolder, k, m, count: manifest.total });
-		} else {
-			const legacy = await loadLegacy(k, m, paramsFolder);
-			available.push({ paramsFolder, k, m, count: legacy?.length ?? 0 });
-		}
-	}
-
-	available.sort((a, b) => (a.paramsFolder ?? '').localeCompare(b.paramsFolder ?? '') || a.k - b.k || a.m - b.m);
-
-	const paramsFolderValues = [...new Set(available.map((a) => a.paramsFolder ?? 'default'))].sort((a, b) => {
-		// Put 'default' (legacy) first for backward compatibility
-		if (a === 'default') return -1;
-		if (b === 'default') return 1;
-		return a.localeCompare(b);
-	});
-
+	const paramsFolderValues = supabaseFolders.length > 0 ? supabaseFolders : ['default'];
 	const selectedParamsFolder = url.searchParams.get('polygons') || paramsFolderValues[0] || null;
 	const effectiveParamsFolder = selectedParamsFolder === 'default' ? null : selectedParamsFolder;
 
-	const availableForParams = available.filter(
-		(a) => (a.paramsFolder ?? 'default') === (effectiveParamsFolder === null ? 'default' : effectiveParamsFolder)
-	);
+	const availableForParams = effectiveParamsFolder
+		? available.filter((a) => a.paramsFolder === effectiveParamsFolder)
+		: [];
 
 	const kValues = [...new Set(availableForParams.map((a) => a.k))].sort((a, b) => a - b);
-
 	const selectedK = url.searchParams.has('k')
 		? parseInt(url.searchParams.get('k')!)
 		: kValues[0] ?? null;
-
 	const mValuesForK = availableForParams.filter((a) => a.k === selectedK);
-
 	const selectedM = url.searchParams.has('m')
 		? parseInt(url.searchParams.get('m')!)
 		: mValuesForK[0]?.m ?? null;
@@ -456,18 +296,35 @@ export async function load({ url }) {
 	const selectedGrouping = url.searchParams.get('grouping') || null;
 	const selectedSearch = url.searchParams.get('search') || null;
 
+	// Polygon composition filter (Phase 3.4)
+	const categoriesParam = url.searchParams.get('categories');
+	const selectedCategories = categoriesParam ? categoriesParam.split(',').filter(Boolean) : null;
+	const filterNMaxEnabled = url.searchParams.get('nmaxEnabled') === '1';
+	const filterNMax = Math.max(3, parseInt(url.searchParams.get('nmax') ?? '12') || 12);
+	const filterAngleEnabled = url.searchParams.get('angleEnabled') === '1';
+	const filterAngle = Math.max(1, parseInt(url.searchParams.get('angle') ?? '30') || 30);
+	const polygonFilter: PolygonCompositionFilter | null =
+		selectedCategories && selectedCategories.length > 0
+			? {
+					categories: selectedCategories,
+					n_max: filterNMaxEnabled ? filterNMax : undefined,
+					angle: filterAngleEnabled ? filterAngle : undefined,
+				}
+			: null;
+
 	let seedConfigurations: any[] = [];
 	let totalItems = 0;
 	let groupings: { label: string; count: number }[] = [];
 
-	if (selectedK !== null && selectedM !== null) {
+	if (effectiveParamsFolder && selectedK !== null && selectedM !== null) {
 		const result = await loadPageData(
 			selectedK,
 			selectedM,
 			page,
 			selectedGrouping,
 			selectedSearch,
-			effectiveParamsFolder
+			effectiveParamsFolder,
+			polygonFilter
 		);
 		seedConfigurations = result.data;
 		totalItems = result.total;
@@ -477,7 +334,7 @@ export async function load({ url }) {
 	return {
 		available: availableForParams,
 		paramsFolderValues: paramsFolderValues.length > 0 ? paramsFolderValues : ['default'],
-		selectedParamsFolder: effectiveParamsFolder === null ? 'default' : effectiveParamsFolder,
+		selectedParamsFolder: effectiveParamsFolder ?? 'default',
 		kValues,
 		selectedK,
 		selectedM,
@@ -488,5 +345,11 @@ export async function load({ url }) {
 		totalItems,
 		seedConfigurations,
 		pageSize: PAGE_SIZE,
+		// Filter state for UI
+		selectedCategories: selectedCategories ?? [],
+		filterNMaxEnabled,
+		filterNMax,
+		filterAngleEnabled,
+		filterAngle,
 	};
 }

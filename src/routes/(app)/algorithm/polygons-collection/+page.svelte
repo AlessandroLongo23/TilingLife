@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { goto, invalidate } from '$app/navigation';
+    import { fetchPipelineWithProgress } from '$lib/utils/fetchPipelineWithProgress';
     import {
         RegularPolygon, StarRegularPolygon, StarParametricPolygon,
         EquilateralPolygon, StarVertexTypes, PolygonType, GenericPolygon
@@ -8,7 +10,7 @@
     import { toRadians, toDegrees, comparePolygonNames, getAngleAtVertex } from '$utils';
     import { isValidMultiple } from '$utils/filterHelpers';
     import { browser } from '$app/environment';
-    import { Search, Minus, Plus, Camera } from 'lucide-svelte';
+    import { Search, Minus, Plus, Camera, Grid2X2, List } from 'lucide-svelte';
     import { headerStore, openScreenshotPreview } from '$stores';
     import { sounds } from '$utils';
     import { categoryOptions } from '$stores';
@@ -19,8 +21,14 @@
     import AngleFilterBlock from '$components/ui/AngleFilterBlock.svelte';
     import Pagination from '$components/ui/Pagination.svelte';
     import ReloadButton from '$components/ui/ReloadButton.svelte';
+    import PolygonListItem from '$components/PolygonListItem.svelte';
+    import GeneratePolygonsDialog from '$components/GeneratePolygonsDialog.svelte';
 
     const { data } = $props();
+
+    let generatePolygonsOpen = $state(false);
+    let generateVCsLoading = $state(false);
+    let generateVCsError = $state<string | null>(null);
 
     const allPolygonNames = data.allPolygonNames ?? [];
 
@@ -30,6 +38,8 @@
 
     const PAGE_SIZE = 32;
     let currentPage = $state(1);
+    let viewMode = $state<'grid' | 'list'>('grid');
+    let selectedPolygonNames = $state<Set<string>>(new Set());
 
     const tagMap = {
         [PolygonType.REGULAR]: 'Reg',
@@ -592,7 +602,7 @@
         </div>
     </aside>
 
-    <!-- Grid -->
+    <!-- Grid / List -->
     <main class="flex-1 min-w-0">
         {#if filteredNames.length === 0}
             <div class="flex flex-col items-center justify-center h-64 text-zinc-600">
@@ -602,8 +612,107 @@
             </div>
         {:else}
             <div class="p-5 flex flex-col gap-4">
-                <Pagination totalItems={filteredNames.length} pageSize={PAGE_SIZE} bind:currentPage />
+                <!-- Header: view toggle + action buttons -->
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">View</span>
+                        <div class="flex gap-1">
+                            <button
+                                class="p-2 rounded-md border transition-all {viewMode === 'grid' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                                onclick={() => viewMode = 'grid'}
+                                title="Grid view"
+                            >
+                                <Grid2X2 size={16} />
+                            </button>
+                            <button
+                                class="p-2 rounded-md border transition-all {viewMode === 'list' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                                onclick={() => viewMode = 'list'}
+                                title="List view"
+                            >
+                                <List size={16} />
+                            </button>
+                        </div>
+                        <span class="text-xs text-zinc-500">
+                            {selectedPolygonNames.size} of {filteredNames.length} selected
+                        </span>
+                        <button
+                            class="km-btn text-xs"
+                            onclick={() => selectedPolygonNames = new Set(sortedNames)}
+                        >
+                            Select all
+                        </button>
+                        <button
+                            class="km-btn text-xs"
+                            onclick={() => selectedPolygonNames = new Set()}
+                        >
+                            Deselect all
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
+                        <button
+                            class="px-4 py-2 rounded-md font-medium text-sm bg-green-500/20 text-green-400 border border-green-500/40 hover:bg-green-500/30 transition-colors"
+                            onclick={() => generatePolygonsOpen = true}
+                        >
+                            Generate Polygons
+                        </button>
+                        {#if generateVCsError}
+                            <span class="text-xs text-red-400">{generateVCsError}</span>
+                        {/if}
+                        <button
+                            class="px-4 py-2 rounded-md font-medium text-sm bg-zinc-700/60 text-zinc-300 border border-zinc-600/50 hover:bg-zinc-600/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={selectedPolygonNames.size === 0 || generateVCsLoading}
+                            onclick={async () => {
+                                const pf = data.selectedParamsFolder ?? 'default';
+                                if (pf === 'default' || selectedPolygonNames.size === 0) return;
+                                generateVCsError = null;
+                                generateVCsLoading = true;
+                                try {
+                                    await fetchPipelineWithProgress({
+                                        url: '/api/pipeline/generate-vcs',
+                                        body: {
+                                            paramsFolder: pf,
+                                            polygonNames: [...selectedPolygonNames],
+                                        },
+                                        title: 'Generate Vertex Configurations',
+                                        initialMessage: 'Extracting vertex configurations from polygons…',
+                                    });
+                                    await invalidate('app:polygons-filter');
+                                    await goto('/algorithm/vertex-configurations?polygons=' + pf);
+                                } catch (e) {
+                                    generateVCsError = e instanceof Error ? e.message : 'Unknown error';
+                                } finally {
+                                    generateVCsLoading = false;
+                                }
+                            }}
+                        >
+                            {generateVCsLoading ? 'Generating…' : 'Generate Vertex Configurations'}
+                        </button>
+                    </div>
+                </div>
 
+                {#if viewMode === 'list'}
+                <div class="flex flex-col gap-1.5">
+                    {#each displayedPolygons as { name, polygon }, i (name + i)}
+                        {@const globalIndex = (currentPage - 1) * PAGE_SIZE + i}
+                        {@const category = getCategory(name)}
+                        <PolygonListItem
+                            id={globalIndex + 1}
+                            name={name}
+                            polygon={polygon}
+                            tagLabel={tagMap[category] ?? '?'}
+                            tagClass={category}
+                            showCheckbox={true}
+                            checked={selectedPolygonNames.has(name)}
+                            onToggle={() => {
+                                const next = new Set(selectedPolygonNames);
+                                if (next.has(name)) next.delete(name);
+                                else next.add(name);
+                                selectedPolygonNames = next;
+                            }}
+                        />
+                    {/each}
+                </div>
+                {:else}
                 <div
                     class="grid gap-3"
                     style="grid-template-columns: repeat({columnsPerRow}, minmax(0, 1fr));"
@@ -611,8 +720,30 @@
                     {#each displayedPolygons as { name, polygon }, i (name + i)}
                         {@const globalIndex = (currentPage - 1) * PAGE_SIZE + i}
                         {@const category = getCategory(name)}
-                        <div class="polygon-card group relative">
+                        <div
+                            class="polygon-card group relative cursor-pointer"
+                            role="button"
+                            tabindex="0"
+                            onclick={() => {
+                                const next = new Set(selectedPolygonNames);
+                                if (next.has(name)) next.delete(name);
+                                else next.add(name);
+                                selectedPolygonNames = next;
+                            }}
+                        >
                             <div class="polygon-card-header flex items-center gap-3 px-3 py-2">
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border border-zinc-600/60 bg-zinc-800/50 checked:bg-green-500/90 shrink-0"
+                                    checked={selectedPolygonNames.has(name)}
+                                    onclick={(e) => e.stopPropagation()}
+                                    onchange={() => {
+                                        const next = new Set(selectedPolygonNames);
+                                        if (next.has(name)) next.delete(name);
+                                        else next.add(name);
+                                        selectedPolygonNames = next;
+                                    }}
+                                />
                                 <span class="polygon-index">{globalIndex + 1}</span>
                                 <span class="truncate" title={name}>{name}</span>
                                 <span class="category-tag category-{category}">{tagMap[category]}</span>
@@ -643,14 +774,54 @@
                         </div>
                     {/each}
                 </div>
+                {/if}
 
                 <Pagination totalItems={filteredNames.length} pageSize={PAGE_SIZE} bind:currentPage />
             </div>
         {/if}
     </main>
+
+    <GeneratePolygonsDialog
+        bind:isOpen={generatePolygonsOpen}
+        onSuccess={async (paramsFolder) => {
+            await invalidate('app:polygons-filter');
+            await goto(`/algorithm/polygons-collection?polygons=${paramsFolder}`);
+        }}
+    />
 </div>
 
 <style>
+    .km-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border: 1px solid rgba(63, 63, 70, 0.4);
+        background-color: rgba(39, 39, 42, 0.5);
+        color: rgba(161, 161, 170, 1);
+        transition: all 0.15s ease;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .km-btn:hover {
+        background-color: rgba(63, 63, 70, 0.5);
+        color: rgba(228, 228, 231, 1);
+    }
+
+    .km-btn-active {
+        background-color: rgba(74, 222, 128, 0.12);
+        color: rgba(74, 222, 128, 0.9);
+        border-color: rgba(74, 222, 128, 0.25);
+    }
+
+    .km-btn-active:hover {
+        background-color: rgba(74, 222, 128, 0.2);
+        color: rgba(74, 222, 128, 1);
+    }
+
     .polygon-card {
         display: flex;
         flex-direction: column;

@@ -1,15 +1,18 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
     import { browser } from '$app/environment';
-    import { Search, Minus, Plus, Grid3x3, Layers, Camera } from 'lucide-svelte';
+    import { Search, Minus, Plus, Grid3x3, Grid2X2, List, Layers, Camera, Move } from 'lucide-svelte';
     import { headerStore, openScreenshotPreview } from '$stores';
     import { map, sounds } from '$utils';
-    import { AlgorithmTiling, type EncodedTiling } from '$classes/algorithm/Tiling.svelte';
-    
+
     import Pagination from '$components/ui/Pagination.svelte';
     import ReloadButton from '$components/ui/ReloadButton.svelte';
+    import RangeSlider from '$components/ui/RangeSlider.svelte';
+    import Checkbox from '$components/ui/Checkbox.svelte';
+    import TilingListItem from '$components/TilingListItem.svelte';
 
     let { data } = $props();
+    let viewMode = $state<'grid' | 'list'>('grid');
 
     $effect(() => {
         headerStore.set({ title: 'Tilings', badge: String(data.totalItems), subtitle: null });
@@ -21,21 +24,45 @@
 
     let currentPage = $state(data.page);
     let layers = $state(data.layers);
+    let showBasisVectors = $state(data.showBasisVectors ?? false);
+    let layersRange = $state<[number, number]>([data.layers, data.layers]);
 
     $effect(() => { currentPage = data.page; });
     $effect(() => { layers = data.layers; });
+    $effect(() => { showBasisVectors = data.showBasisVectors ?? false; });
+    $effect(() => { layersRange = [data.layers, data.layers]; });
 
-    function navigateTo(k: number | null, m: number | null, pg: number = 1, ly: number = layers) {
+    function handleLayersChange() {
+        layers = layersRange[0];
+        navigateTo(data.selectedK, data.selectedM, currentPage, layers, undefined, showBasisVectors);
+    }
+
+    $effect(() => {
+        if (browser && layersRange[0] !== layers && layersRange[0] >= 1 && layersRange[0] <= 8) {
+            handleLayersChange();
+        }
+    });
+
+    function navigateTo(
+        k,
+        m,
+        pg = 1,
+        ly = layers,
+        polygons = data.selectedParamsFolder ?? null,
+        basis = showBasisVectors
+    ) {
         const params = new URLSearchParams();
         if (k !== null) params.set('k', String(k));
         if (m !== null) params.set('m', String(m));
         if (pg > 1) params.set('page', String(pg));
         if (ly !== 2) params.set('layers', String(ly));
+        if (basis) params.set('basis', '1');
+        if (polygons && polygons !== 'default') params.set('polygons', polygons);
         goto(`/algorithm/tilings?${params.toString()}`);
     }
 
     function handlePageChange() {
-        navigateTo(data.selectedK, data.selectedM, currentPage, layers);
+        navigateTo(data.selectedK, data.selectedM, currentPage, layers, undefined, showBasisVectors);
     }
 
     $effect(() => {
@@ -44,22 +71,29 @@
         }
     });
 
+    $effect(() => {
+        if (browser && showBasisVectors !== (data.showBasisVectors ?? false)) {
+            navigateTo(data.selectedK, data.selectedM, currentPage, layers, undefined, showBasisVectors);
+        }
+    });
+
     let mValuesForSelectedK = $derived(
-        data.available.filter((a: any) => a.k === data.selectedK)
+        data.available.filter((a) => a.k === data.selectedK)
     );
 
     // ─── Color helpers ───
 
-    function handleCardScreenshot(e: MouseEvent, filename: string) {
-        const card = (e.currentTarget as HTMLElement).closest('.tiling-card');
-        const canvas = card?.querySelector('canvas');
-        if (!canvas) return;
-        const dataUrl = (canvas as HTMLCanvasElement).toDataURL('image/png');
+    function handleCardScreenshot(e, filename) {
+        const target = e?.currentTarget;
+        const card = target?.closest?.('.tiling-card') ?? target?.closest?.('.tiling-list-item');
+        const canvas = card?.querySelector?.('canvas');
+        if (!canvas?.toDataURL) return;
+        const dataUrl = canvas.toDataURL('image/png');
         openScreenshotPreview({ imageDataUrl: dataUrl, filename, rulestring: '', groupId: null });
         sounds.screenshot();
     }
 
-    function hsbToHsl(h: number, s: number, b: number) {
+    function hsbToHsl(h, s, b) {
         s /= 100;
         b /= 100;
         const l = b * (1 - s / 2);
@@ -67,33 +101,57 @@
         return { h, s: sl * 100, l: l * 100 };
     }
 
-    function getPolygonHue(type: string, vertexCount: number): number {
+    function getPolygonHue(type, vertexCount) {
         if (type === 'regular') {
             return map(Math.log(vertexCount), Math.log(3), Math.log(40), 0, 300);
         }
         return map(vertexCount / 2, 3, 12, 300, 0) + 300 / 12;
     }
 
-    // ─── Polygon expansion (seed + generators format) ───
+    // ─── Translational cell: expand by layers ───
+    // Polygons come from page.server in display format: { type, n, vertices: [{x,y}, ...] }
 
-    interface Vertex { x: number; y: number }
-    interface EncodedPolygon { type: string; n: number; vertices: Vertex[] }
+    function getPolygonsForDrawing(cell, layersCount) {
+        const polys = cell.polygons ?? cell.p ?? [];
+        const basis = cell.b ?? [
+            [1, 0],
+            [0, 1],
+        ];
+        const [v1, v2] = basis;
+        const v1x = Number(v1[0]) || 0,
+            v1y = Number(v1[1]) || 0;
+        const v2x = Number(v2[0]) || 0,
+            v2y = Number(v2[1]) || 0;
 
-    function getPolygonsForDrawing(tiling: EncodedTiling): EncodedPolygon[] {
-        if (tiling.seed && tiling.generators) {
-            const polygons = AlgorithmTiling.expandToPolygons(tiling);
-            return polygons as EncodedPolygon[];
+        const result = [];
+        const half = Math.floor(layersCount / 2);
+        for (let i = -half; i <= half; i++) {
+            for (let j = -half; j <= half; j++) {
+                const dx = i * v1x + j * v2x;
+                const dy = i * v1y + j * v2y;
+                for (const poly of polys) {
+                    const verts = poly.vertices ?? [];
+                    if (verts.length < 3) continue;
+                    const translated = verts.map((v) => ({
+                        x: Number(v.x) + dx,
+                        y: Number(v.y) + dy,
+                    }));
+                    if (translated.some((v) => !Number.isFinite(v.x) || !Number.isFinite(v.y))) continue;
+                    result.push({ type: poly.type ?? 'regular', n: poly.n ?? 0, vertices: translated });
+                }
+            }
         }
-        return [];
+        return result;
     }
 
     // ─── Canvas ───
 
-    function initCanvas(canvas: HTMLCanvasElement, tilingData: EncodedTiling) {
-        let resizeObserver: ResizeObserver;
+    function initCanvas(canvas, binding) {
+        let [cellData, layersCount, drawBasis] = binding;
+        let resizeObserver;
 
         function render() {
-            if (tilingData) drawTiling(canvas, tilingData);
+            if (cellData) drawTranslationalCell(canvas, cellData, layersCount, drawBasis);
         }
 
         requestAnimationFrame(render);
@@ -101,8 +159,8 @@
         resizeObserver.observe(canvas);
 
         return {
-            update(newData: EncodedTiling) {
-                tilingData = newData;
+            update(newBinding) {
+                [cellData, layersCount, drawBasis] = newBinding;
                 requestAnimationFrame(render);
             },
             destroy() {
@@ -111,9 +169,10 @@
         };
     }
 
-    function drawTiling(canvas: HTMLCanvasElement, tiling: EncodedTiling) {
+    function drawTranslationalCell(canvas, cell, layersCount, drawBasis) {
         const size = canvas.clientWidth || 300;
-        const ctx = canvas.getContext('2d')!;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
         const dpr = window.devicePixelRatio || 1;
 
         canvas.width = size * dpr;
@@ -123,18 +182,30 @@
         ctx.fillStyle = '#1e1e24';
         ctx.fillRect(0, 0, size, size);
 
-        const polygons = getPolygonsForDrawing(tiling);
+        const polygons = getPolygonsForDrawing(cell, layersCount);
         if (!polygons.length) return;
 
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const origin = cell.o ?? [0, 0];
+        const basis = cell.b ?? [[1, 0], [0, 1]];
+        const [v1, v2] = basis;
+
         for (const poly of polygons) {
-            for (const v of poly.vertices) {
+            for (const v of poly.vertices ?? []) {
                 if (v.x == null || v.y == null) continue;
                 minX = Math.min(minX, v.x);
                 minY = Math.min(minY, v.y);
                 maxX = Math.max(maxX, v.x);
                 maxY = Math.max(maxY, v.y);
             }
+        }
+        if (drawBasis) {
+            const ox = origin[0], oy = origin[1];
+            const scale = 1.2;
+            minX = Math.min(minX, ox, ox + v1[0] * scale, ox + v2[0] * scale);
+            maxX = Math.max(maxX, ox, ox + v1[0] * scale, ox + v2[0] * scale);
+            minY = Math.min(minY, oy, oy + v1[1] * scale, oy + v2[1] * scale);
+            maxY = Math.max(maxY, oy, oy + v1[1] * scale, oy + v2[1] * scale);
         }
         if (!isFinite(minX)) return;
 
@@ -152,24 +223,44 @@
         ctx.translate(-cx, -cy);
 
         for (const poly of polygons) {
-            if (!poly.vertices?.length) continue;
-            const hasNull = poly.vertices.some(v => v.x == null || v.y == null);
+            const verts = poly.vertices ?? [];
+            if (!verts.length) continue;
+            const hasNull = verts.some((v) => v.x == null || v.y == null);
             if (hasNull) continue;
 
-            const hue = getPolygonHue(poly.type, poly.vertices.length);
+            const hue = getPolygonHue(poly.type ?? 'regular', poly.n ?? verts.length);
             const hsl = hsbToHsl(hue, 40, 100);
             ctx.fillStyle = `hsla(${hsl.h}, ${hsl.s}%, ${hsl.l}%, 0.85)`;
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
             ctx.lineWidth = 1 / scale;
 
             ctx.beginPath();
-            ctx.moveTo(poly.vertices[0].x, poly.vertices[0].y);
-            for (let i = 1; i < poly.vertices.length; i++) {
-                ctx.lineTo(poly.vertices[i].x, poly.vertices[i].y);
+            ctx.moveTo(verts[0].x, verts[0].y);
+            for (let i = 1; i < verts.length; i++) {
+                ctx.lineTo(verts[i].x, verts[i].y);
             }
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
+        }
+
+        if (drawBasis) {
+            const ox = origin[0], oy = origin[1];
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)';
+            ctx.lineWidth = 2 / scale;
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.lineTo(ox + v1[0], oy + v1[1]);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.9)';
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.lineTo(ox + v2[0], oy + v2[1]);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+            ctx.beginPath();
+            ctx.arc(ox, oy, 3 / scale, 0, 2 * Math.PI);
+            ctx.fill();
         }
 
         ctx.restore();
@@ -184,12 +275,12 @@
             <div>
                 <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider">Set size (k)</span>
                 <div class="flex flex-wrap gap-1.5 mt-2.5">
-                    {#each data.kValues as k}
+                        {#each data.kValues as k}
                         {@const isActive = data.selectedK === k}
                         <button
-                            class="km-btn {isActive ? 'km-btn-active' : ''}"
-                            onclick={() => navigateTo(k, null)}
-                        >
+                                class="km-btn {isActive ? 'km-btn-active' : ''}"
+                                onclick={() => navigateTo(k, null, 1, layers, undefined, showBasisVectors)}
+                            >
                             k={k}
                         </button>
                     {/each}
@@ -208,7 +299,7 @@
                             {@const isActive = data.selectedM === m}
                             <button
                                 class="km-btn {isActive ? 'km-btn-active' : ''}"
-                                onclick={() => navigateTo(data.selectedK, m)}
+                                onclick={() => navigateTo(data.selectedK, m, 1, layers, undefined, showBasisVectors)}
                             >
                                 <span>m={m}</span>
                                 <span class="km-count">{count.toLocaleString()}</span>
@@ -218,44 +309,53 @@
                 </div>
             {/if}
 
-            <!-- Layers control -->
+            <!-- Layers slider -->
             <div class="border-t border-zinc-800 pt-5">
                 <div class="flex flex-col gap-2">
                     <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider flex items-center gap-1.5">
                         <Layers size={12} />
                         Layers
                     </span>
-                    <div class="flex items-center gap-2 justify-center">
+                    <RangeSlider
+                        bind:value={layersRange}
+                        min={1}
+                        max={8}
+                        step={1}
+                        label=""
+                    />
+                    <div class="flex gap-1 justify-center mt-1">
                         <button
                             class="ctrl-btn"
-                            onclick={() => { layers = Math.max(1, layers - 1); navigateTo(data.selectedK, data.selectedM, currentPage, layers); }}
-                            disabled={layers <= 1}
+                            onclick={() => { layersRange = [Math.max(1, layersRange[0] - 1), Math.max(1, layersRange[0] - 1)]; handleLayersChange(); }}
+                            disabled={layersRange[0] <= 1}
                             aria-label="Fewer layers"
                         >
                             <Minus size={14} />
                         </button>
-                        <div class="flex gap-1 flex-1 justify-center">
-                            {#each [1, 2, 3, 4, 5] as n}
-                                <button
-                                    class="w-7 h-7 flex items-center justify-center rounded-md text-xs font-medium transition-all border
-                                        {layers === n
-                                            ? 'bg-green-500/15 text-green-400 border-green-500/30'
-                                            : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
-                                    onclick={() => { layers = n; navigateTo(data.selectedK, data.selectedM, currentPage, n); }}
-                                >
-                                    {n}
-                                </button>
-                            {/each}
-                        </div>
                         <button
                             class="ctrl-btn"
-                            onclick={() => { layers = Math.min(5, layers + 1); navigateTo(data.selectedK, data.selectedM, currentPage, layers); }}
-                            disabled={layers >= 5}
+                            onclick={() => { layersRange = [Math.min(8, layersRange[0] + 1), Math.min(8, layersRange[0] + 1)]; handleLayersChange(); }}
+                            disabled={layersRange[0] >= 8}
                             aria-label="More layers"
                         >
                             <Plus size={14} />
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Basis vectors toggle -->
+            <div class="border-t border-zinc-800 pt-5">
+                <div class="flex flex-col gap-2">
+                    <span class="text-xs uppercase text-zinc-400 font-medium tracking-wider flex items-center gap-1.5">
+                        <Move size={12} />
+                        Display
+                    </span>
+                    <Checkbox
+                        id="basis-vectors"
+                        bind:checked={showBasisVectors}
+                        label="Show basis vectors"
+                    />
                 </div>
             </div>
 
@@ -332,27 +432,65 @@
         {:else if data.totalItems === 0}
             <div class="flex flex-col items-center justify-center h-64 text-zinc-600">
                 <Search size={32} class="mb-3 opacity-50" />
-                <p class="text-sm">No tilings found for k={data.selectedK}, m={data.selectedM}.</p>
+                <p class="text-sm">No translational cells found for k={data.selectedK}, m={data.selectedM}.</p>
             </div>
         {:else}
             <div class="p-5 flex flex-col gap-4">
-                <Pagination totalItems={data.totalItems} pageSize={data.pageSize} bind:currentPage />
+                <div class="flex flex-wrap items-center gap-3">
+                    <Pagination totalItems={data.totalItems} pageSize={data.pageSize} bind:currentPage />
+                    <div class="flex gap-1 border-l border-zinc-700 pl-3">
+                        <button
+                            class="p-2 rounded-md border transition-all {viewMode === 'grid' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                            onclick={() => viewMode = 'grid'}
+                            title="Grid view"
+                        >
+                            <Grid2X2 size={16} />
+                        </button>
+                        <button
+                            class="p-2 rounded-md border transition-all {viewMode === 'list' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40 hover:bg-zinc-700/50 hover:text-zinc-300'}"
+                            onclick={() => viewMode = 'list'}
+                            title="List view"
+                        >
+                            <List size={16} />
+                        </button>
+                    </div>
+                </div>
 
+                {#if viewMode === 'list'}
+                    <div class="flex flex-col gap-1.5">
+                        {#each data.tilings as cell, i}
+                            {@const globalIndex = (data.page - 1) * data.pageSize + i}
+                            {#snippet thumbnail()}
+                                <canvas
+                                    use:initCanvas={[cell, layers, showBasisVectors]}
+                                    class="block w-full h-full"
+                                ></canvas>
+                            {/snippet}
+                            <TilingListItem
+                                id={globalIndex + 1}
+                                name={cell.n ?? ''}
+                                polygonCount={(cell.polygons ?? cell.p ?? []).length}
+                                thumbnail={thumbnail}
+                                onScreenshot={(e) => handleCardScreenshot(e, `tiling-k${data.selectedK}-m${data.selectedM}-${globalIndex + 1}.png`)}
+                            />
+                        {/each}
+                    </div>
+                {:else}
                 <div
                     class="grid gap-3"
                     style="grid-template-columns: repeat({columnsPerRow}, minmax(0, 1fr));"
                 >
-                    {#each data.tilings as tiling, i}
+                    {#each data.tilings as cell, i}
                         {@const globalIndex = (data.page - 1) * data.pageSize + i}
                         <div class="tiling-card group relative">
                             <div class="tiling-card-header">
                                 <span class="tiling-index">{globalIndex + 1}</span>
-                                <span class="text-zinc-500 truncate" title={tiling.seed?.name ?? ''}>{tiling.seed?.name ?? '?'}</span>
-                                <span class="text-zinc-600">{tiling.generators?.length ?? 0} gens</span>
+                                <span class="text-zinc-500 truncate" title={cell.n ?? ''}>{cell.n ?? '?'}</span>
+                                <span class="text-zinc-600">{(cell.polygons ?? cell.p ?? []).length} polys</span>
                             </div>
                             {#if browser}
                                 <canvas
-                                    use:initCanvas={tiling}
+                                    use:initCanvas={[cell, layers, showBasisVectors]}
                                     class="block w-full aspect-square"
                                 ></canvas>
                             {:else}
@@ -364,7 +502,7 @@
                                 <button
                                     type="button"
                                     class="absolute bottom-2 right-2 p-1.5 rounded-md bg-zinc-800/90 border border-zinc-600/60 text-zinc-400 hover:text-white hover:bg-zinc-700/90 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onclick={(e) => handleCardScreenshot(e, `tiling-${(tiling.seed?.name ?? 'unknown').replace(/[/\\?%*:|"<>]/g, '-')}-${globalIndex + 1}.png`)}
+                                    onclick={(e) => handleCardScreenshot(e, `cell-${(cell.n ?? 'unknown').replace(/[/\\?%*:|"<>]/g, '-')}-${globalIndex + 1}.png`)}
                                     title="Screenshot"
                                     aria-label="Take screenshot"
                                 >
@@ -374,6 +512,7 @@
                         </div>
                     {/each}
                 </div>
+                {/if}
 
                 <Pagination totalItems={data.totalItems} pageSize={data.pageSize} bind:currentPage />
             </div>

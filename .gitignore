@@ -2,6 +2,7 @@ node_modules
 package-lock.json
 
 # Output
+pipeline-output
 .output
 .vercel
 /.svelte-kit

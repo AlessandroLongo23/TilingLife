@@ -5,9 +5,10 @@
 
 function progressBar(current: number, total: number, width = 30): string {
 	if (total <= 0) return '[' + '='.repeat(width) + ']';
-	const pct = current / total;
+	const pct = Math.min(1, Math.max(0, current / total));
 	const filled = Math.round(width * pct);
-	return '[' + '='.repeat(filled) + ' '.repeat(width - filled) + `] ${(pct * 100).toFixed(1)}%`;
+	const empty = Math.max(0, width - filled);
+	return '[' + '='.repeat(filled) + ' '.repeat(empty) + `] ${(pct * 100).toFixed(1)}%`;
 }
 
 function formatRate(rate: number): string {
@@ -45,14 +46,11 @@ export type PhaseProgressCallback = (
 
 export class PipelineLogger {
 	private stepNum = 0;
-	private totalSteps = 0;
 	private progressStartTime: number | null = null;
 	private progressLastTotal: number | null = null;
 	private lastProgressWasNested = false;
 
-	constructor(totalSteps: number) {
-		this.totalSteps = totalSteps;
-	}
+	constructor() {}
 
 	log(msg: string): void {
 		process.stdout.write(msg + '\n');
@@ -77,7 +75,7 @@ export class PipelineLogger {
 	runStep<T>(name: string, fn: () => T, onComplete?: (result: T) => void): T {
 		this.stepNum++;
 		const start = performance.now();
-		this.log(`Step ${this.stepNum}/${this.totalSteps}: ${name}...`);
+		this.log(`Step ${this.stepNum}: ${name}...`);
 		try {
 			const result = fn();
 			const end = performance.now();

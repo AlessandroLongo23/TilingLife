@@ -2,6 +2,7 @@ import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic } from '$st
 import { isWithinConvexHull, segmentsIntersect, getAngleAtVertex, isWithinTolerance } from '$utils';
 import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
+import { tolerance } from '$stores';
 
 export class Polygon {
     n: number;
@@ -138,22 +139,22 @@ export class Polygon {
         return this;
     }
 
-    containsPoint = (point: Vector): boolean => {
-        return isWithinConvexHull(this.vertices, point);
+    containsPoint = (point: Vector, tol: number = tolerance): boolean => {
+        return isWithinConvexHull(this.vertices, point, tol);
     }
 
-    intersects = (other: Polygon): boolean => {
-        if (this.containsPoint(other.centroid)) return true;
-        if (other.containsPoint(this.centroid)) return true;
+    intersects = (other: Polygon, tol: number = tolerance): boolean => {
+        if (this.containsPoint(other.centroid, tol)) return true;
+        if (other.containsPoint(this.centroid, tol)) return true;
 
         for (let i = 0; i < this.vertices.length; i++) {
-            if (other.containsPoint(this.vertices[i])) return true;
-            if (other.containsPoint(this.halfways[i])) return true;
+            if (other.containsPoint(this.vertices[i], tol)) return true;
+            if (other.containsPoint(this.halfways[i], tol)) return true;
         }
 
         for (let i = 0; i < other.vertices.length; i++) {
-            if (this.containsPoint(other.vertices[i])) return true;
-            if (this.containsPoint(other.halfways[i])) return true;
+            if (this.containsPoint(other.vertices[i], tol)) return true;
+            if (this.containsPoint(other.halfways[i], tol)) return true;
         }
 
         for (let i = 0; i < this.vertices.length; i++) {
@@ -162,7 +163,7 @@ export class Polygon {
             for (let j = 0; j < other.vertices.length; j++) {
                 const p3 = other.vertices[j];
                 const p4 = other.vertices[(j + 1) % other.vertices.length];
-                if (segmentsIntersect(p1, p2, p3, p4)) return true;
+                if (segmentsIntersect(p1, p2, p3, p4, tol)) return true;
             }
         }
 
@@ -282,26 +283,26 @@ export class Polygon {
         throw new Error('Abstract method called');
     }
 
-    isEquivalent = (other: Polygon): boolean => {
+    isEquivalent = (other: Polygon, tol: number = tolerance): boolean => {
         if (this.vertices.length !== other.vertices.length) return false;
 
-        if (!isWithinTolerance(this.centroid, other.centroid)) return false;
+        if (!isWithinTolerance(this.centroid, other.centroid, tol)) return false;
 
         for (let vertex of this.vertices) {
-            if (!other.vertices.some(v => isWithinTolerance(v, vertex))) return false;
+            if (!other.vertices.some(v => isWithinTolerance(v, vertex, tol))) return false;
         }
         
         for (let halfway of this.halfways) {
-            if (!other.halfways.some(h => isWithinTolerance(h, halfway))) return false;
+            if (!other.halfways.some(h => isWithinTolerance(h, halfway, tol))) return false;
         }
         return true;
     }
 
-    isTranslated = (other: Polygon): boolean => {
+    isTranslated = (other: Polygon, tol: number = tolerance): boolean => {
         const translationVector: Vector = Vector.sub(other.centroid, this.centroid);
-        if (isWithinTolerance(translationVector, new Vector())) return false;
+        if (translationVector.mag() < tol) return false;
         const translatedPolygon: Polygon = this.clone().translate(translationVector);
-        return translatedPolygon.isEquivalent(other);
+        return translatedPolygon.isEquivalent(other, tol);
     }
 
     clone = (): Polygon => {

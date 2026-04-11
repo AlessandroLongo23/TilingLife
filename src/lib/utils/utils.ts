@@ -63,7 +63,7 @@ export const isEqualOrChiral = (arrayA: number[], arrayB: number[]): boolean => 
  */
 export const roundNumbersInJson = (
 	value: unknown,
-	decimals: number = 4
+	decimals: number = 6
 ): unknown => {
 	if (typeof value === 'number') {
 		return Math.round(value * 10 ** decimals) / 10 ** decimals;

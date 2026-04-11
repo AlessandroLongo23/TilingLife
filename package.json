@@ -1,5 +1,5 @@
 {
-	"name": "tiling-life",
+	"name": "tiling-atlas",
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
@@ -7,7 +7,8 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"lint": "eslint .",
-		"pipeline": "vite-node src/lib/algorithm/run-pipeline.ts"
+		"pipeline": "vite-node src/lib/algorithm/run-pipeline.ts",
+		"migrate-data": "vite-node scripts/migrate-data-to-type-first.ts"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.0.0",

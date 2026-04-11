@@ -106,7 +106,9 @@ export class StarPolygon extends Polygon {
     }
 
     getName = (coordinate: Vector | null = null): string => {
-        if (!coordinate) return this.name.replace('o', '').replace('i', '');
+        // When no coordinate: return full name including i/o (startsWith) for correct VC serialization.
+        // The i/o suffix is required to reconstruct star polygons correctly in VertexConfiguration.fromName.
+        if (!coordinate) return this.name;
 
         const vertex = this.vertices.find(v => isWithinTolerance(v, coordinate));
         if (!vertex) {

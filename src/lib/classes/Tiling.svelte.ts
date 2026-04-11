@@ -216,23 +216,23 @@ export class Tiling {
         return newTiling;
     }
 
-    static merge = (tilingA: Tiling, tilingB: Tiling): Tiling => {
+    static merge = (tilingA: Tiling, tilingB: Tiling, tol: number = tolerance): Tiling => {
         const mergedTiling: Tiling = tilingA.clone();
         mergedTiling.nodes.push(...tilingB.nodes);
-        mergedTiling.nodes = deduplicatePolygons(mergedTiling.nodes);
+        mergedTiling.nodes = deduplicatePolygons(mergedTiling.nodes, tol);
         return mergedTiling;
     }
 
-    isEquivalent = (other: Tiling): boolean => {
+    isEquivalent = (other: Tiling, tol: number = tolerance): boolean => {
         if (!other) return false;
 
-        const mergedTiling: Tiling = Tiling.merge(this, other);
+        const mergedTiling: Tiling = Tiling.merge(this, other, tol);
 
         for (let i = 0; i < mergedTiling.nodes.length - 1; i++) {
             const polygon = mergedTiling.nodes[i];
             for (let j = i + 1; j < mergedTiling.nodes.length; j++) {
                 const otherPolygon = mergedTiling.nodes[j];
-                if (polygon.intersects(otherPolygon)) {
+                if (polygon.intersects(otherPolygon, tol)) {
                     return false;
                 }
             }

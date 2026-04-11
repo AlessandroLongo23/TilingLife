@@ -6,6 +6,8 @@ export * from './CompatibilityGraph.svelte';
 export * from './SeedConfiguration.svelte';
 export * from './SeedSetExtractor.svelte';
 export * from './SeedBuilder.svelte';
+export * from './SeedExpander.svelte';
+export * from './TranslationalCellExtractor.svelte';
 export * from './Tiling.svelte';
 export * from './TilingGenerator.svelte';
 export * from '../wallpaperGroups';

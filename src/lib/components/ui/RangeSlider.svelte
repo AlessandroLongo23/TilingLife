@@ -9,7 +9,7 @@
 	let {
 		id,
 		label,
-		value = $bindable(0),
+		value = $bindable([0, 0]),
 		min = 0,
 		max = 100,
 		step = 1,
@@ -18,7 +18,7 @@
 	}: {
 		id?: string;
 		label?: string;
-		value: number | [number, number];
+		value: [number, number];
 		min?: number;
 		max?: number;
 		step?: number;
@@ -28,7 +28,7 @@
 
 	const isRangeMode = $derived(Array.isArray(value));
 	const rangeMin = $derived(isRangeMode ? (value as [number, number])[0] : min);
-	const rangeMax = $derived(isRangeMode ? (value as [number, number])[1] : (value as number));
+	const rangeMax = $derived(isRangeMode ? (value as [number, number])[1] : max);
 	const isCollapsed = $derived(isRangeMode && rangeMin === rangeMax);
 
 	let lastLow = $state(min);
