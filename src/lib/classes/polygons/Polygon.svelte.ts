@@ -1,5 +1,5 @@
-import { lineWidth, liveChartMode, controls, islamicAngle, isIslamic } from '$stores';
-import { isWithinConvexHull, segmentsIntersect, getAngleAtVertex, isWithinTolerance } from '$utils';
+import { lineWidth, liveChartMode, controls, islamicAngle, islamicAnimate, isIslamic } from '$stores';
+import { isWithinConvexHull, segmentsIntersect, getAngleAtVertex, isWithinTolerance, islamicAnglesForHalfways } from '$utils';
 import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
 import { tolerance } from '$stores';
@@ -116,6 +116,9 @@ export class Polygon {
             this.halfways[i].mirrorByPointAndDir(point.copy(), dir.copy());
         }
         this.halfways.reverse();
+        // After reversing vertices, halfway_i must remain midpoint(vertex_i, vertex_{i+1}).
+        // Reverse alone leaves it as midpoint(vertex_{i-1}, vertex_i); shift by 1 to fix.
+        this.halfways.push(this.halfways.shift()!);
 
         return this;
     }
@@ -194,7 +197,7 @@ export class Polygon {
         }
 
         if (get(isIslamic)) {
-            this.showIslamic(ctx);
+            this.showIslamicFilled(ctx, opacity, customColor);
         } else {
             ctx.fill(customColor || this.hue, 40, 100 / opacity, 0.80 * opacity);
             ctx.beginShape();
@@ -222,28 +225,54 @@ export class Polygon {
         ctx.pop();
     }
 
-    showIslamic = (ctx) => {
+    calculateIslamicTips = (angle: number | number[]): Vector[] => {
+        const tips: Vector[] = [];
+        const n = this.halfways.length;
+        const beta = Math.PI / n;
+        const gamma = Math.PI / 2 - beta;
+        for (let i = 0; i < n; i++) {
+            const a = Array.isArray(angle) ? angle[i] : angle;
+            const epsilon = Math.PI - beta - a / 2;
+            const side = (this.sides?.[i] ?? 1) / 2;
+            const dist = side * Math.tan(gamma) * Math.sin(beta) / Math.sin(epsilon);
+            const perp = Vector.sub(this.centroid, this.halfways[i]);
+            const dir2 = Vector.rotate(perp, -a / 2).normalize();
+            tips.push(new Vector(
+                this.halfways[i].x + dir2.x * dist,
+                this.halfways[i].y + dir2.y * dist,
+            ));
+        }
+        return tips;
+    }
+
+    showIslamicFilled = (ctx, opacity: number = 0.80, customColor: number | null = null) => {
+        const baseAngle = get(islamicAngle) * Math.PI / 180;
+        let angle: number | number[] = baseAngle;
+        if (get(islamicAnimate)) {
+            angle = islamicAnglesForHalfways(ctx, this.halfways);
+        }
+        const tips = this.calculateIslamicTips(angle);
+
+        ctx.push();
+        ctx.noStroke();
+        ctx.fill(customColor ?? this.hue, 40, 100 / opacity, 0.80 * opacity);
+        ctx.beginShape();
+        for (let i = 0; i < this.halfways.length; i++) {
+            ctx.vertex(this.halfways[i].x, this.halfways[i].y);
+            ctx.vertex(tips[i].x, tips[i].y);
+        }
+        ctx.endShape(ctx.CLOSE);
+        ctx.pop();
+
         ctx.noFill();
         ctx.strokeWeight(get(lineWidth) / get(controls).zoom);
-        ctx.stroke(0, 0, 100);
-        // const noise = ctx.noise(this.centroid.x / 5 + 1000, this.centroid.y / 5 + 1000, ctx.frameCount / 25);
-        // const noiseAngle = map(noise, 0, 1, 0, 180);
-        // let angle = noiseAngle * Math.PI / 180;
-        let angle = get(islamicAngle) * Math.PI / 180;
+        ctx.stroke(0, 0, 0);
         for (let i = 0; i < this.halfways.length; i++) {
-            let side = 0.5
-            let perp = Vector.sub(this.centroid, this.halfways[i]);
-            let dir1 = Vector.rotate(perp, angle / 2).normalize();
-            let dir2 = Vector.rotate(perp, -angle / 2).normalize();
-            
-            let beta = Math.PI / this.n;
-            let epsilon = Math.PI - beta - angle / 2;
-            let gamma = Math.PI / 2 - beta;
-
-            let dist = side * Math.tan(gamma) * Math.sin(beta) / Math.sin(epsilon);
-
-            ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[i].x + dir1.x * dist, this.halfways[i].y + dir1.y * dist);
-            ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[i].x + dir2.x * dist, this.halfways[i].y + dir2.y * dist);
+            const h = this.halfways[i];
+            const tipA = tips[i];
+            const tipB = tips[(i - 1 + this.halfways.length) % this.halfways.length];
+            ctx.line(h.x, h.y, tipA.x, tipA.y);
+            ctx.line(h.x, h.y, tipB.x, tipB.y);
         }
     }
 

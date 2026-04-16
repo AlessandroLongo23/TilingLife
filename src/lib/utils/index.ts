@@ -10,3 +10,5 @@ export * from "./compactSeedName";
 export * from "./vcChiral";
 export * from "./drawVertexConfiguration";
 export * from "./markdown";
+export * from "./islamicNoise";
+export * from "./vertexFigureHue";

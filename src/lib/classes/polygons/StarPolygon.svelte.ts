@@ -1,7 +1,5 @@
 import { Polygon, Vector } from '$classes';
-import { map, findIntersection, isWithinTolerance } from '$utils';
-import { get } from 'svelte/store';
-import { controls, lineWidth, islamicAngle } from '$stores';
+import { map, isWithinTolerance } from '$utils';
 
 export enum StarVertexTypes {
     INNER = 'inner',
@@ -63,6 +61,7 @@ export class StarPolygon extends Polygon {
             this.halfways[i].mirrorByPointAndDir(point.copy(), dir.copy());
         }
         this.halfways.reverse();
+        this.halfways.push(this.halfways.shift()!);
         // After vertices.reverse(), the first vertex swaps outer<->inner, so startsWith must flip
         this.startsWith = this.startsWith === StarVertexTypes.OUTER ? StarVertexTypes.INNER : StarVertexTypes.OUTER;
         this.name = this.name.replace(/[oi](?=})/, (m) => (m === 'o' ? 'i' : 'o'));
@@ -75,37 +74,7 @@ export class StarPolygon extends Polygon {
         this.hue = map(this.vertices.length / 2, 3, 12, 300, 0) + 300 / 12;
     }
 
-    showIslamic = (ctx) => {
-        ctx.noFill();
-        ctx.strokeWeight(get(lineWidth) / get(controls).zoom);
-        ctx.stroke(0, 0, 100);
-        let angle = get(islamicAngle) * Math.PI / 180;
-        for (let i = 0; i < this.halfways.length; i++) {
-            let perp = Vector.sub(this.vertices[i], this.halfways[i]).rotate(Math.PI / 2);
-            let dir1 = Vector.rotate(perp, angle / 2).normalize();
-            let dir2 = Vector.rotate(perp, -angle / 2).normalize();
-
-            let [vint, vout] = [this.vertices[i], this.vertices[(i + 1) % this.vertices.length]].sort((a, b) => Vector.distance(this.centroid, a) - Vector.distance(this.centroid, b));
-            if (i % 2 === 0) {
-                // [dir1, dir2] = [dir2, dir1];
-            }
-            
-            let intersection1 = findIntersection(this.halfways[i], dir1, vout, Vector.sub(this.centroid, vout))!;
-            let dist1 = Vector.distance(this.halfways[i], intersection1);
-            
-            let intersection2: Vector | null = findIntersection(this.halfways[i], dir2, vint, Vector.sub(this.centroid, vint));
-            let intersection3: Vector | null = findIntersection(this.halfways[i], dir2, vout, Vector.sub(this.centroid, vout));
-            let dist2 = Math.min(
-                intersection2 ? Vector.distance(this.halfways[i], intersection2) : Infinity,
-                intersection3 ? Vector.distance(this.halfways[i], intersection3) : Infinity,
-            );
-
-            ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[i].x + dir1.x * dist1, this.halfways[i].y + dir1.y * dist1);
-            ctx.line(this.halfways[i].x, this.halfways[i].y, this.halfways[i].x + dir2.x * dist2, this.halfways[i].y + dir2.y * dist2);
-        }
-    }
-
-    getName = (coordinate: Vector | null = null): string => {
+getName = (coordinate: Vector | null = null): string => {
         // When no coordinate: return full name including i/o (startsWith) for correct VC serialization.
         // The i/o suffix is required to reconstruct star polygons correctly in VertexConfiguration.fromName.
         if (!coordinate) return this.name;

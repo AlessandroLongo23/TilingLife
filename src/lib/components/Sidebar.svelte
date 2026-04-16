@@ -15,8 +15,9 @@
 		takeScreenshot, 
 		exportGraphButtonHover,
 		exportGraph, 
-		islamicAngle, 
-		isIslamic, 
+		islamicAngle,
+		islamicAnimate,
+		isIslamic,
 		gameOfLifeRules, 
 		tilingModalOpen, 
 		tilingStore, 
@@ -339,6 +340,13 @@
 										max={180}
 										step={1}
 										unit="°"
+									/>
+
+									<Checkbox
+										id="islamicAnimate"
+										label="Animate"
+										position="right"
+										bind:checked={$islamicAnimate}
 									/>
 								{/if}
 

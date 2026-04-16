@@ -54,6 +54,7 @@ export let possibleSides = [0, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 16, 18, 20, 24, 
 
 export let isIslamic = writable(false);
 export let islamicAngle = writable(90);
+export let islamicAnimate = writable(false);
 
 export let circlePacking = writable(false);
 export let isTilingRegularOnly = writable(false);

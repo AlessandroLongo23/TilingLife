@@ -94,7 +94,8 @@ export class GenericPolygon extends Polygon {
             this.halfways[i].mirrorByPointAndDir(point, mirrorDir);
         }
         this.halfways.reverse();
-        
+        this.halfways.push(this.halfways.shift()!);
+
         this.anchor.mirrorByPointAndDir(point, mirrorDir);
         this.dir.mirrorByPointAndDir(new Vector(), mirrorDir);
         
