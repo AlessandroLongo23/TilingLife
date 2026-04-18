@@ -29,7 +29,7 @@
 	];
 
 	let displayTitle = $derived(
-		$headerStore.title || ROUTE_TITLES[$page.url.pathname]?.title || 'Tiling Atlas'
+		$headerStore.title || ROUTE_TITLES[$page.url.pathname]?.title || 'Tiling Life'
 	);
 	let displayIcon = $derived(ROUTE_TITLES[$page.url.pathname]?.icon ?? Puzzle);
 	let displayBadge = $derived($headerStore.badge);

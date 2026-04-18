@@ -64,7 +64,7 @@
                 <div class="relative z-10 p-8 md:p-10">
                     <div in:fly={{ y: -15, duration: 600, delay: 200 }}>
                         <h1 class="text-white/90 text-3xl md:text-4xl font-medium tracking-tight">
-                            Welcome to <span class="font-bold text-green-400">Tiling Atlas</span>
+                            Welcome to <span class="font-bold text-green-400">Tiling Life</span>
                         </h1>
                     </div>
                     
