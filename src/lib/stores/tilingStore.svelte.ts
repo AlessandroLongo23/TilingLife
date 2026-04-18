@@ -49,7 +49,7 @@ interface FilterOptions {
 
 async function fetchGroups() {
     const { data, error: err } = await supabase
-        .from('tiling_groups')
+        .from('legacy_tiling_groups')
         .select('*')
         .order('display_order', { ascending: true });
     
@@ -64,10 +64,10 @@ async function fetchGroups() {
 
 async function fetchTilings() {
     const { data, error: err } = await supabase
-        .from('tilings')
+        .from('legacy_tilings')
         .select(`
             *,
-            group:tiling_groups (
+            group:legacy_tiling_groups (
                 id,
                 title,
                 k,

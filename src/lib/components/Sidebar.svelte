@@ -22,7 +22,6 @@
 		tilingStore, 
 		circlePacking, 
 		isTilingRegularOnly, 
-		showWallpaperGroup, 
 		ActiveTab
 	} from '$stores';
 
@@ -127,7 +126,6 @@
 	
 	let catalogContainer;
 	let currentVisibleGroup = $state("");
-	let previousVisibleGroup = $state("");
 	let scrollingTimer;
 	let isScrolling = $state(false);
 	let observer;
@@ -162,7 +160,6 @@
 					if (entry.isIntersecting) {
 						const groupTitle = entry.target.getAttribute('data-group-title');
 						if (currentVisibleGroup !== groupTitle) {
-							previousVisibleGroup = currentVisibleGroup;
 							currentVisibleGroup = groupTitle;
 						}
 					}
@@ -210,7 +207,6 @@
 			if (rect.top <= containerRect.top + 50) {
 				const groupTitle = element.getAttribute('data-group-title');
 				if (currentVisibleGroup !== groupTitle) {
-					previousVisibleGroup = currentVisibleGroup;
 					currentVisibleGroup = groupTitle;
 				}
 				break;
@@ -239,7 +235,6 @@
 	};
 	
 	$effect(() => {
-		const expandedGroupsState = JSON.stringify(expandedGroups);
 		if (Object.keys(expandedGroups).length > 0) {
 			observerNeedsRefresh = true;
 		}

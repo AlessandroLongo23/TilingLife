@@ -730,6 +730,15 @@
                                 else next.add(name);
                                 selectedPolygonNames = next;
                             }}
+                            onkeydown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    const next = new Set(selectedPolygonNames);
+                                    if (next.has(name)) next.delete(name);
+                                    else next.add(name);
+                                    selectedPolygonNames = next;
+                                }
+                            }}
                         >
                             <div class="polygon-card-header flex items-center gap-3 px-3 py-2">
                                 <input

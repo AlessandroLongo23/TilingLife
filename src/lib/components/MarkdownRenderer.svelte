@@ -1,6 +1,6 @@
 <script>
 	import { createEventDispatcher } from 'svelte';
-	import katex from 'katex';
+	import { renderToString } from 'katex';
 	import 'katex/dist/katex.min.css';
 	
 	let { content = '', targetSection = '' } = $props();
@@ -102,7 +102,7 @@
 				inlineMathElements.forEach(el => {
 					try {
 						const latex = el.textContent;
-						el.innerHTML = katex.renderToString(latex, { displayMode: false });
+						el.innerHTML = renderToString(latex, { displayMode: false });
 					} catch (e) {
 						console.error('KaTeX inline error:', e, el.textContent);
 					}
@@ -113,7 +113,7 @@
 				displayMathElements.forEach(el => {
 					try {
 						const latex = el.textContent;
-						const rendered = katex.renderToString(latex, { displayMode: true });
+						const rendered = renderToString(latex, { displayMode: true });
 						el.parentElement.innerHTML = rendered;
 					} catch (e) {
 						console.error('KaTeX display error:', e, el.textContent);

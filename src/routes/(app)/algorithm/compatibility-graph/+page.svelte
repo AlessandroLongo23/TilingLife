@@ -86,8 +86,8 @@
     }
 
     // --- Canvas & camera ---
-    let canvasEl;
-    let containerEl;
+    let canvasEl = $state();
+    let containerEl = $state();
     let animationId;
 
     let zoom = DEFAULT_ZOOM;
@@ -813,37 +813,6 @@
 </div>
 
 <style>
-    .km-btn {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-        padding: 0.375rem 0.75rem;
-        border-radius: 0.375rem;
-        font-size: 0.75rem;
-        font-weight: 500;
-        border: 1px solid rgba(63, 63, 70, 0.4);
-        background-color: rgba(39, 39, 42, 0.5);
-        color: rgba(161, 161, 170, 1);
-        transition: all 0.15s ease;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
-
-    .km-btn:hover {
-        background-color: rgba(63, 63, 70, 0.5);
-        color: rgba(228, 228, 231, 1);
-    }
-
-    .km-btn-active {
-        background-color: rgba(74, 222, 128, 0.12);
-        color: rgba(74, 222, 128, 0.9);
-        border-color: rgba(74, 222, 128, 0.25);
-    }
-
-    .km-btn-active:hover {
-        background-color: rgba(74, 222, 128, 0.2);
-        color: rgba(74, 222, 128, 1);
-    }
-
     .sim-param {
         display: flex;
         flex-direction: column;

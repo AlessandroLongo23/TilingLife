@@ -128,7 +128,7 @@ export async function uploadTilingScreenshot(
         // Update tilings table
         const updateField = isDual ? 'dual_image_url' : 'image_url';
         const { error: updateError } = await supabase
-            .from('tilings')
+            .from('legacy_tilings')
             .update({ [updateField]: publicUrl })
             .eq('rulestring', dbRulestring);
 

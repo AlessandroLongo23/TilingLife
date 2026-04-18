@@ -52,6 +52,7 @@
 	}
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
 	class="vc-list-item flex items-center gap-3 px-3 py-2 rounded-md border border-zinc-700/30 bg-zinc-800/30 hover:border-zinc-600/40 transition-colors {showCheckbox ? 'cursor-pointer' : ''}"
 	role={showCheckbox ? 'button' : undefined}
@@ -60,14 +61,13 @@
 	onkeydown={(e) => e.key === 'Enter' && showCheckbox && onToggle?.()}
 >
 	{#if showCheckbox}
-		<div class="shrink-0" onclick={(e) => e.stopPropagation()}>
-			<input
-				type="checkbox"
-				class="h-4 w-4 rounded border border-zinc-600/60 bg-zinc-800/50 checked:bg-green-500/90 checked:border-green-500/80 focus:ring-1 focus:ring-green-500/40"
-				checked={checked}
-				onchange={() => onToggle?.()}
-			/>
-		</div>
+		<input
+			type="checkbox"
+			class="shrink-0 h-4 w-4 rounded border border-zinc-600/60 bg-zinc-800/50 checked:bg-green-500/90 checked:border-green-500/80 focus:ring-1 focus:ring-green-500/40"
+			checked={checked}
+			onclick={(e) => e.stopPropagation()}
+			onchange={() => onToggle?.()}
+		/>
 	{/if}
 	<div class="shrink-0 w-12 h-12 rounded overflow-hidden border border-zinc-700/50 bg-zinc-900">
 		{#if vc}
