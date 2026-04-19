@@ -22,8 +22,10 @@
 		tilingModalOpen, 
 		tilingStore, 
 		circlePacking, 
-		isTilingRegularOnly, 
-		ActiveTab
+		isTilingRegularOnly,
+		showWallpaperGroup,
+		ActiveTab,
+		uiVisible
 	} from '$stores';
 
 	let activeTilingRules = $derived(
@@ -258,7 +260,7 @@
 	});
 </script>
 
-{#if !isSidebarOpen}
+{#if !isSidebarOpen && $uiVisible}
 	<button
 		onclick={toggleSidebar}
 		class="fixed top-3 left-3 z-50 p-2 rounded-md bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 hover:bg-zinc-700/70 transition-all text-white/80 hover:text-white/100 shadow-lg"

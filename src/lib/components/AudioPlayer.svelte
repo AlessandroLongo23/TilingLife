@@ -1,6 +1,7 @@
 <script>
 	import { Volume2, VolumeX, Volume1, Volume } from 'lucide-svelte';
 	import { fly } from 'svelte/transition';
+	import { uiVisible } from '$stores';
 
 	let audio;
 	let isPlaying = $state(false);
@@ -78,8 +79,9 @@
 	});
 </script>
 
-<div 
+<div
 	class="fixed top-5 right-5 z-[1000] flex items-center gap-2"
+	class:hidden={!$uiVisible}
 	role="group"
 	aria-label="Volume control"
 	onmouseenter={() => showVolumeSlider = true}

@@ -1,5 +1,5 @@
 import { lineWidth, liveChartMode, controls, islamicAngle, islamicAnimate, isIslamic } from '$stores';
-import { isWithinConvexHull, segmentsIntersect, getAngleAtVertex, isWithinTolerance, islamicAnglesForHalfways } from '$utils';
+import { isWithinConvexHull, segmentsIntersect, getAngleAtVertex, isWithinTolerance, islamicAnglesForHalfways, findIntersection } from '$utils';
 import { Vector, Behavior, State } from '$classes';
 import { get } from 'svelte/store';
 import { tolerance } from '$stores';
@@ -225,24 +225,76 @@ export class Polygon {
         ctx.pop();
     }
 
-    calculateIslamicTips = (angle: number | number[]): Vector[] => {
-        const tips: Vector[] = [];
+    calculateIslamicTips = (angle: number | number[]): { forward: Vector[]; backward: Vector[] } => {
         const n = this.halfways.length;
-        const beta = Math.PI / n;
-        const gamma = Math.PI / 2 - beta;
+
+        const normals: Vector[] = [];
         for (let i = 0; i < n; i++) {
-            const a = Array.isArray(angle) ? angle[i] : angle;
-            const epsilon = Math.PI - beta - a / 2;
-            const side = (this.sides?.[i] ?? 1) / 2;
-            const dist = side * Math.tan(gamma) * Math.sin(beta) / Math.sin(epsilon);
-            const perp = Vector.sub(this.centroid, this.halfways[i]);
-            const dir2 = Vector.rotate(perp, -a / 2).normalize();
-            tips.push(new Vector(
-                this.halfways[i].x + dir2.x * dist,
-                this.halfways[i].y + dir2.y * dist,
+            const edge = Vector.sub(this.vertices[(i + 1) % n], this.vertices[i]);
+            normals.push(Vector.rotate(edge, Math.PI / 2).normalize());
+        }
+
+        const angleAt = (i: number) => Array.isArray(angle) ? angle[i] : angle;
+
+        const forwardDir: Vector[] = [];
+        const backwardDir: Vector[] = [];
+        for (let i = 0; i < n; i++) {
+            forwardDir.push(Vector.rotate(normals[i], -angleAt(i) / 2));
+            backwardDir.push(Vector.rotate(normals[i], angleAt(i) / 2));
+        }
+
+        const rayHit = (p: Vector, dir: Vector, p2: Vector, d2: Vector): { hit: Vector; t: number } | null => {
+            const hit = findIntersection(p, dir, p2, d2);
+            if (!hit) return null;
+            const t = (hit.x - p.x) * dir.x + (hit.y - p.y) * dir.y;
+            const s = (hit.x - p2.x) * d2.x + (hit.y - p2.y) * d2.y;
+            return t > 0 && s > 0 ? { hit, t } : null;
+        };
+
+        // Classic pairing (forward[i] × backward[i+1], symmetric for backward) always
+        // converges at convex vertices. At reflex vertices the rays meet behind both
+        // halfways and rayHit rejects the hit. Try the other three adjacent-neighbor
+        // pairings and pick the nearest positive-t valid intersection as a recovery.
+        const nearestTip = (p: Vector, dir: Vector, primary: [Vector, Vector], alts: [Vector, Vector][]): Vector => {
+            const classic = rayHit(p, dir, primary[0], primary[1]);
+            if (classic) return classic.hit;
+            let best: { hit: Vector; t: number } | null = null;
+            for (const [p2, d2] of alts) {
+                const r = rayHit(p, dir, p2, d2);
+                if (r && (!best || r.t < best.t)) best = r;
+            }
+            if (best) return best.hit;
+            // Primary failed and no alternate worked — rays parallel (static aligned
+            // angle) or diverging (per-halfway animated angles mismatched). Collapse
+            // tip to the midpoint of the primary halfways so the strap draws straight.
+            return new Vector((p.x + primary[0].x) / 2, (p.y + primary[0].y) / 2);
+        };
+
+        const forward: Vector[] = [];
+        const backward: Vector[] = [];
+        for (let i = 0; i < n; i++) {
+            const j = (i + 1) % n;
+            const k = (i - 1 + n) % n;
+            forward.push(nearestTip(
+                this.halfways[i], forwardDir[i],
+                [this.halfways[j], backwardDir[j]],
+                [
+                    [this.halfways[j], forwardDir[j]],
+                    [this.halfways[k], backwardDir[k]],
+                    [this.halfways[k], forwardDir[k]],
+                ],
+            ));
+            backward.push(nearestTip(
+                this.halfways[i], backwardDir[i],
+                [this.halfways[k], forwardDir[k]],
+                [
+                    [this.halfways[k], backwardDir[k]],
+                    [this.halfways[j], forwardDir[j]],
+                    [this.halfways[j], backwardDir[j]],
+                ],
             ));
         }
-        return tips;
+        return { forward, backward };
     }
 
     showIslamicFilled = (ctx, opacity: number = 0.80, customColor: number | null = null) => {
@@ -251,15 +303,17 @@ export class Polygon {
         if (get(islamicAnimate)) {
             angle = islamicAnglesForHalfways(ctx, this.halfways);
         }
-        const tips = this.calculateIslamicTips(angle);
+        const { forward, backward } = this.calculateIslamicTips(angle);
+        const n = this.halfways.length;
 
         ctx.push();
         ctx.noStroke();
         ctx.fill(customColor ?? this.hue, 40, 100 / opacity, 0.80 * opacity);
         ctx.beginShape();
-        for (let i = 0; i < this.halfways.length; i++) {
+        for (let i = 0; i < n; i++) {
             ctx.vertex(this.halfways[i].x, this.halfways[i].y);
-            ctx.vertex(tips[i].x, tips[i].y);
+            ctx.vertex(forward[i].x, forward[i].y);
+            ctx.vertex(backward[(i + 1) % n].x, backward[(i + 1) % n].y);
         }
         ctx.endShape(ctx.CLOSE);
         ctx.pop();
@@ -267,12 +321,10 @@ export class Polygon {
         ctx.noFill();
         ctx.strokeWeight(get(lineWidth) / get(controls).zoom);
         ctx.stroke(0, 0, 0);
-        for (let i = 0; i < this.halfways.length; i++) {
+        for (let i = 0; i < n; i++) {
             const h = this.halfways[i];
-            const tipA = tips[i];
-            const tipB = tips[(i - 1 + this.halfways.length) % this.halfways.length];
-            ctx.line(h.x, h.y, tipA.x, tipA.y);
-            ctx.line(h.x, h.y, tipB.x, tipB.y);
+            ctx.line(h.x, h.y, forward[i].x, forward[i].y);
+            ctx.line(h.x, h.y, backward[i].x, backward[i].y);
         }
     }
 

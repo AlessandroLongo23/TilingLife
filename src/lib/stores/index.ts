@@ -10,3 +10,4 @@ export * from "./gameOfLifeRules";
 export * from "./tilingStore.svelte";
 export * from "./algorithm.svelte";
 export * from "./pipelineProgress.svelte";
+export * from "./uiVisibility";

@@ -77,8 +77,8 @@ export class Tiling {
         const animate = get(islamicAnimate);
         const baseAngle = get(islamicAngle) * Math.PI / 180;
 
-        const tipsCache = new Map<Polygon, Vector[]>();
-        const getTips = (tile: Polygon): Vector[] => {
+        const tipsCache = new Map<Polygon, { forward: Vector[]; backward: Vector[] }>();
+        const getTips = (tile: Polygon): { forward: Vector[]; backward: Vector[] } => {
             let t = tipsCache.get(tile);
             if (!t) {
                 let angle: number | number[] = baseAngle;
@@ -132,18 +132,25 @@ export class Tiling {
             if (!interiorOk) continue;
             if (Math.abs(interiorSum - 2 * Math.PI) > 1e-3) continue;
 
-            type Arms = { ccwArm: Vector; cwArm: Vector; tip: Vector };
+            type Arms = { cwArm: Vector; tipCW: Vector; tipCCW: Vector; ccwArm: Vector };
             const armsOf = (c: Corner): Arms => {
                 const n = c.tile.halfways.length;
-                const hPrev = c.tile.halfways[(c.cornerIdx - 1 + n) % n];
-                const hNext = c.tile.halfways[c.cornerIdx];
-                const tip = getTips(c.tile)[(c.cornerIdx - 1 + n) % n];
+                const prevIdx = (c.cornerIdx - 1 + n) % n;
+                const nextIdx = c.cornerIdx;
+                const hPrev = c.tile.halfways[prevIdx];
+                const hNext = c.tile.halfways[nextIdx];
+                const tips = getTips(c.tile);
+                // halfway[prevIdx]'s forward ray heads toward V; halfway[nextIdx]'s backward ray heads toward V.
+                const tipOfPrev = tips.forward[prevIdx];
+                const tipOfNext = tips.backward[nextIdx];
                 const tc = c.tile.centroid;
                 const tcx = tc.x - V.x, tcy = tc.y - V.y;
                 const px = hPrev.x - V.x, py = hPrev.y - V.y;
                 const crossPrev = tcx * py - tcy * px;
-                if (crossPrev > 0) return { ccwArm: hPrev, cwArm: hNext, tip };
-                return { ccwArm: hNext, cwArm: hPrev, tip };
+                if (crossPrev > 0) {
+                    return { cwArm: hNext, tipCW: tipOfNext, tipCCW: tipOfPrev, ccwArm: hPrev };
+                }
+                return { cwArm: hPrev, tipCW: tipOfPrev, tipCCW: tipOfNext, ccwArm: hNext };
             };
 
             const armsArr = ordered.map(armsOf);
@@ -153,7 +160,8 @@ export class Tiling {
             ctx.beginShape();
             for (let i = 0; i < ordered.length; i++) {
                 ctx.vertex(armsArr[i].cwArm.x, armsArr[i].cwArm.y);
-                ctx.vertex(armsArr[i].tip.x, armsArr[i].tip.y);
+                ctx.vertex(armsArr[i].tipCW.x, armsArr[i].tipCW.y);
+                ctx.vertex(armsArr[i].tipCCW.x, armsArr[i].tipCCW.y);
             }
             ctx.endShape(ctx.CLOSE);
         }
